@@ -567,6 +567,7 @@ const TacticalRPG = () => {
         { name: 'Dagger Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A quick dagger strike.' },
         { name: 'Sneak Attack', mpCost: 6, power: 1.6, range: 1, type: 'physical', targetType: 'enemy', accuracy: 85, level: 1, description: 'Strike from behind for bonus damage.' },
         { name: 'Poison Strike', mpCost: 8, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'poison', accuracy: 80, level: 2, description: 'Venomous attack. May poison.' },
+        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'tree_hide', accuracy: 100, level: 2, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
         { name: 'Feint', mpCost: 5, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 3, description: 'Fake attack that lowers enemy DEF.' },
         { name: 'Throw Sand', mpCost: 4, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'blind', accuracy: 75, level: 4, description: 'Blind enemy with dirt.' },
         { name: 'Coup de Grace', mpCost: 15, power: 2.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 75, level: 5, description: 'Deadly finishing blow.' }
@@ -685,6 +686,7 @@ const TacticalRPG = () => {
         { name: 'Armor Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 2, description: 'Reduce enemy DEF.' },
         { name: 'Magic Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'mag_down', accuracy: 90, level: 2, description: 'Reduce enemy MAG.' },
         { name: 'Speed Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'spd_down', accuracy: 90, level: 3, description: 'Reduce enemy SPD.' },
+        { name: 'Rock Push', mpCost: 8, power: 0, range: 1, type: 'support', targetType: 'rock', accuracy: 100, level: 3, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
         { name: 'Full Break', mpCost: 15, power: 1.2, range: 1, type: 'physical', targetType: 'enemy', effect: 'full_break', accuracy: 75, level: 4, description: 'Reduce all enemy stats.' },
         { name: 'Rend Weapon', mpCost: 12, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', effect: 'disarm', accuracy: 70, level: 5, description: 'Destroy enemy weapon.' }
       ],
@@ -2923,9 +2925,10 @@ const TacticalRPG = () => {
           </div>
         )}
         {gamePhase === 'rewards' && (
-          <div className="mt-4 p-6 bg-purple-900 border-2 border-purple-500 rounded-lg">
-            <div className="text-center mb-4">
-              <div className="text-3xl font-bold text-yellow-400 mb-2">Wave {waveNumber} Complete!</div>
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div className="p-8 bg-purple-900 border-4 border-purple-500 rounded-lg shadow-2xl max-w-md w-full">
+              <div className="text-center mb-4">
+                <div className="text-3xl font-bold text-yellow-400 mb-2">Wave {waveNumber} Complete!</div>
               <div className="text-xl text-purple-100 mb-4">
                 <div>Gil Earned: <span className="text-yellow-400 font-bold">+{waveRewards.gil}</span></div>
                 <div>EXP Earned: <span className="text-green-400 font-bold">+{waveRewards.exp}</span></div>
@@ -2961,6 +2964,7 @@ const TacticalRPG = () => {
                 className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
                 End Run
               </button>
+            </div>
             </div>
           </div>
         )}
@@ -3018,6 +3022,31 @@ const TacticalRPG = () => {
                     <div>MAG: {unit.mag}</div>
                     <div>SPD: {unit.spd}</div>
                   </div>
+
+                  {unit.level < 10 && (
+                    <div className="mt-3 pt-3 border-t border-gray-700">
+                      <div className="text-xs font-bold text-green-400 mb-1">Next Level Gains:</div>
+                      <div className="grid grid-cols-3 gap-2 text-xs text-green-300">
+                        {jobData[unit.job].statGrowth.hp > 0 && <div>HP +{jobData[unit.job].statGrowth.hp}</div>}
+                        {jobData[unit.job].statGrowth.mp > 0 && <div>MP +{jobData[unit.job].statGrowth.mp}</div>}
+                        {jobData[unit.job].statGrowth.atk > 0 && <div>ATK +{jobData[unit.job].statGrowth.atk}</div>}
+                        {jobData[unit.job].statGrowth.def > 0 && <div>DEF +{jobData[unit.job].statGrowth.def}</div>}
+                        {jobData[unit.job].statGrowth.mag > 0 && <div>MAG +{jobData[unit.job].statGrowth.mag}</div>}
+                        {jobData[unit.job].statGrowth.spd > 0 && <div>SPD +{jobData[unit.job].statGrowth.spd}</div>}
+                      </div>
+                      {(() => {
+                        const nextSkills = jobData[unit.job].skills.filter(s => s.level === unit.level + 1);
+                        return nextSkills.length > 0 && (
+                          <div className="mt-2">
+                            <div className="text-xs font-bold text-yellow-400">Unlocks:</div>
+                            {nextSkills.map(skill => (
+                              <div key={skill.name} className="text-xs text-yellow-300">• {skill.name}</div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -3328,11 +3357,11 @@ const TacticalRPG = () => {
             
             <div className="mt-4">
               <div className="font-bold mb-2">Skills:</div>
-              {jobData[selectedUnit.job].skills.map(skill => (
+              {jobData[selectedUnit.job].skills.filter(skill => skill.level <= selectedUnit.level).map(skill => (
                 <button
                   key={skill.name}
                   onClick={() => handleSkillClick(skill)}
-                  disabled={selectedUnit.mp < skill.mpCost || selectedUnit.hasActed}
+                  disabled={selectedUnit.mp < skill.mpCost || selectedUnit.hasActed || skill.level > selectedUnit.level}
                   className={`w-full text-left p-2 mb-2 rounded ${
                     selectedSkill?.name === skill.name 
                       ? 'bg-yellow-600' 
