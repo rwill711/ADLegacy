@@ -134,6 +134,7 @@ const levelTemplateInfo = {
 
 // Team Selection Screen Component
 const TeamSelectionScreen = ({ onStartGame }) => {
+  const [gameMode, setGameMode] = useState('normal'); // 'normal' or 'endless'
   const [playerTeam, setPlayerTeam] = useState([
     { id: 1, name: 'Arthur', job: 'knight', level: 1 },
     { id: 2, name: 'Merlin', job: 'mage', level: 1 },
@@ -156,8 +157,9 @@ const TeamSelectionScreen = ({ onStartGame }) => {
     const names = team === 'player' ? playerNames : enemyNames;
     const currentTeam = team === 'player' ? playerTeam : enemyTeam;
     const setTeam = team === 'player' ? setPlayerTeam : setEnemyTeam;
-    
-    if (currentTeam.length >= 6) return;
+
+    const maxUnits = (team === 'player' && gameMode === 'endless') ? 3 : 6;
+    if (currentTeam.length >= maxUnits) return;
     
     const usedNames = currentTeam.map(u => u.name);
     const availableNames = names.filter(n => !usedNames.includes(n));
@@ -195,11 +197,30 @@ const TeamSelectionScreen = ({ onStartGame }) => {
   };
 
   const handleStartGame = () => {
-    if (playerTeam.length === 0 || enemyTeam.length === 0) {
-      alert('Both teams need at least one unit!');
-      return;
+    if (gameMode === 'endless') {
+      // Endless mode validation
+      if (playerTeam.length === 0 || playerTeam.length > 3) {
+        alert('Endless mode requires 1-3 units!');
+        return;
+      }
+      // Check that all units are level 1 and base jobs
+      const allValid = playerTeam.every(u => {
+        const jobInfo = jobDataStatic[u.job];
+        return u.level === 1 && jobInfo && jobInfo.tier === 1;
+      });
+      if (!allValid) {
+        alert('Endless mode requires all units to be level 1 with base jobs (Knight, Rogue, Archer, or Mage)!');
+        return;
+      }
+      onStartGame(playerTeam, null, selectedLevel, gameMode);
+    } else {
+      // Normal mode validation
+      if (playerTeam.length === 0 || enemyTeam.length === 0) {
+        alert('Both teams need at least one unit!');
+        return;
+      }
+      onStartGame(playerTeam, enemyTeam, selectedLevel, gameMode);
     }
-    onStartGame(playerTeam, enemyTeam, selectedLevel);
   };
 
   const renderJobCard = (jobKey, jobInfo) => {
@@ -249,19 +270,38 @@ const TeamSelectionScreen = ({ onStartGame }) => {
         
         <div className="mb-2">
           <label className="text-xs text-gray-400 block mb-1">Job:</label>
-          <select value={unit.job} onChange={(e) => updateUnit(team, unit.id, 'job', e.target.value)} className="bg-gray-600 text-white px-2 py-1 rounded text-sm w-full">
-            <optgroup label="Base Jobs">
-              {baseJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
-            </optgroup>
-            <optgroup label="Advanced Jobs">
-              {advancedJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
-            </optgroup>
+          <select
+            value={unit.job}
+            onChange={(e) => updateUnit(team, unit.id, 'job', e.target.value)}
+            className="bg-gray-600 text-white px-2 py-1 rounded text-sm w-full"
+            disabled={gameMode === 'endless' && team === 'player'}>
+            {gameMode === 'endless' && team === 'player' ? (
+              <optgroup label="Base Jobs (Endless Mode)">
+                {baseJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
+              </optgroup>
+            ) : (
+              <>
+                <optgroup label="Base Jobs">
+                  {baseJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
+                </optgroup>
+                <optgroup label="Advanced Jobs">
+                  {advancedJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
+                </optgroup>
+              </>
+            )}
           </select>
         </div>
-        
+
         <div className="mb-2">
-          <label className="text-xs text-gray-400 block mb-1">Level (1-10):</label>
-          <input type="number" min="1" max="10" value={unit.level} onChange={(e) => updateUnit(team, unit.id, 'level', e.target.value)} className="bg-gray-600 text-white px-2 py-1 rounded text-sm w-20" />
+          <label className="text-xs text-gray-400 block mb-1">Level {gameMode === 'endless' && team === 'player' ? '(Fixed at 1)' : '(1-10)'}:</label>
+          <input
+            type="number"
+            min="1"
+            max="10"
+            value={gameMode === 'endless' && team === 'player' ? 1 : unit.level}
+            onChange={(e) => updateUnit(team, unit.id, 'level', e.target.value)}
+            className="bg-gray-600 text-white px-2 py-1 rounded text-sm w-20"
+            disabled={gameMode === 'endless' && team === 'player'} />
         </div>
         
         <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-800 rounded">
@@ -283,15 +323,44 @@ const TeamSelectionScreen = ({ onStartGame }) => {
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold text-center text-white mb-2">Tactical RPG</h1>
-        <h2 className="text-xl text-center text-yellow-400 mb-8">Team Selection</h2>
-        
+        <h2 className="text-xl text-center text-yellow-400 mb-4">Team Selection</h2>
+
+        {/* Game Mode Selection */}
+        <div className="flex justify-center gap-4 mb-6">
+          <button
+            onClick={() => setGameMode('normal')}
+            className={`px-6 py-3 rounded-lg font-bold transition-colors ${gameMode === 'normal' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Normal Mode
+          </button>
+          <button
+            onClick={() => setGameMode('endless')}
+            className={`px-6 py-3 rounded-lg font-bold transition-colors ${gameMode === 'endless' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Endless Mode
+          </button>
+        </div>
+
+        {gameMode === 'endless' && (
+          <div className="bg-purple-900 border-2 border-purple-500 rounded-lg p-4 mb-6 text-center">
+            <h3 className="text-xl font-bold text-purple-200 mb-2">Endless Mode Rules</h3>
+            <p className="text-purple-100 text-sm">
+              • Start with 1-3 units at level 1 (base jobs only)<br/>
+              • Face waves of increasingly difficult enemies<br/>
+              • Earn Gil and EXP after each wave<br/>
+              • Spend EXP to level up and Gil to buy equipment<br/>
+              • Survive as long as you can!
+            </p>
+          </div>
+        )}
+
         <div className="flex justify-center gap-4 mb-6">
           <button onClick={() => setSelectedTab('player')} className={`px-6 py-3 rounded-lg font-bold transition-colors ${selectedTab === 'player' ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
-            Your Team ({playerTeam.length}/6)
+            Your Team ({playerTeam.length}/{gameMode === 'endless' ? '3' : '6'})
           </button>
-          <button onClick={() => setSelectedTab('enemy')} className={`px-6 py-3 rounded-lg font-bold transition-colors ${selectedTab === 'enemy' ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
-            Enemy Team ({enemyTeam.length}/6)
-          </button>
+          {gameMode === 'normal' && (
+            <button onClick={() => setSelectedTab('enemy')} className={`px-6 py-3 rounded-lg font-bold transition-colors ${selectedTab === 'enemy' ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+              Enemy Team ({enemyTeam.length}/6)
+            </button>
+          )}
           <button onClick={() => setSelectedTab('level')} className={`px-6 py-3 rounded-lg font-bold transition-colors ${selectedTab === 'level' ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
             Battlefield
           </button>
@@ -400,6 +469,13 @@ const TacticalRPG = () => {
   const logRef = useRef(null);
   const aiProcessingRef = useRef(false);
   const currentTurnIndexRef = useRef(0);
+
+  // Endless Mode State
+  const [gameMode, setGameMode] = useState('normal');
+  const [waveNumber, setWaveNumber] = useState(1);
+  const [gil, setGil] = useState(0);
+  const [inventory, setInventory] = useState([]); // Equipment owned by player
+  const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0 }); // Rewards from last wave
   
   const gameState = useRef({
     grid: { cols: 15, rows: 15, tileSize: 50 },
@@ -845,6 +921,21 @@ const TacticalRPG = () => {
     return all;
   };
 
+  // Calculate equipment price based on stats
+  const getEquipmentPrice = (item) => {
+    if (!item.stats) return 100;
+    let price = 0;
+    Object.entries(item.stats).forEach(([stat, value]) => {
+      if (stat === 'hp') price += value * 5;
+      else if (stat === 'mp') price += value * 3;
+      else if (stat === 'atk') price += value * 20;
+      else if (stat === 'def') price += value * 20;
+      else if (stat === 'mag') price += value * 20;
+      else if (stat === 'spd') price += value * 15;
+    });
+    return Math.max(100, price);
+  };
+
   // Calculate total stats including equipment bonuses
   const calculateTotalStats = (unit) => {
     const allEquip = getAllEquipment();
@@ -964,14 +1055,96 @@ const TacticalRPG = () => {
     };
   };
 
+  // Continue to next wave in endless mode
+  const continueToNextWave = (newWaveNumber) => {
+    // Get current player units (alive ones)
+    const playerUnits = gameState.current.units.filter(u => u.team === 'player' && u.hp > 0);
+
+    // Heal players to full HP/MP for next wave
+    playerUnits.forEach(unit => {
+      unit.hp = unit.maxHp;
+      unit.mp = unit.maxMp;
+      unit.hasActed = false;
+      unit.hasMoved = false;
+      unit.effects = [];
+    });
+
+    // Generate new enemies for the new wave
+    const enemyUnits = generateEndlessEnemies(newWaveNumber, playerUnits.length);
+
+    // Reset positions for new battle
+    playerUnits.forEach((unit, index) => {
+      const spacing = Math.floor(gameState.current.grid.cols / (playerUnits.length + 1));
+      unit.x = spacing * (index + 1);
+      unit.y = gameState.current.grid.rows - 2;
+      unit.previousX = unit.x;
+      unit.previousY = unit.y;
+    });
+
+    // Update game state
+    gameState.current.units = [...playerUnits, ...enemyUnits];
+    gameState.current.defeatedUnits = [];
+    terrainStateRef.current = {};
+
+    // Start new battle
+    setGamePhase('player');
+    setTurnNumber(1);
+    setMessage(`Wave ${newWaveNumber} begins! Select a unit to move.`);
+    setMessageLog([{ text: `Wave ${newWaveNumber} begins!`, turn: 1, isEnemy: false }]);
+  };
+
+  // Generate enemies for endless mode based on wave number
+  const generateEndlessEnemies = (wave, playerCount) => {
+    const enemyNames = ['Goblin', 'Orc', 'Troll', 'Dark Mage', 'Shadow Knight', 'Skeleton', 'Wraith', 'Demon', 'Lich', 'Dragon', 'Imp', 'Ogre', 'Bandit', 'Assassin', 'Necromancer'];
+    const baseJobs = ['knight', 'rogue', 'archer', 'mage'];
+    const advancedJobs = ['paladin', 'darkKnight', 'warrior', 'dragoon', 'thief', 'assassin', 'ninja', 'sniper', 'ranger', 'whiteMage', 'blackMage', 'timeMage'];
+
+    // Calculate enemy count (starts equal, adds 1 every 3 waves, max 6)
+    const baseCount = playerCount;
+    const bonusCount = Math.floor((wave - 1) / 3);
+    const enemyCount = Math.min(baseCount + bonusCount, 6);
+
+    // Calculate enemy level (wave number, capped at 10)
+    const enemyLevel = Math.min(wave, 10);
+
+    // Determine job pool (advanced jobs start appearing at wave 3)
+    const jobPool = wave >= 3
+      ? [...baseJobs, ...advancedJobs.slice(0, Math.min((wave - 2) * 2, advancedJobs.length))]
+      : baseJobs;
+
+    // Generate enemy team
+    const enemies = [];
+    for (let i = 0; i < enemyCount; i++) {
+      const job = jobPool[Math.floor(Math.random() * jobPool.length)];
+      const name = enemyNames[i % enemyNames.length];
+      enemies.push({
+        id: 100 + i,
+        name: `${name}`,
+        job: job,
+        level: enemyLevel
+      });
+    }
+
+    return enemies.map((data, index) => createUnit(data, 'enemy', index, enemies.length));
+  };
+
   // Start game with selected teams
-  const handleStartGame = (playerTeam, enemyTeam, levelTemplate = 'random') => {
-    const playerUnits = playerTeam.map((data, index) => 
+  const handleStartGame = (playerTeam, enemyTeam, levelTemplate = 'random', mode = 'normal') => {
+    setGameMode(mode);
+
+    const playerUnits = playerTeam.map((data, index) =>
       createUnit(data, 'player', index, playerTeam.length)
     );
-    const enemyUnits = enemyTeam.map((data, index) => 
-      createUnit(data, 'enemy', index, enemyTeam.length)
-    );
+
+    let enemyUnits;
+    if (mode === 'endless') {
+      // Generate enemies for endless mode
+      enemyUnits = generateEndlessEnemies(waveNumber, playerTeam.length);
+    } else {
+      enemyUnits = enemyTeam.map((data, index) =>
+        createUnit(data, 'enemy', index, enemyTeam.length)
+      );
+    }
 
     gameState.current.units = [...playerUnits, ...enemyUnits];
     gameState.current.terrain = generateTerrain(levelTemplate);
@@ -985,10 +1158,11 @@ const TacticalRPG = () => {
     });
 
     const templateName = levelTemplates[levelTemplate]?.name || 'Random Battlefield';
+    const waveTxt = mode === 'endless' ? ` Wave ${waveNumber}!` : '';
     setGamePhase('player');
     setTurnNumber(1);
-    setMessage(`Battle begins on ${templateName}! Select a unit to move.`);
-    setMessageLog([{ text: `Battle begins on ${templateName}!`, turn: 1, isEnemy: false }]);
+    setMessage(`Battle begins on ${templateName}!${waveTxt} Select a unit to move.`);
+    setMessageLog([{ text: `Battle begins on ${templateName}!${waveTxt}`, turn: 1, isEnemy: false }]);
   };
 
   // Initialize unit stats on first render - no longer needed as units are created dynamically
@@ -2246,7 +2420,28 @@ const TacticalRPG = () => {
           
           const aliveEnemies = gs.units.filter(u => u.team === 'enemy' && u.hp > 0);
           if (aliveEnemies.length === 0) {
-            setGamePhase('victory');
+            if (gameMode === 'endless') {
+              // Calculate rewards for endless mode
+              const defeatedEnemies = gs.units.filter(u => u.team === 'enemy');
+              const gilEarned = defeatedEnemies.reduce((sum, enemy) => {
+                return sum + (50 * enemy.level * waveNumber);
+              }, 0);
+              const expEarned = defeatedEnemies.reduce((sum, enemy) => {
+                return sum + (30 * enemy.level);
+              }, 0);
+
+              setWaveRewards({ gil: gilEarned, exp: expEarned });
+              setGil(prev => prev + gilEarned);
+
+              // Give EXP to all surviving player units
+              gs.units.filter(u => u.team === 'player' && u.hp > 0).forEach(unit => {
+                unit.exp += expEarned;
+              });
+
+              setGamePhase('rewards');
+            } else {
+              setGamePhase('victory');
+            }
             return;
           }
           
@@ -2675,12 +2870,259 @@ const TacticalRPG = () => {
             )}
           </div>
         )}
+        {gamePhase === 'rewards' && (
+          <div className="mt-4 p-6 bg-purple-900 border-2 border-purple-500 rounded-lg">
+            <div className="text-center mb-4">
+              <div className="text-3xl font-bold text-yellow-400 mb-2">Wave {waveNumber} Complete!</div>
+              <div className="text-xl text-purple-100 mb-4">
+                <div>Gil Earned: <span className="text-yellow-400 font-bold">+{waveRewards.gil}</span></div>
+                <div>EXP Earned: <span className="text-green-400 font-bold">+{waveRewards.exp}</span></div>
+              </div>
+              <div className="text-lg text-purple-200 mb-4">
+                <div>Total Gil: <span className="text-yellow-300 font-bold">{gil}</span></div>
+                <div>Current Wave: <span className="text-cyan-300 font-bold">{waveNumber}</span></div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => setGamePhase('levelup')}
+                className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors">
+                Level Up Units
+              </button>
+              <button
+                onClick={() => setGamePhase('shop')}
+                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                Visit Shop (Gil: {gil})
+              </button>
+              <button
+                onClick={() => {
+                  const nextWave = waveNumber + 1;
+                  setWaveNumber(nextWave);
+                  continueToNextWave(nextWave);
+                }}
+                className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-colors">
+                Continue to Wave {waveNumber + 1}
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
+                End Run
+              </button>
+            </div>
+          </div>
+        )}
+        {gamePhase === 'levelup' && (
+          <div className="mt-4 p-6 bg-green-900 border-2 border-green-500 rounded-lg max-h-96 overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-2xl font-bold text-green-300 mb-2">Level Up Units</div>
+              <div className="text-sm text-green-200">Cost: Level × 100 EXP</div>
+            </div>
+
+            {gameState.current.units.filter(u => u.team === 'player' && u.hp > 0).map(unit => {
+              const expNeeded = unit.level * 100;
+              const canLevelUp = unit.exp >= expNeeded && unit.level < 10;
+
+              return (
+                <div key={unit.id} className="mb-4 p-4 bg-gray-800 rounded-lg border-2" style={{ borderColor: jobData[unit.job]?.color || '#666' }}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="text-lg font-bold text-white">{unit.name}</div>
+                      <div className="text-sm text-gray-300">
+                        {unit.job.charAt(0).toUpperCase() + unit.job.slice(1)} - Level {unit.level}
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        EXP: {unit.exp}/{expNeeded} {unit.level >= 10 && '(MAX)'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (canLevelUp) {
+                          unit.exp -= expNeeded;
+                          unit.level += 1;
+                          recalculateUnitStats(unit);
+                          unit.hp = unit.maxHp;
+                          unit.mp = unit.maxMp;
+                          setMessage(`${unit.name} leveled up to ${unit.level}!`);
+                          // Force re-render
+                          setGamePhase('levelup');
+                        }
+                      }}
+                      disabled={!canLevelUp}
+                      className={`px-4 py-2 rounded font-bold transition-colors ${
+                        canLevelUp
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      }`}>
+                      {unit.level >= 10 ? 'MAX' : canLevelUp ? 'Level Up!' : 'Need EXP'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-300">
+                    <div>HP: {unit.maxHp}</div>
+                    <div>MP: {unit.maxMp}</div>
+                    <div>ATK: {unit.atk}</div>
+                    <div>DEF: {unit.def}</div>
+                    <div>MAG: {unit.mag}</div>
+                    <div>SPD: {unit.spd}</div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => setGamePhase('rewards')}
+              className="w-full mt-4 px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
+              Back to Rewards
+            </button>
+          </div>
+        )}
+        {gamePhase === 'shop' && (
+          <div className="mt-4 p-6 bg-blue-900 border-2 border-blue-500 rounded-lg max-h-96 overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-2xl font-bold text-blue-300 mb-2">Equipment Shop</div>
+              <div className="text-lg text-yellow-300">Gil: {gil}</div>
+            </div>
+
+            {Object.entries(equipmentData).map(([categoryName, category]) => (
+              <div key={categoryName} className="mb-6">
+                <h3 className="text-xl font-bold text-blue-200 mb-3 capitalize">{categoryName}</h3>
+                <div className="grid gap-2">
+                  {Object.entries(category).map(([itemKey, item]) => {
+                    const price = getEquipmentPrice(item);
+                    const owned = inventory.includes(itemKey);
+                    const canAfford = gil >= price;
+
+                    return (
+                      <div key={itemKey} className="p-3 bg-gray-800 rounded border-2 border-gray-600">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <div className="font-bold text-white">
+                              {item.name}
+                              {owned && <span className="ml-2 text-xs bg-green-600 px-2 py-1 rounded">OWNED</span>}
+                            </div>
+                            <div className="text-xs text-gray-400 mb-1">
+                              {item.jobs ? `Jobs: ${item.jobs.join(', ')}` : 'All Jobs'}
+                            </div>
+                            <div className="text-sm text-gray-300">
+                              {Object.entries(item.stats || {}).map(([stat, val]) => (
+                                <span key={stat} className="mr-2">
+                                  {stat.toUpperCase()}: {val > 0 ? '+' : ''}{val}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-yellow-400 mb-1">{price}G</div>
+                            <button
+                              onClick={() => {
+                                if (!owned && canAfford) {
+                                  setGil(prev => prev - price);
+                                  setInventory(prev => [...prev, itemKey]);
+                                  setMessage(`Purchased ${item.name}!`);
+                                }
+                              }}
+                              disabled={owned || !canAfford}
+                              className={`px-3 py-1 rounded text-sm font-bold ${
+                                owned
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                  : canAfford
+                                  ? 'bg-green-600 text-white hover:bg-green-700'
+                                  : 'bg-red-900 text-red-400 cursor-not-allowed'
+                              }`}>
+                              {owned ? 'Owned' : canAfford ? 'Buy' : 'Too Expensive'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={() => setGamePhase('equip')}
+              className="w-full mb-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-colors">
+              Manage Equipment
+            </button>
+            <button
+              onClick={() => setGamePhase('rewards')}
+              className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
+              Back to Rewards
+            </button>
+          </div>
+        )}
+        {gamePhase === 'equip' && (
+          <div className="mt-4 p-6 bg-purple-900 border-2 border-purple-500 rounded-lg max-h-96 overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-2xl font-bold text-purple-300 mb-2">Manage Equipment</div>
+            </div>
+
+            {gameState.current.units.filter(u => u.team === 'player' && u.hp > 0).map(unit => {
+              const allEquip = getAllEquipment();
+              const availableEquip = inventory.filter(itemKey => {
+                const item = allEquip[itemKey];
+                if (!item) return false;
+                if (!item.jobs) return true; // Accessories work for all
+                return item.jobs.includes(unit.job);
+              });
+
+              return (
+                <div key={unit.id} className="mb-4 p-4 bg-gray-800 rounded-lg border-2" style={{ borderColor: jobData[unit.job]?.color || '#666' }}>
+                  <div className="text-lg font-bold text-white mb-2">{unit.name} - {unit.job}</div>
+
+                  {['mainHand', 'offHand', 'armor', 'helmet'].map(slot => {
+                    const currentItem = unit.equipment[slot];
+                    const slotEquip = availableEquip.filter(key => allEquip[key]?.slot === slot);
+
+                    return (
+                      <div key={slot} className="mb-2">
+                        <label className="text-xs text-gray-400 block mb-1 capitalize">
+                          {slot === 'mainHand' ? 'Main Hand' : slot === 'offHand' ? 'Off Hand' : slot}:
+                        </label>
+                        <select
+                          value={currentItem || ''}
+                          onChange={(e) => {
+                            unit.equipment[slot] = e.target.value || null;
+                            recalculateUnitStats(unit);
+                            setGamePhase('equip'); // Force re-render
+                          }}
+                          className="w-full bg-gray-700 text-white px-2 py-1 rounded text-sm">
+                          <option value="">None</option>
+                          {slotEquip.map(key => (
+                            <option key={key} value={key}>{allEquip[key].name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+
+                  <div className="mt-2 text-xs text-gray-300 grid grid-cols-3 gap-1">
+                    <div>HP: {unit.maxHp}</div>
+                    <div>MP: {unit.maxMp}</div>
+                    <div>ATK: {unit.atk}</div>
+                    <div>DEF: {unit.def}</div>
+                    <div>MAG: {unit.mag}</div>
+                    <div>SPD: {unit.spd}</div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => setGamePhase('shop')}
+              className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
+              Back to Shop
+            </button>
+          </div>
+        )}
         {(gamePhase === 'victory' || gamePhase === 'defeat') && (
           <div className="mt-4 text-center">
             <div className="text-3xl font-bold mb-2" style={{color: gamePhase === 'victory' ? '#FFD700' : '#FF0000'}}>
               {gamePhase === 'victory' ? 'Victory!' : 'Defeat!'}
             </div>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
