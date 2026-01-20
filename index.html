@@ -1124,6 +1124,11 @@ const TacticalRPG = () => {
     gameState.current.defeatedUnits = [];
     terrainStateRef.current = {};
 
+    // Give players guaranteed first turn in new wave by boosting their initiative
+    playerUnits.forEach(unit => {
+      unit.newWaveBonus = true;
+    });
+
     // Start new battle
     setGamePhase('player');
     setTurnNumber(1);
@@ -1722,10 +1727,17 @@ const TacticalRPG = () => {
     
     const aliveUnits = gameState.current.units.filter(u => u.hp > 0);
     // Roll d20 + speed for initiative
-    const withInitiative = aliveUnits.map(u => ({
-      unit: u,
-      initiative: Math.floor(Math.random() * 20) + 1 + u.spd + (u.effects.includes('slow') ? -3 : 0)
-    }));
+    const withInitiative = aliveUnits.map(u => {
+      const newWaveBonus = u.newWaveBonus ? 100 : 0;
+      // Clear the bonus flag after applying it
+      if (u.newWaveBonus) {
+        u.newWaveBonus = false;
+      }
+      return {
+        unit: u,
+        initiative: Math.floor(Math.random() * 20) + 1 + u.spd + (u.effects.includes('slow') ? -3 : 0) + newWaveBonus
+      };
+    });
     const sorted = withInitiative.sort((a, b) => b.initiative - a.initiative).map(i => i.unit);
     
     // Log the initiative rolls
