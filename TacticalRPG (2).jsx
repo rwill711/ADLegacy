@@ -24,8 +24,15 @@ const jobDataStatic = {
     description: 'A skilled marksman who strikes from a distance.',
     baseStats: { hp: 34, mp: 12, atk: 7, def: 4, mag: 3, spd: 6 },
   },
-  mage: { 
-    color: '#9370DB', 
+  whiteMage: {
+    color: '#F0F8FF',
+    tier: 1,
+    armorClass: 'light',
+    description: 'A healer devoted to restoring allies.',
+    baseStats: { hp: 30, mp: 28, atk: 2, def: 4, mag: 10, spd: 4 },
+  },
+  darkMage: {
+    color: '#9370DB',
     tier: 1,
     armorClass: 'light',
     description: 'A wielder of destructive elemental magic.',
@@ -98,21 +105,7 @@ const jobDataStatic = {
     description: 'A wilderness expert who uses nature and traps.',
     baseStats: { hp: 38, mp: 16, atk: 8, def: 5, mag: 5, spd: 7 },
   },
-  // MAGES
-  whiteMage: {
-    color: '#FFFFFF',
-    tier: 2,
-    armorClass: 'light',
-    description: 'A healer devoted to restoring and protecting allies.',
-    baseStats: { hp: 30, mp: 40, atk: 2, def: 4, mag: 10, spd: 4 },
-  },
-  blackMage: {
-    color: '#4B0082',
-    tier: 2,
-    armorClass: 'light',
-    description: 'A master of destructive elemental magic.',
-    baseStats: { hp: 25, mp: 45, atk: 2, def: 2, mag: 14, spd: 4 },
-  },
+  // MAGES (Tier 2 versions removed - now use tier 1 whiteMage and darkMage as base jobs)
   timeMage: {
     color: '#00CED1',
     tier: 2,
@@ -137,12 +130,12 @@ const TeamSelectionScreen = ({ onStartGame }) => {
   const [gameMode, setGameMode] = useState('normal'); // 'normal' or 'endless'
   const [playerTeam, setPlayerTeam] = useState([
     { id: 1, name: 'Arthur', job: 'knight', level: 1 },
-    { id: 2, name: 'Merlin', job: 'mage', level: 1 },
+    { id: 2, name: 'Merlin', job: 'whiteMage', level: 1 },
     { id: 3, name: 'Phoenix', job: 'archer', level: 1 },
   ]);
   const [enemyTeam, setEnemyTeam] = useState([
     { id: 101, name: 'Goblin', job: 'knight', level: 1 },
-    { id: 102, name: 'Dark Mage', job: 'mage', level: 2 },
+    { id: 102, name: 'Dark Sorcerer', job: 'darkMage', level: 2 },
   ]);
   const [selectedTab, setSelectedTab] = useState('player');
   const [selectedLevel, setSelectedLevel] = useState('random');
@@ -209,7 +202,7 @@ const TeamSelectionScreen = ({ onStartGame }) => {
         return u.level === 1 && jobInfo && jobInfo.tier === 1;
       });
       if (!allValid) {
-        alert('Endless mode requires all units to be level 1 with base jobs (Knight, Rogue, Archer, or Mage)!');
+        alert('Endless mode requires all units to be level 1 with base jobs (Knight, Rogue, Archer, White Mage, or Dark Mage)!');
         return;
       }
       onStartGame(playerTeam, null, selectedLevel, gameMode);
@@ -518,7 +511,7 @@ const TacticalRPG = () => {
       equipment.armor = 'chainMail';
       equipment.helmet = 'ironHelm';
     // Light armor - Mages
-    } else if (['mage', 'whiteMage', 'blackMage', 'timeMage'].includes(job)) {
+    } else if (['whiteMage', 'darkMage', 'blackMage', 'timeMage'].includes(job)) {
       equipment.mainHand = 'woodenStaff';
       equipment.offHand = 'tome';
       equipment.armor = 'clothRobe';
@@ -600,9 +593,28 @@ const TacticalRPG = () => {
       unlocks: { sniper: 4, ranger: 4 }
     },
     
-    // MAGE - Base (unchanged for now)
-    mage: { 
-      color: '#9370DB', 
+    // WHITE MAGE - Base (Healer)
+    whiteMage: {
+      color: '#F0F8FF',
+      tier: 1,
+      armorClass: 'light',
+      description: 'A healer devoted to restoring allies.',
+      baseStats: { hp: 30, mp: 28, atk: 2, def: 4, mag: 10, spd: 4 },
+      skills: [
+        { name: 'Staff Strike', mpCost: 0, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Bonk with staff.' },
+        { name: 'Cure', mpCost: 8, power: 25, range: 4, type: 'heal', targetType: 'ally', accuracy: 100, level: 1, description: 'Restore HP to an ally.' },
+        { name: 'Protect', mpCost: 10, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'buff_def', accuracy: 100, level: 2, description: 'Increase ally DEF.' },
+        { name: 'Esuna', mpCost: 12, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'cleanse', accuracy: 100, level: 3, description: 'Remove status ailments.' },
+        { name: 'Cura', mpCost: 16, power: 50, range: 4, type: 'heal', targetType: 'ally', accuracy: 100, level: 4, description: 'Strong healing.' },
+        { name: 'Raise', mpCost: 24, power: 0.5, range: 2, type: 'revive', targetType: 'ally', accuracy: 100, level: 5, description: 'Revive fallen ally with 50% HP.' }
+      ],
+      statGrowth: { hp: 4, mp: 6, atk: 0, def: 2, mag: 3, spd: 1 },
+      unlocks: { timeMage: 5 }
+    },
+
+    // DARK MAGE - Base (Destructive Magic)
+    darkMage: {
+      color: '#9370DB',
       tier: 1,
       armorClass: 'light',
       description: 'A wielder of destructive elemental magic.',
@@ -616,7 +628,7 @@ const TacticalRPG = () => {
         { name: 'Firaga', mpCost: 20, power: 2.2, range: 5, type: 'magic', targetType: 'enemy', accuracy: 85, level: 5, description: 'Powerful fire magic.' }
       ],
       statGrowth: { hp: 4, mp: 6, atk: 1, def: 1, mag: 4, spd: 2 },
-      unlocks: { whiteMage: 3, blackMage: 3, timeMage: 5 }
+      unlocks: { blackMage: 3, timeMage: 5 }
     },
 
     // ==================== HEAVY ARMOR JOBS ====================
@@ -790,45 +802,9 @@ const TacticalRPG = () => {
     },
 
     // ==================== MAGE JOBS ====================
-    
-    whiteMage: {
-      color: '#FFFFFF',
-      tier: 2,
-      armorClass: 'light',
-      description: 'A healer devoted to restoring and protecting allies.',
-      baseStats: { hp: 30, mp: 40, atk: 2, def: 4, mag: 10, spd: 4 },
-      skills: [
-        { name: 'Staff Strike', mpCost: 0, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Bonk with staff.' },
-        { name: 'Cure', mpCost: 8, power: 30, range: 4, type: 'heal', targetType: 'ally', accuracy: 100, level: 1, description: 'Restore HP.' },
-        { name: 'Esuna', mpCost: 12, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'cleanse', accuracy: 100, level: 2, description: 'Remove status ailments.' },
-        { name: 'Protect', mpCost: 10, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'buff_def', accuracy: 100, level: 2, description: 'Increase DEF.' },
-        { name: 'Cura', mpCost: 18, power: 60, range: 4, type: 'heal', targetType: 'ally', accuracy: 100, level: 3, description: 'Strong healing.' },
-        { name: 'Shell', mpCost: 10, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'shell', accuracy: 100, level: 4, description: 'Increase magic resistance.' },
-        { name: 'Curaga', mpCost: 28, power: 100, range: 4, type: 'heal', targetType: 'ally', accuracy: 100, level: 5, description: 'Powerful healing.' }
-      ],
-      statGrowth: { hp: 4, mp: 7, atk: 0, def: 2, mag: 4, spd: 1 },
-      unlocks: {}
-    },
-    
-    blackMage: {
-      color: '#4B0082',
-      tier: 2,
-      armorClass: 'light',
-      description: 'A master of destructive elemental magic.',
-      baseStats: { hp: 25, mp: 45, atk: 2, def: 2, mag: 14, spd: 4 },
-      skills: [
-        { name: 'Staff Strike', mpCost: 0, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Bonk with staff.' },
-        { name: 'Fira', mpCost: 14, power: 1.8, range: 5, type: 'magic', targetType: 'enemy', accuracy: 90, level: 1, description: 'Strong fire magic.' },
-        { name: 'Blizzara', mpCost: 14, power: 1.8, range: 5, type: 'magic', targetType: 'enemy', effect: 'slow', accuracy: 85, level: 1, description: 'Strong ice magic.' },
-        { name: 'Thundara', mpCost: 16, power: 2.0, range: 6, type: 'magic', targetType: 'enemy', accuracy: 80, level: 2, description: 'Strong lightning.' },
-        { name: 'Drain', mpCost: 14, power: 1.4, range: 4, type: 'magic', targetType: 'enemy', effect: 'drain', accuracy: 85, level: 3, description: 'Steal HP.' },
-        { name: 'Osmose', mpCost: 0, power: 1.0, range: 4, type: 'magic', targetType: 'enemy', effect: 'mp_drain', accuracy: 90, level: 4, description: 'Steal MP.' },
-        { name: 'Flare', mpCost: 30, power: 3.0, range: 5, type: 'magic', targetType: 'enemy', accuracy: 85, level: 5, description: 'Non-elemental devastation.' }
-      ],
-      statGrowth: { hp: 3, mp: 8, atk: 0, def: 1, mag: 5, spd: 1 },
-      unlocks: {}
-    },
-    
+    // Note: whiteMage and darkMage are now tier 1 base jobs (see above)
+    // blackMage was removed to avoid duplication with darkMage
+
     timeMage: {
       color: '#00CED1',
       tier: 2,
@@ -856,8 +832,8 @@ const TacticalRPG = () => {
       ironSword: { name: 'Iron Sword', slot: 'mainHand', type: 'sword', stats: { atk: 5 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
       steelSword: { name: 'Steel Sword', slot: 'mainHand', type: 'sword', stats: { atk: 10 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
       darkBlade: { name: 'Dark Blade', slot: 'mainHand', type: 'sword', stats: { atk: 8, hp: -5 }, jobs: ['darkKnight'] },
-      woodenStaff: { name: 'Wooden Staff', slot: 'mainHand', type: 'staff', stats: { mag: 4, mp: 5 }, jobs: ['mage', 'whiteMage', 'blackMage', 'timeMage'] },
-      oakStaff: { name: 'Oak Staff', slot: 'mainHand', type: 'staff', stats: { mag: 8, mp: 10 }, jobs: ['mage', 'whiteMage', 'blackMage', 'timeMage'] },
+      woodenStaff: { name: 'Wooden Staff', slot: 'mainHand', type: 'staff', stats: { mag: 4, mp: 5 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
+      oakStaff: { name: 'Oak Staff', slot: 'mainHand', type: 'staff', stats: { mag: 8, mp: 10 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
       ironDagger: { name: 'Iron Dagger', slot: 'mainHand', type: 'dagger', stats: { atk: 3, spd: 2 }, jobs: ['rogue', 'assassin', 'ninja', 'thief'] },
       steelDagger: { name: 'Steel Dagger', slot: 'mainHand', type: 'dagger', stats: { atk: 6, spd: 3 }, jobs: ['rogue', 'assassin', 'ninja', 'thief'] },
       katana: { name: 'Katana', slot: 'mainHand', type: 'katana', stats: { atk: 8, spd: 1 }, jobs: ['ninja', 'assassin'] },
@@ -872,13 +848,13 @@ const TacticalRPG = () => {
       woodenShield: { name: 'Wooden Shield', slot: 'offHand', type: 'shield', stats: { def: 3 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
       ironShield: { name: 'Iron Shield', slot: 'offHand', type: 'shield', stats: { def: 6 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
       buckler: { name: 'Buckler', slot: 'offHand', type: 'shield', stats: { def: 2, spd: 1 }, jobs: ['rogue', 'thief'] },
-      tome: { name: 'Tome of Knowledge', slot: 'offHand', type: 'tome', stats: { mag: 3, mp: 5 }, jobs: ['mage', 'whiteMage', 'blackMage', 'timeMage'] },
+      tome: { name: 'Tome of Knowledge', slot: 'offHand', type: 'tome', stats: { mag: 3, mp: 5 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
       secondDagger: { name: 'Parrying Dagger', slot: 'offHand', type: 'dagger', stats: { atk: 2, def: 1 }, jobs: ['rogue', 'assassin', 'ninja', 'thief'] },
       quiver: { name: 'Quiver', slot: 'offHand', type: 'quiver', stats: { atk: 2 }, jobs: ['archer', 'sniper', 'ranger'] },
     },
     // Armor
     armor: {
-      clothRobe: { name: 'Cloth Robe', slot: 'armor', stats: { def: 1, mag: 2 }, jobs: ['mage', 'whiteMage', 'blackMage', 'timeMage'] },
+      clothRobe: { name: 'Cloth Robe', slot: 'armor', stats: { def: 1, mag: 2 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
       leatherArmor: { name: 'Leather Armor', slot: 'armor', stats: { def: 3, spd: 1 }, jobs: ['rogue', 'assassin', 'ninja', 'thief', 'archer', 'sniper', 'ranger'] },
       chainMail: { name: 'Chain Mail', slot: 'armor', stats: { def: 5 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight', 'dragoon'], heavy: true },
       plateArmor: { name: 'Plate Armor', slot: 'armor', stats: { def: 10, spd: -2 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'], heavy: true },
@@ -890,8 +866,8 @@ const TacticalRPG = () => {
     helmets: {
       leatherCap: { name: 'Leather Cap', slot: 'helmet', stats: { def: 1 }, jobs: ['rogue', 'assassin', 'ninja', 'thief', 'archer', 'sniper', 'ranger'] },
       ironHelm: { name: 'Iron Helm', slot: 'helmet', stats: { def: 3 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight', 'dragoon'] },
-      wizardHat: { name: 'Wizard Hat', slot: 'helmet', stats: { mag: 2, mp: 3 }, jobs: ['mage', 'whiteMage', 'blackMage', 'timeMage'] },
-      circlet: { name: 'Silver Circlet', slot: 'helmet', stats: { mag: 3, def: 1 }, jobs: ['mage', 'whiteMage', 'blackMage', 'timeMage'] },
+      wizardHat: { name: 'Wizard Hat', slot: 'helmet', stats: { mag: 2, mp: 3 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
+      circlet: { name: 'Silver Circlet', slot: 'helmet', stats: { mag: 3, def: 1 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
       dragonHelm: { name: 'Dragon Helm', slot: 'helmet', stats: { def: 4, atk: 1 }, jobs: ['dragoon'] },
     },
     // Rings
@@ -1101,7 +1077,7 @@ const TacticalRPG = () => {
   // Generate enemies for endless mode based on wave number
   const generateEndlessEnemies = (wave, playerCount) => {
     const enemyNames = ['Goblin', 'Orc', 'Troll', 'Dark Mage', 'Shadow Knight', 'Skeleton', 'Wraith', 'Demon', 'Lich', 'Dragon', 'Imp', 'Ogre', 'Bandit', 'Assassin', 'Necromancer'];
-    const baseJobs = ['knight', 'rogue', 'archer', 'mage'];
+    const baseJobs = ['knight', 'rogue', 'archer', 'whiteMage', 'darkMage'];
     const advancedJobs = ['paladin', 'darkKnight', 'warrior', 'dragoon', 'thief', 'assassin', 'ninja', 'sniper', 'ranger', 'whiteMage', 'blackMage', 'timeMage'];
 
     // Calculate enemy count (starts equal, adds 1 every 3 waves, max 6)
