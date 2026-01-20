@@ -2044,6 +2044,24 @@ const TacticalRPG = () => {
     return hitChance;
   };
 
+  const calculateDamageEstimate = (attacker, skill) => {
+    if (!skill || skill.type === 'heal' || skill.type === 'support' || skill.type === 'status') {
+      return null; // No damage for non-attack skills
+    }
+
+    const basePower = skill.type === 'magic' ? attacker.mag : attacker.atk;
+    const atkBonus = attacker.effects.includes('buff_atk') ? 5 : 0;
+
+    // Calculate damage against low defense (3) and high defense (15) targets
+    const lowDefense = skill.type === 'magic' ? 3 / 2 : 3;
+    const highDefense = skill.type === 'magic' ? 15 / 2 : 15;
+
+    const minDamage = Math.max(1, Math.floor((basePower + atkBonus) * skill.power - highDefense));
+    const maxDamage = Math.max(1, Math.floor((basePower + atkBonus) * skill.power - lowDefense));
+
+    return { min: minDamage, max: maxDamage };
+  };
+
   const useTerrainSkill = (unit, targetX, targetY, skill) => {
     if (unit.mp < skill.mpCost) return;
     
@@ -3325,7 +3343,14 @@ const TacticalRPG = () => {
                   <div className="font-semibold">{skill.name}</div>
                   <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
                   <div className="text-xs">Base Accuracy: {skill.accuracy}%</div>
-                  <div className="text-xs text-gray-300">{skill.type} - targets any unit</div>
+                  {(() => {
+                    const dmgEst = calculateDamageEstimate(selectedUnit, skill);
+                    return dmgEst ? (
+                      <div className="text-xs text-orange-400">Est. Damage: {dmgEst.min}-{dmgEst.max}</div>
+                    ) : (
+                      <div className="text-xs text-gray-300">{skill.type} - targets any unit</div>
+                    );
+                  })()}
                 </button>
               ))}
               {selectedSkill && (
