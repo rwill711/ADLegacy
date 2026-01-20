@@ -505,7 +505,7 @@ const TacticalRPG = () => {
   const [waveNumber, setWaveNumber] = useState(1);
   const [gil, setGil] = useState(0);
   const [inventory, setInventory] = useState([]); // Equipment owned by player
-  const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0 }); // Rewards from last wave
+  const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0, potions: [] }); // Rewards from last wave
   const [debugMode, setDebugMode] = useState(false); // Debug mode for bug reporting
   const [showDebugPanel, setShowDebugPanel] = useState(false); // Debug panel visibility
 
@@ -1080,10 +1080,12 @@ const TacticalRPG = () => {
     Object.values(equipment).forEach(equipKey => {
       if (equipKey && allEquip[equipKey]) {
         const eq = allEquip[equipKey];
-        equipAtk += eq.atk || 0;
-        equipDef += eq.def || 0;
-        equipMag += eq.mag || 0;
-        equipSpd += eq.spd || 0;
+        // Skip potions (they don't have stats, only effects)
+        if (eq.type === 'potion') return;
+        equipAtk += eq.stats?.atk || 0;
+        equipDef += eq.stats?.def || 0;
+        equipMag += eq.stats?.mag || 0;
+        equipSpd += eq.stats?.spd || 0;
       }
     });
 
@@ -1147,6 +1149,28 @@ const TacticalRPG = () => {
       unit.hasMoved = false;
       unit.effects = [];
     });
+
+    // Distribute potions from wave rewards to player units
+    if (waveRewards.potions && waveRewards.potions.length > 0) {
+      const potionsToDistribute = [...waveRewards.potions];
+      playerUnits.forEach(unit => {
+        while (potionsToDistribute.length > 0) {
+          // Find empty potion slot
+          if (!unit.equipment.potion1) {
+            unit.equipment.potion1 = potionsToDistribute.shift();
+          } else if (!unit.equipment.potion2) {
+            unit.equipment.potion2 = potionsToDistribute.shift();
+          } else if (!unit.equipment.potion3) {
+            unit.equipment.potion3 = potionsToDistribute.shift();
+          } else {
+            break; // All potion slots full for this unit
+          }
+        }
+      });
+      if (potionsToDistribute.length > 0) {
+        addMessage(`Couldn't fit ${potionsToDistribute.length} potions - all slots full!`);
+      }
+    }
 
     // Generate new enemies for the new wave
     const enemyUnits = generateEndlessEnemies(newWaveNumber, playerUnits.length);
@@ -2271,7 +2295,34 @@ const TacticalRPG = () => {
       }
       return range;
     }
-    
+
+    // Handle potion targeting
+    if (skill.type === 'potion') {
+      if (skill.effect === 'revive') {
+        // Target adjacent dead bodies
+        gameState.current.defeatedUnits.forEach(body => {
+          const dist = Math.abs(body.x - unit.x) + Math.abs(body.y - unit.y);
+          if (dist <= 1) {
+            range.push({ x: body.x, y: body.y });
+          }
+        });
+      } else {
+        // Target self
+        range.push({ x: unit.x, y: unit.y });
+
+        // Target adjacent allies
+        gameState.current.units.forEach(ally => {
+          if (ally.team === unit.team && ally.hp > 0) {
+            const dist = Math.abs(ally.x - unit.x) + Math.abs(ally.y - unit.y);
+            if (dist === 1) {
+              range.push({ x: ally.x, y: ally.y });
+            }
+          }
+        });
+      }
+      return range;
+    }
+
     for (let x = 0; x < gameState.current.grid.cols; x++) {
       for (let y = 0; y < gameState.current.grid.rows; y++) {
         const dist = Math.abs(x - unit.x) + Math.abs(y - unit.y);
@@ -2953,7 +3004,43 @@ const TacticalRPG = () => {
 
         const target = gs.units.find(u => u.x === gridX && u.y === gridY);
         if (target) {
-          useSkill(gs.selectedUnit, target, gs.selectedSkill);
+          // Handle potion usage
+          if (gs.selectedSkill.type === 'potion') {
+            const potion = gs.selectedSkill;
+            let targetUnit = target;
+
+            // Check if targeting a dead body for revive
+            if (potion.effect === 'revive') {
+              const deadBody = gs.defeatedUnits.find(b => b.x === gridX && b.y === gridY);
+              if (deadBody) {
+                targetUnit = deadBody.unit;
+                // Revive the unit
+                targetUnit.hp = Math.floor(targetUnit.maxHp * potion.power);
+                targetUnit.x = deadBody.x;
+                targetUnit.y = deadBody.y;
+                gs.units.push(targetUnit);
+                // Remove from defeated units
+                gs.defeatedUnits = gs.defeatedUnits.filter(b => b !== deadBody);
+                addMessage(`${targetUnit.name} was revived with ${targetUnit.hp} HP!`);
+              }
+            } else if (potion.effect === 'heal_hp') {
+              targetUnit.hp = Math.min(targetUnit.maxHp, targetUnit.hp + potion.power);
+              addMessage(`${targetUnit.name} restored ${potion.power} HP!`);
+            } else if (potion.effect === 'restore_mp') {
+              targetUnit.mp = Math.min(targetUnit.maxMp, targetUnit.mp + potion.power);
+              addMessage(`${targetUnit.name} restored ${potion.power} MP!`);
+            } else if (potion.effect === 'cure_status') {
+              targetUnit.effects = [];
+              addMessage(`${targetUnit.name} was cured of all status effects!`);
+            }
+
+            // Consume the potion (remove from equipment)
+            gs.selectedUnit.equipment[potion.potionSlot] = null;
+            addMessage(`${gs.selectedUnit.name} used ${potion.name}!`);
+          } else {
+            // Normal skill usage
+            useSkill(gs.selectedUnit, target, gs.selectedSkill);
+          }
           gs.selectedUnit.hasActed = true;
           gs.selectedUnit = null;
           gs.skillRange = [];
@@ -2973,7 +3060,22 @@ const TacticalRPG = () => {
                 return sum + (30 * enemy.level);
               }, 0);
 
-              setWaveRewards({ gil: gilEarned, exp: expEarned });
+              // Award potions based on wave number
+              const potionsEarned = [];
+              // Always get healing potions
+              potionsEarned.push('healingPotion', 'healingPotion');
+              // Get mana potions
+              potionsEarned.push('manaPotion');
+              // Every 3rd wave, get an elixir
+              if (waveNumber % 3 === 0) {
+                potionsEarned.push('elixir');
+              }
+              // Every 5th wave, get a life potion
+              if (waveNumber % 5 === 0) {
+                potionsEarned.push('lifePotion');
+              }
+
+              setWaveRewards({ gil: gilEarned, exp: expEarned, potions: potionsEarned });
               setGil(prev => prev + gilEarned);
 
               // Give EXP to all surviving player units
@@ -3104,16 +3206,59 @@ const TacticalRPG = () => {
     chest.opened = true;
     const objData = objectData[chest.type];
 
-    // Calculate gold reward
-    const goldAmount = Math.floor(Math.random() * (objData.maxGold - objData.minGold + 1)) + objData.minGold;
+    // Calculate gold reward (scaled by wave number)
+    const baseGold = Math.floor(Math.random() * (objData.maxGold - objData.minGold + 1)) + objData.minGold;
+    const waveMultiplier = gameMode === 'endless' ? waveNumber : 1;
+    const goldAmount = baseGold * waveMultiplier;
     setGil(prev => prev + goldAmount);
 
     addMessage(`${unit.name} opened a ${objData.name} and found ${goldAmount} gil!`);
 
-    // Check for item drop
-    if (Math.random() * 100 < objData.itemChance) {
-      // TODO: Add item generation when item system is ready
-      addMessage(`...and found a rare item! (Item system coming soon)`);
+    // Check for item drop based on chest rarity
+    const allEquip = getAllEquipment();
+    const roll = Math.random() * 100;
+
+    if (roll < objData.itemChance) {
+      // Determine what type of item to drop based on chest rarity
+      const itemRoll = Math.random() * 100;
+
+      // Common chests: mostly potions, occasionally equipment
+      if (chest.type === 'chest_common') {
+        if (itemRoll < 70) {
+          // 70% chance for potion
+          const potions = ['healingPotion', 'manaPotion', 'elixir'];
+          const potionKey = potions[Math.floor(Math.random() * potions.length)];
+          // Add potion to first empty slot
+          if (!unit.equipment.potion1) unit.equipment.potion1 = potionKey;
+          else if (!unit.equipment.potion2) unit.equipment.potion2 = potionKey;
+          else if (!unit.equipment.potion3) unit.equipment.potion3 = potionKey;
+          else addMessage(`...but ${unit.name}'s potion slots are full!`);
+          addMessage(`...and found a ${allEquip[potionKey].name}!`);
+        } else {
+          addMessage(`...and found a common item!`);
+        }
+      }
+      // Rare chests: weapons and armor
+      else if (chest.type === 'chest_rare') {
+        addMessage(`...and found rare equipment! (Equipment drops coming soon)`);
+      }
+      // Epic chests: better equipment and life potions
+      else if (chest.type === 'chest_epic') {
+        if (itemRoll < 30) {
+          // 30% chance for life potion
+          if (!unit.equipment.potion1) unit.equipment.potion1 = 'lifePotion';
+          else if (!unit.equipment.potion2) unit.equipment.potion2 = 'lifePotion';
+          else if (!unit.equipment.potion3) unit.equipment.potion3 = 'lifePotion';
+          else addMessage(`...but ${unit.name}'s potion slots are full!`);
+          addMessage(`...and found a Life Potion!`);
+        } else {
+          addMessage(`...and found epic equipment! (Equipment drops coming soon)`);
+        }
+      }
+      // Legendary chests: best items
+      else if (chest.type === 'chest_legendary') {
+        addMessage(`...and found legendary equipment! (Equipment drops coming soon)`);
+      }
     }
   };
 
@@ -3808,6 +3953,23 @@ const TacticalRPG = () => {
               <div className="text-xl text-purple-100 mb-4">
                 <div>Gil Earned: <span className="text-yellow-400 font-bold">+{waveRewards.gil}</span></div>
                 <div>EXP Earned: <span className="text-green-400 font-bold">+{waveRewards.exp}</span></div>
+                {waveRewards.potions && waveRewards.potions.length > 0 && (
+                  <div className="mt-2 text-sm">
+                    <div className="text-purple-300 font-bold">Potions Earned:</div>
+                    <div className="text-purple-200">
+                      {(() => {
+                        const allEquip = getAllEquipment();
+                        const potionCounts = {};
+                        waveRewards.potions.forEach(p => {
+                          potionCounts[p] = (potionCounts[p] || 0) + 1;
+                        });
+                        return Object.entries(potionCounts).map(([key, count]) => (
+                          <div key={key}>• {count}x {allEquip[key]?.name}</div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="text-lg text-purple-200 mb-4">
                 <div>Total Gil: <span className="text-yellow-300 font-bold">{gil}</span></div>
@@ -4156,7 +4318,10 @@ const TacticalRPG = () => {
                     { key: 'helmet', label: 'â›‘ï¸ Helmet' },
                     { key: 'ring1', label: 'ðŸ’ Ring 1' },
                     { key: 'ring2', label: 'ðŸ’ Ring 2' },
-                    { key: 'necklace', label: 'ðŸ“¿ Necklace' }
+                    { key: 'necklace', label: 'ðŸ"¿ Necklace' },
+                    { key: 'potion1', label: 'ðŸ§ª Potion 1' },
+                    { key: 'potion2', label: 'ðŸ§ª Potion 2' },
+                    { key: 'potion3', label: 'ðŸ§ª Potion 3' }
                   ];
                   return slots.map(slot => {
                     const equipKey = inspectedUnit.equipment?.[slot.key];
@@ -4244,7 +4409,10 @@ const TacticalRPG = () => {
                     { key: 'helmet', label: 'â›'ï¸ Helmet', types: ['helmet'] },
                     { key: 'ring1', label: 'ðŸ' Ring 1', types: ['ring'] },
                     { key: 'ring2', label: 'ðŸ' Ring 2', types: ['ring'] },
-                    { key: 'necklace', label: 'ðŸ"¿ Necklace', types: ['necklace'] }
+                    { key: 'necklace', label: 'ðŸ"¿ Necklace', types: ['necklace'] },
+                    { key: 'potion1', label: 'ðŸ§ª Potion 1', types: ['potion'] },
+                    { key: 'potion2', label: 'ðŸ§ª Potion 2', types: ['potion'] },
+                    { key: 'potion3', label: 'ðŸ§ª Potion 3', types: ['potion'] }
                   ];
                   return slots.map(slot => {
                     const equipKey = selectedUnit.equipment?.[slot.key];
@@ -4298,10 +4466,12 @@ const TacticalRPG = () => {
                             Object.values(selectedUnit.equipment).forEach(equipKey => {
                               if (equipKey && allEquip[equipKey]) {
                                 const eq = allEquip[equipKey];
-                                totalAtk += eq.atk || 0;
-                                totalDef += eq.def || 0;
-                                totalMag += eq.mag || 0;
-                                totalSpd += eq.spd || 0;
+                                // Skip potions (they don't have stats, only effects)
+                                if (eq.type === 'potion') return;
+                                totalAtk += eq.stats?.atk || 0;
+                                totalDef += eq.stats?.def || 0;
+                                totalMag += eq.stats?.mag || 0;
+                                totalSpd += eq.stats?.spd || 0;
                               }
                             });
 
@@ -4318,16 +4488,22 @@ const TacticalRPG = () => {
                           <option value="">(empty)</option>
                           {availableItems.map(([key, equip]) => (
                             <option key={key} value={key}>
-                              {equip.name} {equip.atk ? `+${equip.atk} ATK` : ''}{equip.def ? `+${equip.def} DEF` : ''}{equip.mag ? `+${equip.mag} MAG` : ''}
+                              {equip.name} {equip.type === 'potion' ? `- ${equip.description}` : `${equip.stats?.atk ? `+${equip.stats.atk} ATK` : ''}${equip.stats?.def ? `+${equip.stats.def} DEF` : ''}${equip.stats?.mag ? `+${equip.stats.mag} MAG` : ''}`}
                             </option>
                           ))}
                         </select>
                         {item && (
                           <div className="text-xs text-gray-400 mt-1">
-                            {item.atk ? `+${item.atk} ATK ` : ''}
-                            {item.def ? `+${item.def} DEF ` : ''}
-                            {item.mag ? `+${item.mag} MAG ` : ''}
-                            {item.spd ? `+${item.spd} SPD` : ''}
+                            {item.type === 'potion' ? (
+                              <span className="italic">{item.description}</span>
+                            ) : (
+                              <>
+                                {item.stats?.atk ? `+${item.stats.atk} ATK ` : ''}
+                                {item.stats?.def ? `+${item.stats.def} DEF ` : ''}
+                                {item.stats?.mag ? `+${item.stats.mag} MAG ` : ''}
+                                {item.stats?.spd ? `+${item.stats.spd} SPD` : ''}
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
@@ -4338,6 +4514,61 @@ const TacticalRPG = () => {
               <div className="text-xs text-gray-500 italic mt-2">
                 Note: Equipment changes do not use your action
               </div>
+            </div>
+
+            {/* Potions Section - Use potions (consumes them) */}
+            <div className="mt-4">
+              <div className="font-bold mb-2 text-purple-400">Potions:</div>
+              {(() => {
+                const allEquip = getAllEquipment();
+                const potions = [
+                  selectedUnit.equipment?.potion1,
+                  selectedUnit.equipment?.potion2,
+                  selectedUnit.equipment?.potion3
+                ].filter(p => p && allEquip[p]);
+
+                if (potions.length === 0) {
+                  return <div className="text-xs text-gray-500 italic">No potions equipped</div>;
+                }
+
+                return potions.map((potionKey, idx) => {
+                  const potion = allEquip[potionKey];
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        // Set the selected skill to the potion (treat it like a skill)
+                        const potionSkill = {
+                          name: potion.name,
+                          mpCost: 0,
+                          range: 1, // Can use on self or adjacent
+                          type: 'potion',
+                          targetType: potion.effect === 'revive' ? 'dead' : potion.effect === 'heal_hp' || potion.effect === 'restore_mp' || potion.effect === 'cure_status' ? 'ally' : 'self',
+                          effect: potion.effect,
+                          power: potion.power,
+                          potionKey: potionKey,
+                          potionSlot: idx === 0 ? 'potion1' : idx === 1 ? 'potion2' : 'potion3',
+                          accuracy: 100,
+                          description: potion.description
+                        };
+                        handleSkillClick(potionSkill);
+                      }}
+                      disabled={selectedUnit.hasActed}
+                      className={`w-full text-left p-2 mb-2 rounded ${
+                        selectedSkill?.potionKey === potionKey
+                          ? 'bg-purple-600'
+                          : selectedUnit.hasActed
+                          ? 'bg-gray-600 cursor-not-allowed'
+                          : 'bg-purple-500 hover:bg-purple-700'
+                      }`}
+                    >
+                      <div className="font-semibold">{potion.name}</div>
+                      <div className="text-xs">{potion.description}</div>
+                      <div className="text-xs text-gray-300">Range: 1 (self or adjacent)</div>
+                    </button>
+                  );
+                });
+              })()}
             </div>
 
             <div className="mt-4">
