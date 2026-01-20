@@ -533,7 +533,10 @@ const TacticalRPG = () => {
       helmet: null,
       ring1: null,
       ring2: null,
-      necklace: null
+      necklace: null,
+      potion1: null,
+      potion2: null,
+      potion3: null
     };
 
     // Heavy armor classes
@@ -927,6 +930,45 @@ const TacticalRPG = () => {
       healthAmulet: { name: 'Health Amulet', slot: 'necklace', stats: { hp: 15 } },
       manaAmulet: { name: 'Mana Amulet', slot: 'necklace', stats: { mp: 10 } },
       wardingAmulet: { name: 'Warding Amulet', slot: 'necklace', stats: { def: 2, mag: 1 } },
+    },
+    // Potions - Consumable items
+    potions: {
+      healingPotion: {
+        name: 'Healing Potion',
+        slot: 'potion',
+        type: 'potion',
+        effect: 'heal_hp',
+        power: 30, // Restores 30 HP
+        description: 'Restores 30 HP',
+        consumable: true
+      },
+      manaPotion: {
+        name: 'Mana Potion',
+        slot: 'potion',
+        type: 'potion',
+        effect: 'restore_mp',
+        power: 20, // Restores 20 MP
+        description: 'Restores 20 MP',
+        consumable: true
+      },
+      lifePotion: {
+        name: 'Life Potion',
+        slot: 'potion',
+        type: 'potion',
+        effect: 'revive',
+        power: 0.5, // Revives with 50% HP
+        description: 'Revives a KO\'d unit with 50% HP',
+        consumable: true
+      },
+      elixir: {
+        name: 'Elixir',
+        slot: 'potion',
+        type: 'potion',
+        effect: 'cure_status',
+        power: 0, // Removes all status effects
+        description: 'Cures all status ailments',
+        consumable: true
+      }
     }
   };
 
