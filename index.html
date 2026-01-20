@@ -1051,11 +1051,33 @@ const TacticalRPG = () => {
     }
   };
 
-  // Get skills available to a unit based on job and level
+  // Get skills available to a unit from ALL learned jobs
   const getAvailableSkills = (unit) => {
-    const job = jobData[unit.job];
-    if (!job) return [];
-    return job.skills.filter(skill => skill.level <= unit.level);
+    const allSkills = [];
+
+    // Backwards compatibility
+    if (!unit.jobLevels) {
+      const job = jobData[unit.job];
+      if (!job) return [];
+      return job.skills.filter(skill => skill.level <= unit.level);
+    }
+
+    // Get skills from all jobs unit has leveled in
+    Object.entries(unit.jobLevels).forEach(([jobKey, jobLevel]) => {
+      const job = jobData[jobKey];
+      if (job) {
+        const jobSkills = job.skills
+          .filter(skill => skill.level <= jobLevel)
+          .map(skill => ({
+            ...skill,
+            jobSource: jobKey, // Track which job this skill comes from
+            jobColor: job.color // For UI display
+          }));
+        allSkills.push(...jobSkills);
+      }
+    });
+
+    return allSkills;
   };
 
   // Create a full unit from selection data
@@ -1134,7 +1156,9 @@ const TacticalRPG = () => {
       previousX: null,
       previousY: null,
       previousFacing: null,
-      unlockedJobs: [selectionData.job]
+      unlockedJobs: [selectionData.job],
+      jobLevels: { [selectionData.job]: level }, // Track levels in each job
+      currentJob: selectionData.job // Track current active job
     };
   };
 
@@ -2365,13 +2389,18 @@ const TacticalRPG = () => {
   const gainExp = (unit, amount) => {
     unit.exp += amount;
     const expNeeded = unit.level * 100;
-    
+
     if (unit.exp >= expNeeded) {
       unit.exp -= expNeeded;
       unit.level++;
-      
+
+      // Update job levels (track progress in current job)
+      const currentJob = unit.currentJob || unit.job;
+      if (!unit.jobLevels) unit.jobLevels = {}; // Backwards compatibility
+      unit.jobLevels[currentJob] = (unit.jobLevels[currentJob] || 0) + 1;
+
       // Apply stat growth to base stats
-      const growth = jobData[unit.job].statGrowth;
+      const growth = jobData[currentJob].statGrowth;
       unit.baseHp += growth.hp;
       unit.baseMp += growth.mp;
       unit.baseAtk += growth.atk;
@@ -2386,21 +2415,24 @@ const TacticalRPG = () => {
       unit.hp += growth.hp;
       unit.mp += growth.mp;
       
-      addMessage(`${unit.name} reached level ${unit.level}!`);
-      
-      // Check for new skills unlocked
-      const newSkills = jobData[unit.job].skills.filter(s => s.level === unit.level);
+      const jobLevel = unit.jobLevels[currentJob];
+      const jobName = currentJob.charAt(0).toUpperCase() + currentJob.slice(1);
+      addMessage(`${unit.name} reached ${jobName} level ${jobLevel}! (Overall: ${unit.level})`);
+
+      // Check for new skills unlocked in current job
+      const newSkills = jobData[currentJob].skills.filter(s => s.level === jobLevel);
       newSkills.forEach(skill => {
         addMessage(`${unit.name} learned ${skill.name}!`);
       });
-      
-      // Check for job unlocks
-      const currentJob = jobData[unit.job];
-      if (currentJob.unlocks && unit.unlockedJobs) {
-        Object.entries(currentJob.unlocks).forEach(([jobKey, levelReq]) => {
-          if (unit.level >= levelReq && !unit.unlockedJobs.includes(jobKey)) {
+
+      // Check for job unlocks based on current job level
+      const currentJobData = jobData[currentJob];
+      if (currentJobData.unlocks && unit.unlockedJobs) {
+        Object.entries(currentJobData.unlocks).forEach(([jobKey, levelReq]) => {
+          if (jobLevel >= levelReq && !unit.unlockedJobs.includes(jobKey)) {
             unit.unlockedJobs.push(jobKey);
-            addMessage(`${unit.name} unlocked the ${jobData[jobKey]?.description ? jobKey.charAt(0).toUpperCase() + jobKey.slice(1) : jobKey} job!`);
+            const unlockedJobName = jobKey.charAt(0).toUpperCase() + jobKey.slice(1);
+            addMessage(`${unit.name} unlocked the ${unlockedJobName} job!`);
           }
         });
       }
@@ -4026,11 +4058,40 @@ const TacticalRPG = () => {
                     <div>
                       <div className="text-lg font-bold text-white">{unit.name}</div>
                       <div className="text-sm text-gray-300">
-                        {unit.job.charAt(0).toUpperCase() + unit.job.slice(1)} - Level {unit.level}
+                        {(unit.currentJob || unit.job).charAt(0).toUpperCase() + (unit.currentJob || unit.job).slice(1)} - Level {unit.level}
                       </div>
                       <div className="text-sm text-gray-400">
                         EXP: {unit.exp}/{expNeeded} {unit.level >= 10 && '(MAX)'}
                       </div>
+                      {unit.unlockedJobs && unit.unlockedJobs.length > 1 && (
+                        <div className="mt-2">
+                          <label className="text-xs text-purple-300">Change Job:</label>
+                          <select
+                            value={unit.currentJob || unit.job}
+                            onChange={(e) => {
+                              const newJob = e.target.value;
+                              unit.currentJob = newJob;
+                              unit.job = newJob; // Update display job
+                              // Don't reset level - keep overall level
+                              // Initialize job level if first time in this job
+                              if (!unit.jobLevels) unit.jobLevels = {};
+                              if (!unit.jobLevels[newJob]) {
+                                unit.jobLevels[newJob] = 1; // Start at level 1 in new job
+                              }
+                              recalculateUnitStats(unit);
+                              addMessage(`${unit.name} changed to ${newJob.charAt(0).toUpperCase() + newJob.slice(1)}!`);
+                              setGamePhase('levelup'); // Force re-render
+                            }}
+                            className="ml-2 bg-gray-700 text-white px-2 py-1 rounded text-xs"
+                          >
+                            {unit.unlockedJobs.map(jobKey => (
+                              <option key={jobKey} value={jobKey}>
+                                {jobKey.charAt(0).toUpperCase() + jobKey.slice(1)} (Lv {unit.jobLevels?.[jobKey] || 1})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => {
@@ -4580,33 +4641,48 @@ const TacticalRPG = () => {
             </div>
 
             <div className="mt-4">
-              <div className="font-bold mb-2">Skills:</div>
-              {jobData[selectedUnit.job].skills.filter(skill => skill.level <= selectedUnit.level).map(skill => (
-                <button
-                  key={skill.name}
-                  onClick={() => handleSkillClick(skill)}
-                  disabled={selectedUnit.mp < skill.mpCost || selectedUnit.hasActed || skill.level > selectedUnit.level}
-                  className={`w-full text-left p-2 mb-2 rounded ${
-                    selectedSkill?.name === skill.name 
-                      ? 'bg-yellow-600' 
-                      : selectedUnit.mp < skill.mpCost || selectedUnit.hasActed
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  <div className="font-semibold">{skill.name}</div>
-                  <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
-                  <div className="text-xs">Base Accuracy: {skill.accuracy}%</div>
-                  {(() => {
-                    const dmgEst = calculateDamageEstimate(selectedUnit, skill);
-                    return dmgEst ? (
-                      <div className="text-xs text-orange-400">Est. Damage: {dmgEst.min}-{dmgEst.max}</div>
-                    ) : (
-                      <div className="text-xs text-gray-300">{skill.type} - targets any unit</div>
-                    );
-                  })()}
-                </button>
-              ))}
+              <div className="font-bold mb-2">Skills (All Jobs):</div>
+              {(() => {
+                const allSkills = getAvailableSkills(selectedUnit);
+                // Group skills by job
+                const skillsByJob = {};
+                allSkills.forEach(skill => {
+                  const job = skill.jobSource || selectedUnit.job;
+                  if (!skillsByJob[job]) skillsByJob[job] = [];
+                  skillsByJob[job].push(skill);
+                });
+
+                return Object.entries(skillsByJob).map(([jobKey, skills]) => (
+                  <div key={jobKey} className="mb-2">
+                    <div className="text-xs font-bold text-gray-400 mb-1" style={{color: jobData[jobKey]?.color}}>
+                      {jobKey.charAt(0).toUpperCase() + jobKey.slice(1)} (Lv {selectedUnit.jobLevels?.[jobKey] || 0})
+                    </div>
+                    {skills.map(skill => (
+                      <button
+                        key={`${jobKey}-${skill.name}`}
+                        onClick={() => handleSkillClick(skill)}
+                        disabled={selectedUnit.mp < skill.mpCost || selectedUnit.hasActed}
+                        className={`w-full text-left p-2 mb-1 rounded text-sm ${
+                          selectedSkill?.name === skill.name
+                            ? 'bg-yellow-600'
+                            : selectedUnit.mp < skill.mpCost || selectedUnit.hasActed
+                            ? 'bg-gray-600 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        <div className="font-semibold">{skill.name}</div>
+                        <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
+                        {(() => {
+                          const dmgEst = calculateDamageEstimate(selectedUnit, skill);
+                          return dmgEst ? (
+                            <div className="text-xs text-orange-400">Est. Damage: {dmgEst.min}-{dmgEst.max}</div>
+                          ) : null;
+                        })()}
+                      </button>
+                    ))}
+                  </div>
+                ));
+              })()}
               {selectedSkill && (
                 <button
                   onClick={() => {
