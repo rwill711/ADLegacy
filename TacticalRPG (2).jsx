@@ -2792,11 +2792,39 @@ const TacticalRPG = () => {
           });
         }
         
+        // Job initials on body
+        ctx.fillStyle = '#FFF';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.font = 'bold 9px Arial';
+        ctx.textAlign = 'center';
+        const jobInitials = {
+          'knight': 'K',
+          'rogue': 'R',
+          'archer': 'A',
+          'whiteMage': 'WM',
+          'darkMage': 'DM',
+          'paladin': 'P',
+          'darkKnight': 'DK',
+          'warrior': 'W',
+          'dragoon': 'Dr',
+          'thief': 'T',
+          'assassin': 'As',
+          'ninja': 'N',
+          'sniper': 'Sn',
+          'ranger': 'Rg',
+          'blackMage': 'BM',
+          'timeMage': 'TM'
+        };
+        const initials = jobInitials[unit.job] || '?';
+        ctx.strokeText(initials, px, py + 15);
+        ctx.fillText(initials, px, py + 15);
+
         ctx.fillStyle = '#FFF';
         ctx.font = 'bold 10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(`Lv${unit.level}`, px, py + 45);
-        
+
         // Reset alpha
         ctx.globalAlpha = 1.0;
       });
