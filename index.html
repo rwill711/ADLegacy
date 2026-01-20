@@ -505,7 +505,7 @@ const TacticalRPG = () => {
   const [waveNumber, setWaveNumber] = useState(1);
   const [gil, setGil] = useState(0);
   const [inventory, setInventory] = useState([]); // Equipment owned by player
-  const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0 }); // Rewards from last wave
+  const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0, potions: [] }); // Rewards from last wave
   const [debugMode, setDebugMode] = useState(false); // Debug mode for bug reporting
   const [showDebugPanel, setShowDebugPanel] = useState(false); // Debug panel visibility
 
@@ -533,7 +533,10 @@ const TacticalRPG = () => {
       helmet: null,
       ring1: null,
       ring2: null,
-      necklace: null
+      necklace: null,
+      potion1: null,
+      potion2: null,
+      potion3: null
     };
 
     // Heavy armor classes
@@ -588,10 +591,11 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Sword Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A basic sword attack.' },
         { name: 'Shield Bash', mpCost: 4, power: 0.7, range: 1, type: 'physical', targetType: 'enemy', effect: 'stun', accuracy: 85, level: 1, description: 'Bash with shield. May stun.' },
-        { name: 'Parry', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'parry', accuracy: 100, level: 2, description: 'Defensive stance. +50% DEF until next turn.' },
-        { name: 'War Cry', mpCost: 8, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'buff_atk', accuracy: 100, level: 3, description: 'Rally nearby allies. +ATK buff.' },
-        { name: 'Provoke', mpCost: 6, power: 0, range: 3, type: 'status', targetType: 'enemy', effect: 'provoke', accuracy: 80, level: 4, description: 'Force enemy to target you.' },
-        { name: 'Cross Slash', mpCost: 12, power: 1.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 5, description: 'Powerful X-shaped slash.' }
+        { name: 'Cut Tree', mpCost: 3, power: 0, range: 1, type: 'terrain', targetType: 'tree', accuracy: 100, level: 2, description: 'Cut down adjacent tree. Tree falls and deals damage.' },
+        { name: 'Parry', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'parry', accuracy: 100, level: 3, description: 'Defensive stance. +50% DEF until next turn.' },
+        { name: 'Push Rock', mpCost: 4, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 4, description: 'Push adjacent rock one space.' },
+        { name: 'War Cry', mpCost: 8, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'buff_atk', accuracy: 100, level: 5, description: 'Rally nearby allies. +ATK buff.' },
+        { name: 'Cross Slash', mpCost: 12, power: 1.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 6, description: 'Powerful X-shaped slash.' }
       ],
       statGrowth: { hp: 8, mp: 2, atk: 3, def: 3, mag: 1, spd: 1 },
       unlocks: { paladin: 4, warrior: 3, dragoon: 5 }
@@ -608,7 +612,7 @@ const TacticalRPG = () => {
         { name: 'Dagger Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A quick dagger strike.' },
         { name: 'Sneak Attack', mpCost: 6, power: 1.6, range: 1, type: 'physical', targetType: 'enemy', accuracy: 85, level: 1, description: 'Strike from behind for bonus damage.' },
         { name: 'Poison Strike', mpCost: 8, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'poison', accuracy: 80, level: 2, description: 'Venomous attack. May poison.' },
-        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'tree_hide', accuracy: 100, level: 2, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
+        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 2, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
         { name: 'Feint', mpCost: 5, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 3, description: 'Fake attack that lowers enemy DEF.' },
         { name: 'Throw Sand', mpCost: 4, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'blind', accuracy: 75, level: 4, description: 'Blind enemy with dirt.' },
         { name: 'Coup de Grace', mpCost: 15, power: 2.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 75, level: 5, description: 'Deadly finishing blow.' }
@@ -627,10 +631,11 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Bow Shot', mpCost: 0, power: 1.0, range: 4, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Standard ranged attack.' },
         { name: 'Aim', mpCost: 4, power: 1.3, range: 5, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Careful aimed shot. Higher accuracy.' },
-        { name: 'Leg Shot', mpCost: 6, power: 0.8, range: 4, type: 'physical', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 2, description: 'Shoot the legs. May slow.' },
-        { name: 'Rapid Fire', mpCost: 10, power: 0.6, range: 4, type: 'physical', targetType: 'enemy', hits: 2, accuracy: 75, level: 3, description: 'Fire two quick shots.' },
-        { name: 'Focus', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'focus', accuracy: 100, level: 4, description: 'Concentrate. Next attack +50% damage.' },
-        { name: 'Piercing Shot', mpCost: 14, power: 1.8, range: 5, type: 'physical', targetType: 'enemy', effect: 'armor_pierce', accuracy: 85, level: 5, description: 'Arrow that ignores 50% DEF.' }
+        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 2, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
+        { name: 'Leg Shot', mpCost: 6, power: 0.8, range: 4, type: 'physical', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 3, description: 'Shoot the legs. May slow.' },
+        { name: 'Rapid Fire', mpCost: 10, power: 0.6, range: 4, type: 'physical', targetType: 'enemy', hits: 2, accuracy: 75, level: 4, description: 'Fire two quick shots.' },
+        { name: 'Focus', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'focus', accuracy: 100, level: 5, description: 'Concentrate. Next attack +50% damage.' },
+        { name: 'Piercing Shot', mpCost: 14, power: 1.8, range: 5, type: 'physical', targetType: 'enemy', effect: 'armor_pierce', accuracy: 85, level: 6, description: 'Arrow that ignores 50% DEF.' }
       ],
       statGrowth: { hp: 5, mp: 2, atk: 3, def: 1, mag: 1, spd: 3 },
       unlocks: { sniper: 4, ranger: 4 }
@@ -927,6 +932,45 @@ const TacticalRPG = () => {
       healthAmulet: { name: 'Health Amulet', slot: 'necklace', stats: { hp: 15 } },
       manaAmulet: { name: 'Mana Amulet', slot: 'necklace', stats: { mp: 10 } },
       wardingAmulet: { name: 'Warding Amulet', slot: 'necklace', stats: { def: 2, mag: 1 } },
+    },
+    // Potions - Consumable items
+    potions: {
+      healingPotion: {
+        name: 'Healing Potion',
+        slot: 'potion',
+        type: 'potion',
+        effect: 'heal_hp',
+        power: 30, // Restores 30 HP
+        description: 'Restores 30 HP',
+        consumable: true
+      },
+      manaPotion: {
+        name: 'Mana Potion',
+        slot: 'potion',
+        type: 'potion',
+        effect: 'restore_mp',
+        power: 20, // Restores 20 MP
+        description: 'Restores 20 MP',
+        consumable: true
+      },
+      lifePotion: {
+        name: 'Life Potion',
+        slot: 'potion',
+        type: 'potion',
+        effect: 'revive',
+        power: 0.5, // Revives with 50% HP
+        description: 'Revives a KO\'d unit with 50% HP',
+        consumable: true
+      },
+      elixir: {
+        name: 'Elixir',
+        slot: 'potion',
+        type: 'potion',
+        effect: 'cure_status',
+        power: 0, // Removes all status effects
+        description: 'Cures all status ailments',
+        consumable: true
+      }
     }
   };
 
@@ -1007,11 +1051,33 @@ const TacticalRPG = () => {
     }
   };
 
-  // Get skills available to a unit based on job and level
+  // Get skills available to a unit from ALL learned jobs
   const getAvailableSkills = (unit) => {
-    const job = jobData[unit.job];
-    if (!job) return [];
-    return job.skills.filter(skill => skill.level <= unit.level);
+    const allSkills = [];
+
+    // Backwards compatibility
+    if (!unit.jobLevels) {
+      const job = jobData[unit.job];
+      if (!job) return [];
+      return job.skills.filter(skill => skill.level <= unit.level);
+    }
+
+    // Get skills from all jobs unit has leveled in
+    Object.entries(unit.jobLevels).forEach(([jobKey, jobLevel]) => {
+      const job = jobData[jobKey];
+      if (job) {
+        const jobSkills = job.skills
+          .filter(skill => skill.level <= jobLevel)
+          .map(skill => ({
+            ...skill,
+            jobSource: jobKey, // Track which job this skill comes from
+            jobColor: job.color // For UI display
+          }));
+        allSkills.push(...jobSkills);
+      }
+    });
+
+    return allSkills;
   };
 
   // Create a full unit from selection data
@@ -1029,6 +1095,23 @@ const TacticalRPG = () => {
     const baseDef = baseStats.def + (growth.def * levelBonus);
     const baseMag = baseStats.mag + (growth.mag * levelBonus);
     const baseSpd = baseStats.spd + (growth.spd * levelBonus);
+
+    // Apply equipment bonuses
+    const equipment = getDefaultEquipment(selectionData.job);
+    const allEquip = getAllEquipment();
+    let equipAtk = 0, equipDef = 0, equipMag = 0, equipSpd = 0;
+
+    Object.values(equipment).forEach(equipKey => {
+      if (equipKey && allEquip[equipKey]) {
+        const eq = allEquip[equipKey];
+        // Skip potions (they don't have stats, only effects)
+        if (eq.type === 'potion') return;
+        equipAtk += eq.stats?.atk || 0;
+        equipDef += eq.stats?.def || 0;
+        equipMag += eq.stats?.mag || 0;
+        equipSpd += eq.stats?.spd || 0;
+      }
+    });
 
     // Calculate spawn position
     let x, y;
@@ -1062,18 +1145,20 @@ const TacticalRPG = () => {
       maxHp: baseHp,
       mp: baseMp,
       maxMp: baseMp,
-      atk: baseAtk,
-      def: baseDef,
-      mag: baseMag,
-      spd: baseSpd,
-      equipment: getDefaultEquipment(selectionData.job),
+      atk: baseAtk + equipAtk,
+      def: baseDef + equipDef,
+      mag: baseMag + equipMag,
+      spd: baseSpd + equipSpd,
+      equipment: equipment,
       hasActed: false,
       hasMoved: false,
       effects: [],
       previousX: null,
       previousY: null,
       previousFacing: null,
-      unlockedJobs: [selectionData.job]
+      unlockedJobs: [selectionData.job],
+      jobLevels: { [selectionData.job]: level }, // Track levels in each job
+      currentJob: selectionData.job // Track current active job
     };
   };
 
@@ -1091,6 +1176,28 @@ const TacticalRPG = () => {
       unit.effects = [];
     });
 
+    // Distribute potions from wave rewards to player units
+    if (waveRewards.potions && waveRewards.potions.length > 0) {
+      const potionsToDistribute = [...waveRewards.potions];
+      playerUnits.forEach(unit => {
+        while (potionsToDistribute.length > 0) {
+          // Find empty potion slot
+          if (!unit.equipment.potion1) {
+            unit.equipment.potion1 = potionsToDistribute.shift();
+          } else if (!unit.equipment.potion2) {
+            unit.equipment.potion2 = potionsToDistribute.shift();
+          } else if (!unit.equipment.potion3) {
+            unit.equipment.potion3 = potionsToDistribute.shift();
+          } else {
+            break; // All potion slots full for this unit
+          }
+        }
+      });
+      if (potionsToDistribute.length > 0) {
+        addMessage(`Couldn't fit ${potionsToDistribute.length} potions - all slots full!`);
+      }
+    }
+
     // Generate new enemies for the new wave
     const enemyUnits = generateEndlessEnemies(newWaveNumber, playerUnits.length);
 
@@ -1106,6 +1213,7 @@ const TacticalRPG = () => {
     // Update game state
     gameState.current.units = [...playerUnits, ...enemyUnits];
     gameState.current.defeatedUnits = [];
+    gameState.current.objects = []; // Clear treasure chests and other objects
     terrainStateRef.current = {};
 
     // Give players guaranteed first turn in new wave by boosting their initiative
@@ -2214,7 +2322,34 @@ const TacticalRPG = () => {
       }
       return range;
     }
-    
+
+    // Handle potion targeting
+    if (skill.type === 'potion') {
+      if (skill.effect === 'revive') {
+        // Target adjacent dead bodies
+        gameState.current.defeatedUnits.forEach(body => {
+          const dist = Math.abs(body.x - unit.x) + Math.abs(body.y - unit.y);
+          if (dist <= 1) {
+            range.push({ x: body.x, y: body.y });
+          }
+        });
+      } else {
+        // Target self
+        range.push({ x: unit.x, y: unit.y });
+
+        // Target adjacent allies
+        gameState.current.units.forEach(ally => {
+          if (ally.team === unit.team && ally.hp > 0) {
+            const dist = Math.abs(ally.x - unit.x) + Math.abs(ally.y - unit.y);
+            if (dist === 1) {
+              range.push({ x: ally.x, y: ally.y });
+            }
+          }
+        });
+      }
+      return range;
+    }
+
     for (let x = 0; x < gameState.current.grid.cols; x++) {
       for (let y = 0; y < gameState.current.grid.rows; y++) {
         const dist = Math.abs(x - unit.x) + Math.abs(y - unit.y);
@@ -2254,13 +2389,18 @@ const TacticalRPG = () => {
   const gainExp = (unit, amount) => {
     unit.exp += amount;
     const expNeeded = unit.level * 100;
-    
+
     if (unit.exp >= expNeeded) {
       unit.exp -= expNeeded;
       unit.level++;
-      
+
+      // Update job levels (track progress in current job)
+      const currentJob = unit.currentJob || unit.job;
+      if (!unit.jobLevels) unit.jobLevels = {}; // Backwards compatibility
+      unit.jobLevels[currentJob] = (unit.jobLevels[currentJob] || 0) + 1;
+
       // Apply stat growth to base stats
-      const growth = jobData[unit.job].statGrowth;
+      const growth = jobData[currentJob].statGrowth;
       unit.baseHp += growth.hp;
       unit.baseMp += growth.mp;
       unit.baseAtk += growth.atk;
@@ -2275,21 +2415,24 @@ const TacticalRPG = () => {
       unit.hp += growth.hp;
       unit.mp += growth.mp;
       
-      addMessage(`${unit.name} reached level ${unit.level}!`);
-      
-      // Check for new skills unlocked
-      const newSkills = jobData[unit.job].skills.filter(s => s.level === unit.level);
+      const jobLevel = unit.jobLevels[currentJob];
+      const jobName = currentJob.charAt(0).toUpperCase() + currentJob.slice(1);
+      addMessage(`${unit.name} reached ${jobName} level ${jobLevel}! (Overall: ${unit.level})`);
+
+      // Check for new skills unlocked in current job
+      const newSkills = jobData[currentJob].skills.filter(s => s.level === jobLevel);
       newSkills.forEach(skill => {
         addMessage(`${unit.name} learned ${skill.name}!`);
       });
-      
-      // Check for job unlocks
-      const currentJob = jobData[unit.job];
-      if (currentJob.unlocks && unit.unlockedJobs) {
-        Object.entries(currentJob.unlocks).forEach(([jobKey, levelReq]) => {
-          if (unit.level >= levelReq && !unit.unlockedJobs.includes(jobKey)) {
+
+      // Check for job unlocks based on current job level
+      const currentJobData = jobData[currentJob];
+      if (currentJobData.unlocks && unit.unlockedJobs) {
+        Object.entries(currentJobData.unlocks).forEach(([jobKey, levelReq]) => {
+          if (jobLevel >= levelReq && !unit.unlockedJobs.includes(jobKey)) {
             unit.unlockedJobs.push(jobKey);
-            addMessage(`${unit.name} unlocked the ${jobData[jobKey]?.description ? jobKey.charAt(0).toUpperCase() + jobKey.slice(1) : jobKey} job!`);
+            const unlockedJobName = jobKey.charAt(0).toUpperCase() + jobKey.slice(1);
+            addMessage(`${unit.name} unlocked the ${unlockedJobName} job!`);
           }
         });
       }
@@ -2647,7 +2790,7 @@ const TacticalRPG = () => {
     
     const nextUnit = turnOrder[nextIndex];
     if (nextUnit && nextUnit.team === 'enemy') {
-      aiProcessingRef.current = false; // Reset before starting new enemy turn
+      // Don't reset aiProcessingRef here - let enemyAI manage it
       setTimeout(() => enemyAI(nextUnit), 500);
     } else if (nextUnit) {
       addMessage(`${nextUnit.name}'s turn!`);
@@ -2673,16 +2816,15 @@ const TacticalRPG = () => {
   };
 
   const enemyAI = (enemy) => {
-    // Guard: don't act if AI is already processing this specific unit
-    if (aiProcessingRef.current) {
-      console.log(`[AI] Blocked: AI already processing`);
+    // Guard: don't act if unit already acted (check this FIRST)
+    if (enemy.hasActed) {
+      console.warn(`[AI BUG] ${enemy.name} already acted but enemyAI was called again - skipping`);
       return;
     }
-    
-    // Guard: don't act if unit already acted or moved this turn
-    if (enemy.hasActed) {
-      console.log(`[AI] ${enemy.name} already acted, skipping to next turn`);
-      setTimeout(nextTurn, 500);
+
+    // Guard: don't act if AI is already processing
+    if (aiProcessingRef.current) {
+      console.warn(`[AI BUG] AI already processing but ${enemy.name} was called - this should not happen`);
       return;
     }
     
@@ -2693,10 +2835,11 @@ const TacticalRPG = () => {
       return;
     }
     
-    // Lock AI processing
+    // Lock AI processing and mark unit as having acted to prevent double-turns
     aiProcessingRef.current = true;
-    console.log(`[AI] ${enemy.name}'s turn starting`);
-    
+    enemy.hasActed = true; // Set immediately to prevent race conditions
+    console.log(`[AI] ${enemy.name}'s turn starting (index: ${currentTurnIndexRef.current}, hasActed: ${enemy.hasActed})`);
+
     if (enemy.effects.includes('sleep')) {
       addMessage(`${enemy.name} is asleep and cannot act!`);
       enemy.hasActed = true;
@@ -2777,6 +2920,16 @@ const TacticalRPG = () => {
 
     if (bestMove && !enemy.hasMoved) {
       console.log(`[AI] ${enemy.name} moving from (${enemy.x},${enemy.y}) to (${bestMove.x},${bestMove.y})`);
+
+      // Update facing direction based on movement
+      const dx = bestMove.x - enemy.x;
+      const dy = bestMove.y - enemy.y;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        enemy.facing = dx > 0 ? 'E' : 'W';
+      } else if (dy !== 0) {
+        enemy.facing = dy > 0 ? 'S' : 'N';
+      }
+
       enemy.x = bestMove.x;
       enemy.y = bestMove.y;
       enemy.hasMoved = true;
@@ -2810,11 +2963,6 @@ const TacticalRPG = () => {
   };
 
   const handleCanvasClick = (e) => {
-    if (gamePhase !== 'player') return;
-    
-    const currentUnit = turnOrder[currentTurnIndex];
-    if (!currentUnit || currentUnit.team !== 'player') return;
-
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -2824,8 +2972,8 @@ const TacticalRPG = () => {
     if (gridX < 0 || gridY < 0 || gridX >= 15 || gridY >= 15) return;
 
     const gs = gameState.current;
-    
-    // Right-click or Shift+Click to inspect any unit
+
+    // Right-click or Shift+Click to inspect any unit - WORKS AT ANY TIME
     if (e.shiftKey || e.button === 2) {
       e.preventDefault();
       const unit = gs.units.find(u => u.x === gridX && u.y === gridY && u.hp > 0);
@@ -2835,6 +2983,12 @@ const TacticalRPG = () => {
       }
       return;
     }
+
+    // Normal click actions only work during player phase
+    if (gamePhase !== 'player') return;
+
+    const currentUnit = turnOrder[currentTurnIndex];
+    if (!currentUnit || currentUnit.team !== 'player') return;
     
     // If a skill is selected and clicking on empty space, deselect the skill
     if (gs.selectedSkill && !gs.skillRange.find(tile => tile.x === gridX && tile.y === gridY)) {
@@ -2842,7 +2996,7 @@ const TacticalRPG = () => {
       if (!clickedUnit) {
         gs.selectedSkill = null;
         gs.skillRange = [];
-        gs.moveRange = gs.selectedUnit.hasMoved ? [] : calculateMoveRange(gs.selectedUnit);
+        gs.moveRange = gs.selectedUnit && gs.selectedUnit.hasMoved ? [] : (gs.selectedUnit ? calculateMoveRange(gs.selectedUnit) : []);
         setSelectedSkill(null);
         addMessage('Skill cancelled. Choose another action.');
         return;
@@ -2885,7 +3039,43 @@ const TacticalRPG = () => {
 
         const target = gs.units.find(u => u.x === gridX && u.y === gridY);
         if (target) {
-          useSkill(gs.selectedUnit, target, gs.selectedSkill);
+          // Handle potion usage
+          if (gs.selectedSkill.type === 'potion') {
+            const potion = gs.selectedSkill;
+            let targetUnit = target;
+
+            // Check if targeting a dead body for revive
+            if (potion.effect === 'revive') {
+              const deadBody = gs.defeatedUnits.find(b => b.x === gridX && b.y === gridY);
+              if (deadBody) {
+                targetUnit = deadBody.unit;
+                // Revive the unit
+                targetUnit.hp = Math.floor(targetUnit.maxHp * potion.power);
+                targetUnit.x = deadBody.x;
+                targetUnit.y = deadBody.y;
+                gs.units.push(targetUnit);
+                // Remove from defeated units
+                gs.defeatedUnits = gs.defeatedUnits.filter(b => b !== deadBody);
+                addMessage(`${targetUnit.name} was revived with ${targetUnit.hp} HP!`);
+              }
+            } else if (potion.effect === 'heal_hp') {
+              targetUnit.hp = Math.min(targetUnit.maxHp, targetUnit.hp + potion.power);
+              addMessage(`${targetUnit.name} restored ${potion.power} HP!`);
+            } else if (potion.effect === 'restore_mp') {
+              targetUnit.mp = Math.min(targetUnit.maxMp, targetUnit.mp + potion.power);
+              addMessage(`${targetUnit.name} restored ${potion.power} MP!`);
+            } else if (potion.effect === 'cure_status') {
+              targetUnit.effects = [];
+              addMessage(`${targetUnit.name} was cured of all status effects!`);
+            }
+
+            // Consume the potion (remove from equipment)
+            gs.selectedUnit.equipment[potion.potionSlot] = null;
+            addMessage(`${gs.selectedUnit.name} used ${potion.name}!`);
+          } else {
+            // Normal skill usage
+            useSkill(gs.selectedUnit, target, gs.selectedSkill);
+          }
           gs.selectedUnit.hasActed = true;
           gs.selectedUnit = null;
           gs.skillRange = [];
@@ -2905,7 +3095,22 @@ const TacticalRPG = () => {
                 return sum + (30 * enemy.level);
               }, 0);
 
-              setWaveRewards({ gil: gilEarned, exp: expEarned });
+              // Award potions based on wave number
+              const potionsEarned = [];
+              // Always get healing potions
+              potionsEarned.push('healingPotion', 'healingPotion');
+              // Get mana potions
+              potionsEarned.push('manaPotion');
+              // Every 3rd wave, get an elixir
+              if (waveNumber % 3 === 0) {
+                potionsEarned.push('elixir');
+              }
+              // Every 5th wave, get a life potion
+              if (waveNumber % 5 === 0) {
+                potionsEarned.push('lifePotion');
+              }
+
+              setWaveRewards({ gil: gilEarned, exp: expEarned, potions: potionsEarned });
               setGil(prev => prev + gilEarned);
 
               // Give EXP to all surviving player units
@@ -3036,16 +3241,59 @@ const TacticalRPG = () => {
     chest.opened = true;
     const objData = objectData[chest.type];
 
-    // Calculate gold reward
-    const goldAmount = Math.floor(Math.random() * (objData.maxGold - objData.minGold + 1)) + objData.minGold;
+    // Calculate gold reward (scaled by wave number)
+    const baseGold = Math.floor(Math.random() * (objData.maxGold - objData.minGold + 1)) + objData.minGold;
+    const waveMultiplier = gameMode === 'endless' ? waveNumber : 1;
+    const goldAmount = baseGold * waveMultiplier;
     setGil(prev => prev + goldAmount);
 
     addMessage(`${unit.name} opened a ${objData.name} and found ${goldAmount} gil!`);
 
-    // Check for item drop
-    if (Math.random() * 100 < objData.itemChance) {
-      // TODO: Add item generation when item system is ready
-      addMessage(`...and found a rare item! (Item system coming soon)`);
+    // Check for item drop based on chest rarity
+    const allEquip = getAllEquipment();
+    const roll = Math.random() * 100;
+
+    if (roll < objData.itemChance) {
+      // Determine what type of item to drop based on chest rarity
+      const itemRoll = Math.random() * 100;
+
+      // Common chests: mostly potions, occasionally equipment
+      if (chest.type === 'chest_common') {
+        if (itemRoll < 70) {
+          // 70% chance for potion
+          const potions = ['healingPotion', 'manaPotion', 'elixir'];
+          const potionKey = potions[Math.floor(Math.random() * potions.length)];
+          // Add potion to first empty slot
+          if (!unit.equipment.potion1) unit.equipment.potion1 = potionKey;
+          else if (!unit.equipment.potion2) unit.equipment.potion2 = potionKey;
+          else if (!unit.equipment.potion3) unit.equipment.potion3 = potionKey;
+          else addMessage(`...but ${unit.name}'s potion slots are full!`);
+          addMessage(`...and found a ${allEquip[potionKey].name}!`);
+        } else {
+          addMessage(`...and found a common item!`);
+        }
+      }
+      // Rare chests: weapons and armor
+      else if (chest.type === 'chest_rare') {
+        addMessage(`...and found rare equipment! (Equipment drops coming soon)`);
+      }
+      // Epic chests: better equipment and life potions
+      else if (chest.type === 'chest_epic') {
+        if (itemRoll < 30) {
+          // 30% chance for life potion
+          if (!unit.equipment.potion1) unit.equipment.potion1 = 'lifePotion';
+          else if (!unit.equipment.potion2) unit.equipment.potion2 = 'lifePotion';
+          else if (!unit.equipment.potion3) unit.equipment.potion3 = 'lifePotion';
+          else addMessage(`...but ${unit.name}'s potion slots are full!`);
+          addMessage(`...and found a Life Potion!`);
+        } else {
+          addMessage(`...and found epic equipment! (Equipment drops coming soon)`);
+        }
+      }
+      // Legendary chests: best items
+      else if (chest.type === 'chest_legendary') {
+        addMessage(`...and found legendary equipment! (Equipment drops coming soon)`);
+      }
     }
   };
 
@@ -3737,15 +3985,32 @@ const TacticalRPG = () => {
             <div className="p-8 bg-purple-900 border-4 border-purple-500 rounded-lg shadow-2xl max-w-md w-full">
               <div className="text-center mb-4">
                 <div className="text-3xl font-bold text-yellow-400 mb-2">Wave {waveNumber} Complete!</div>
-              <div className="text-xl text-purple-100 mb-4">
-                <div>Gil Earned: <span className="text-yellow-400 font-bold">+{waveRewards.gil}</span></div>
-                <div>EXP Earned: <span className="text-green-400 font-bold">+{waveRewards.exp}</span></div>
+                <div className="text-xl text-purple-100 mb-4">
+                  <div>Gil Earned: <span className="text-yellow-400 font-bold">+{waveRewards.gil}</span></div>
+                  <div>EXP Earned: <span className="text-green-400 font-bold">+{waveRewards.exp}</span></div>
+                  {waveRewards.potions && waveRewards.potions.length > 0 && (
+                    <div className="mt-2 text-sm">
+                      <div className="text-purple-300 font-bold">Potions Earned:</div>
+                      <div className="text-purple-200">
+                        {(() => {
+                          const allEquip = getAllEquipment();
+                          const potionCounts = {};
+                          waveRewards.potions.forEach(p => {
+                            potionCounts[p] = (potionCounts[p] || 0) + 1;
+                          });
+                          return Object.entries(potionCounts).map(([key, count]) => (
+                            <div key={key}>• {count}x {allEquip[key]?.name}</div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="text-lg text-purple-200 mb-4">
+                  <div>Total Gil: <span className="text-yellow-300 font-bold">{gil}</span></div>
+                  <div>Current Wave: <span className="text-cyan-300 font-bold">{waveNumber}</span></div>
+                </div>
               </div>
-              <div className="text-lg text-purple-200 mb-4">
-                <div>Total Gil: <span className="text-yellow-300 font-bold">{gil}</span></div>
-                <div>Current Wave: <span className="text-cyan-300 font-bold">{waveNumber}</span></div>
-              </div>
-            </div>
 
             <div className="space-y-3">
               <button
@@ -3793,11 +4058,40 @@ const TacticalRPG = () => {
                     <div>
                       <div className="text-lg font-bold text-white">{unit.name}</div>
                       <div className="text-sm text-gray-300">
-                        {unit.job.charAt(0).toUpperCase() + unit.job.slice(1)} - Level {unit.level}
+                        {(unit.currentJob || unit.job).charAt(0).toUpperCase() + (unit.currentJob || unit.job).slice(1)} - Level {unit.level}
                       </div>
                       <div className="text-sm text-gray-400">
                         EXP: {unit.exp}/{expNeeded} {unit.level >= 10 && '(MAX)'}
                       </div>
+                      {unit.unlockedJobs && unit.unlockedJobs.length > 1 && (
+                        <div className="mt-2">
+                          <label className="text-xs text-purple-300">Change Job:</label>
+                          <select
+                            value={unit.currentJob || unit.job}
+                            onChange={(e) => {
+                              const newJob = e.target.value;
+                              unit.currentJob = newJob;
+                              unit.job = newJob; // Update display job
+                              // Don't reset level - keep overall level
+                              // Initialize job level if first time in this job
+                              if (!unit.jobLevels) unit.jobLevels = {};
+                              if (!unit.jobLevels[newJob]) {
+                                unit.jobLevels[newJob] = 1; // Start at level 1 in new job
+                              }
+                              recalculateUnitStats(unit);
+                              addMessage(`${unit.name} changed to ${newJob.charAt(0).toUpperCase() + newJob.slice(1)}!`);
+                              setGamePhase('levelup'); // Force re-render
+                            }}
+                            className="ml-2 bg-gray-700 text-white px-2 py-1 rounded text-xs"
+                          >
+                            {unit.unlockedJobs.map(jobKey => (
+                              <option key={jobKey} value={jobKey}>
+                                {jobKey.charAt(0).toUpperCase() + jobKey.slice(1)} (Lv {unit.jobLevels?.[jobKey] || 1})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => {
@@ -4082,13 +4376,16 @@ const TacticalRPG = () => {
                 {(() => {
                   const allEquip = getAllEquipment();
                   const slots = [
-                    { key: 'mainHand', label: 'ðŸ—¡ï¸ Main Hand' },
-                    { key: 'offHand', label: 'ðŸ›¡ï¸ Off Hand' },
-                    { key: 'armor', label: 'ðŸ‘• Armor' },
-                    { key: 'helmet', label: 'â›‘ï¸ Helmet' },
-                    { key: 'ring1', label: 'ðŸ’ Ring 1' },
-                    { key: 'ring2', label: 'ðŸ’ Ring 2' },
-                    { key: 'necklace', label: 'ðŸ“¿ Necklace' }
+                    { key: 'mainHand', label: 'Main Hand' },
+                    { key: 'offHand', label: 'Off Hand' },
+                    { key: 'armor', label: 'Armor' },
+                    { key: 'helmet', label: 'Helmet' },
+                    { key: 'ring1', label: 'Ring 1' },
+                    { key: 'ring2', label: 'Ring 2' },
+                    { key: 'necklace', label: 'Necklace' },
+                    { key: 'potion1', label: 'Potion 1' },
+                    { key: 'potion2', label: 'Potion 2' },
+                    { key: 'potion3', label: 'Potion 3' }
                   ];
                   return slots.map(slot => {
                     const equipKey = inspectedUnit.equipment?.[slot.key];
@@ -4162,35 +4459,230 @@ const TacticalRPG = () => {
             <div className="text-xs text-gray-400">
               MP Regen: {Math.floor(2 + selectedUnit.mag / 4)}/turn
             </div>
-            
+
+            {/* Equipment Section - Can swap without using action */}
             <div className="mt-4">
-              <div className="font-bold mb-2">Skills:</div>
-              {jobData[selectedUnit.job].skills.filter(skill => skill.level <= selectedUnit.level).map(skill => (
-                <button
-                  key={skill.name}
-                  onClick={() => handleSkillClick(skill)}
-                  disabled={selectedUnit.mp < skill.mpCost || selectedUnit.hasActed || skill.level > selectedUnit.level}
-                  className={`w-full text-left p-2 mb-2 rounded ${
-                    selectedSkill?.name === skill.name 
-                      ? 'bg-yellow-600' 
-                      : selectedUnit.mp < skill.mpCost || selectedUnit.hasActed
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  <div className="font-semibold">{skill.name}</div>
-                  <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
-                  <div className="text-xs">Base Accuracy: {skill.accuracy}%</div>
-                  {(() => {
-                    const dmgEst = calculateDamageEstimate(selectedUnit, skill);
-                    return dmgEst ? (
-                      <div className="text-xs text-orange-400">Est. Damage: {dmgEst.min}-{dmgEst.max}</div>
-                    ) : (
-                      <div className="text-xs text-gray-300">{skill.type} - targets any unit</div>
+              <div className="font-bold mb-2 text-yellow-400">Equipment:</div>
+              <div className="text-xs space-y-1">
+                {(() => {
+                  const allEquip = getAllEquipment();
+                  const slots = [
+                    { key: 'mainHand', label: 'Main Hand', types: ['sword', 'staff', 'dagger', 'bow', 'spear', 'katana'] },
+                    { key: 'offHand', label: 'Off Hand', types: ['shield', 'tome', 'dagger', 'quiver'] },
+                    { key: 'armor', label: 'Armor', types: [] }, // No type filter, use slot matching
+                    { key: 'helmet', label: 'Helmet', types: [] }, // No type filter, use slot matching
+                    { key: 'ring1', label: 'Ring 1', types: [] }, // No type filter, use slot matching
+                    { key: 'ring2', label: 'Ring 2', types: [] }, // No type filter, use slot matching
+                    { key: 'necklace', label: 'Necklace', types: [] }, // No type filter, use slot matching
+                    { key: 'potion1', label: 'Potion 1', types: ['potion'] },
+                    { key: 'potion2', label: 'Potion 2', types: ['potion'] },
+                    { key: 'potion3', label: 'Potion 3', types: ['potion'] }
+                  ];
+                  return slots.map(slot => {
+                    const equipKey = selectedUnit.equipment?.[slot.key];
+                    const item = equipKey ? allEquip[equipKey] : null;
+
+                    // Get available items for this slot
+                    const availableItems = Object.entries(allEquip)
+                      .filter(([key, equip]) => {
+                        // Match by slot first (more reliable)
+                        if (equip.slot !== slot.key) {
+                          // For potions and items without slot, check type
+                          if (slot.types.length > 0 && !slot.types.includes(equip.type)) return false;
+                          // If no types specified and slot doesn't match, skip
+                          if (slot.types.length === 0 && equip.slot !== slot.key) return false;
+                        }
+                        // For two-handed weapons, only show in main hand
+                        if (equip.twoHanded && slot.key === 'offHand') return false;
+                        // Check job restrictions (potions have no job restrictions)
+                        if (equip.jobs && !equip.jobs.includes(selectedUnit.job)) return false;
+                        return true;
+                      });
+
+                    return (
+                      <div key={slot.key} className="bg-gray-700 p-2 rounded">
+                        <div className="text-gray-400 mb-1">{slot.label}:</div>
+                        <select
+                          value={equipKey || ''}
+                          onChange={(e) => {
+                            const newEquipKey = e.target.value || null;
+                            // Swap equipment without using action
+                            selectedUnit.equipment = selectedUnit.equipment || {};
+                            selectedUnit.equipment[slot.key] = newEquipKey;
+
+                            // Recalculate stats
+                            const baseStats = {
+                              atk: selectedUnit.baseAtk || selectedUnit.atk,
+                              def: selectedUnit.baseDef || selectedUnit.def,
+                              mag: selectedUnit.baseMag || selectedUnit.mag,
+                              spd: selectedUnit.baseSpd || selectedUnit.spd
+                            };
+
+                            // Store base stats if not already stored
+                            if (!selectedUnit.baseAtk) {
+                              selectedUnit.baseAtk = baseStats.atk;
+                              selectedUnit.baseDef = baseStats.def;
+                              selectedUnit.baseMag = baseStats.mag;
+                              selectedUnit.baseSpd = baseStats.spd;
+                            }
+
+                            // Apply equipment bonuses
+                            let totalAtk = selectedUnit.baseAtk;
+                            let totalDef = selectedUnit.baseDef;
+                            let totalMag = selectedUnit.baseMag;
+                            let totalSpd = selectedUnit.baseSpd;
+
+                            Object.values(selectedUnit.equipment).forEach(equipKey => {
+                              if (equipKey && allEquip[equipKey]) {
+                                const eq = allEquip[equipKey];
+                                // Skip potions (they don't have stats, only effects)
+                                if (eq.type === 'potion') return;
+                                totalAtk += eq.stats?.atk || 0;
+                                totalDef += eq.stats?.def || 0;
+                                totalMag += eq.stats?.mag || 0;
+                                totalSpd += eq.stats?.spd || 0;
+                              }
+                            });
+
+                            selectedUnit.atk = totalAtk;
+                            selectedUnit.def = totalDef;
+                            selectedUnit.mag = totalMag;
+                            selectedUnit.spd = totalSpd;
+
+                            addMessage(`Equipped ${newEquipKey ? allEquip[newEquipKey].name : 'nothing'} to ${slot.label}`);
+                            setSelectedUnit({...selectedUnit}); // Trigger re-render
+                          }}
+                          className="w-full bg-gray-800 text-white p-1 rounded text-xs"
+                        >
+                          <option value="">(empty)</option>
+                          {availableItems.map(([key, equip]) => (
+                            <option key={key} value={key}>
+                              {equip.name} {equip.type === 'potion' ? `- ${equip.description}` : `${equip.stats?.atk ? `+${equip.stats.atk} ATK` : ''}${equip.stats?.def ? `+${equip.stats.def} DEF` : ''}${equip.stats?.mag ? `+${equip.stats.mag} MAG` : ''}`}
+                            </option>
+                          ))}
+                        </select>
+                        {item && (
+                          <div className="text-xs text-gray-400 mt-1">
+                            {item.type === 'potion' ? (
+                              <span className="italic">{item.description}</span>
+                            ) : (
+                              <>
+                                {item.stats?.atk ? `+${item.stats.atk} ATK ` : ''}
+                                {item.stats?.def ? `+${item.stats.def} DEF ` : ''}
+                                {item.stats?.mag ? `+${item.stats.mag} MAG ` : ''}
+                                {item.stats?.spd ? `+${item.stats.spd} SPD` : ''}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     );
-                  })()}
-                </button>
-              ))}
+                  });
+                })()}
+              </div>
+              <div className="text-xs text-gray-500 italic mt-2">
+                Note: Equipment changes do not use your action
+              </div>
+            </div>
+
+            {/* Potions Section - Use potions (consumes them) */}
+            <div className="mt-4">
+              <div className="font-bold mb-2 text-purple-400">Potions:</div>
+              {(() => {
+                const allEquip = getAllEquipment();
+                const potions = [
+                  selectedUnit.equipment?.potion1,
+                  selectedUnit.equipment?.potion2,
+                  selectedUnit.equipment?.potion3
+                ].filter(p => p && allEquip[p]);
+
+                if (potions.length === 0) {
+                  return <div className="text-xs text-gray-500 italic">No potions equipped</div>;
+                }
+
+                return potions.map((potionKey, idx) => {
+                  const potion = allEquip[potionKey];
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        // Set the selected skill to the potion (treat it like a skill)
+                        const potionSkill = {
+                          name: potion.name,
+                          mpCost: 0,
+                          range: 1, // Can use on self or adjacent
+                          type: 'potion',
+                          targetType: potion.effect === 'revive' ? 'dead' : potion.effect === 'heal_hp' || potion.effect === 'restore_mp' || potion.effect === 'cure_status' ? 'ally' : 'self',
+                          effect: potion.effect,
+                          power: potion.power,
+                          potionKey: potionKey,
+                          potionSlot: idx === 0 ? 'potion1' : idx === 1 ? 'potion2' : 'potion3',
+                          accuracy: 100,
+                          description: potion.description
+                        };
+                        handleSkillClick(potionSkill);
+                      }}
+                      disabled={selectedUnit.hasActed}
+                      className={`w-full text-left p-2 mb-2 rounded ${
+                        selectedSkill?.potionKey === potionKey
+                          ? 'bg-purple-600'
+                          : selectedUnit.hasActed
+                          ? 'bg-gray-600 cursor-not-allowed'
+                          : 'bg-purple-500 hover:bg-purple-700'
+                      }`}
+                    >
+                      <div className="font-semibold">{potion.name}</div>
+                      <div className="text-xs">{potion.description}</div>
+                      <div className="text-xs text-gray-300">Range: 1 (self or adjacent)</div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            <div className="mt-4">
+              <div className="font-bold mb-2">Skills (All Jobs):</div>
+              {(() => {
+                const allSkills = getAvailableSkills(selectedUnit);
+                // Group skills by job
+                const skillsByJob = {};
+                allSkills.forEach(skill => {
+                  const job = skill.jobSource || selectedUnit.job;
+                  if (!skillsByJob[job]) skillsByJob[job] = [];
+                  skillsByJob[job].push(skill);
+                });
+
+                return Object.entries(skillsByJob).map(([jobKey, skills]) => (
+                  <div key={jobKey} className="mb-2">
+                    <div className="text-xs font-bold text-gray-400 mb-1" style={{color: jobData[jobKey]?.color}}>
+                      {jobKey.charAt(0).toUpperCase() + jobKey.slice(1)} (Lv {selectedUnit.jobLevels?.[jobKey] || 0})
+                    </div>
+                    {skills.map(skill => (
+                      <button
+                        key={`${jobKey}-${skill.name}`}
+                        onClick={() => handleSkillClick(skill)}
+                        disabled={selectedUnit.mp < skill.mpCost || selectedUnit.hasActed}
+                        className={`w-full text-left p-2 mb-1 rounded text-sm ${
+                          selectedSkill?.name === skill.name
+                            ? 'bg-yellow-600'
+                            : selectedUnit.mp < skill.mpCost || selectedUnit.hasActed
+                            ? 'bg-gray-600 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        <div className="font-semibold">{skill.name}</div>
+                        <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
+                        {(() => {
+                          const dmgEst = calculateDamageEstimate(selectedUnit, skill);
+                          return dmgEst ? (
+                            <div className="text-xs text-orange-400">Est. Damage: {dmgEst.min}-{dmgEst.max}</div>
+                          ) : null;
+                        })()}
+                      </button>
+                    ))}
+                  </div>
+                ));
+              })()}
               {selectedSkill && (
                 <button
                   onClick={() => {
