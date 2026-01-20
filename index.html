@@ -508,6 +508,7 @@ const TacticalRPG = () => {
   const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0, potions: [] }); // Rewards from last wave
   const [debugMode, setDebugMode] = useState(false); // Debug mode for bug reporting
   const [showDebugPanel, setShowDebugPanel] = useState(false); // Debug panel visibility
+  const [recruitCost, setRecruitCost] = useState(300); // Cost to recruit new unit, increases by 200 each time
 
   const gameState = useRef({
     grid: { cols: 15, rows: 15, tileSize: 50 },
@@ -1261,6 +1262,76 @@ const TacticalRPG = () => {
     }
 
     return enemies.map((data, index) => createUnit(data, 'enemy', index, enemies.length));
+  };
+
+  // Recruit a new unit for the player team
+  const recruitNewUnit = () => {
+    if (gil < recruitCost) {
+      addMessage(`Not enough gil! Need ${recruitCost} gil.`);
+      return;
+    }
+
+    const playerUnits = gameState.current.units.filter(u => u.team === 'player' && u.hp > 0);
+    if (playerUnits.length === 0) return; // Safety check
+
+    // Calculate average level (round down)
+    const totalLevel = playerUnits.reduce((sum, u) => sum + u.level, 0);
+    const avgLevel = Math.floor(totalLevel / playerUnits.length);
+
+    // Generate unique name
+    const possibleNames = ['Shadow', 'Cloud', 'Terra', 'Locke', 'Celes', 'Edgar', 'Sabin', 'Cyan',
+      'Setzer', 'Strago', 'Relm', 'Mog', 'Gau', 'Gogo', 'Umaro', 'Leo', 'Kefka', 'Banon'];
+    const usedNames = playerUnits.map(u => u.name);
+    const availableNames = possibleNames.filter(n => !usedNames.includes(n));
+    if (availableNames.length === 0) {
+      addMessage('No more unique names available!');
+      return;
+    }
+    const newName = availableNames[Math.floor(Math.random() * availableNames.length)];
+
+    // Generate random job path
+    const baseJobs = ['knight', 'rogue', 'archer', 'whiteMage', 'darkMage'];
+    const startingJob = baseJobs[Math.floor(Math.random() * baseJobs.length)];
+
+    // Distribute levels across jobs
+    const jobLevels = { [startingJob]: 1 }; // Start with level 1 in starting job
+    let remainingLevels = avgLevel - 1;
+
+    // Potentially add a second job if enough levels
+    if (remainingLevels >= 2 && Math.random() > 0.5) {
+      const secondJob = baseJobs.filter(j => j !== startingJob)[Math.floor(Math.random() * 4)];
+      const secondJobLevels = Math.min(remainingLevels, Math.floor(Math.random() * 3) + 1);
+      jobLevels[secondJob] = secondJobLevels;
+      remainingLevels -= secondJobLevels;
+    }
+
+    // Put remaining levels in starting job
+    jobLevels[startingJob] += remainingLevels;
+
+    // Create the new unit
+    const newUnit = createUnit({
+      id: Date.now(),
+      name: newName,
+      job: startingJob,
+      level: avgLevel
+    }, 'player', playerUnits.length, playerUnits.length + 1);
+
+    // Set up job levels
+    newUnit.jobLevels = jobLevels;
+    newUnit.currentJob = startingJob;
+
+    // Add to game
+    gameState.current.units.push(newUnit);
+
+    // Deduct gil and increase cost
+    setGil(prev => prev - recruitCost);
+    setRecruitCost(prev => prev + 200);
+
+    const jobsStr = Object.entries(jobLevels)
+      .map(([job, lvl]) => `${job.charAt(0).toUpperCase() + job.slice(1)} Lv${lvl}`)
+      .join(', ');
+    addMessage(`Recruited ${newName}! (Level ${avgLevel}: ${jobsStr})`);
+    setGamePhase('shop'); // Force re-render
   };
 
   // Start game with selected teams
@@ -4165,6 +4236,31 @@ const TacticalRPG = () => {
             <div className="text-center mb-4">
               <div className="text-2xl font-bold text-blue-300 mb-2">Equipment Shop</div>
               <div className="text-lg text-yellow-300">Gil: {gil}</div>
+
+              {/* Recruit New Unit */}
+              <div className="mt-4 p-4 bg-purple-900 border-2 border-purple-500 rounded">
+                <div className="text-xl font-bold text-purple-300 mb-2">Recruit New Unit</div>
+                <div className="text-sm text-gray-300 mb-3">
+                  Hire a new fighter to join your team!<br/>
+                  Level: {(() => {
+                    const playerUnits = gameState.current.units.filter(u => u.team === 'player' && u.hp > 0);
+                    if (playerUnits.length === 0) return 1;
+                    const avgLevel = Math.floor(playerUnits.reduce((sum, u) => sum + u.level, 0) / playerUnits.length);
+                    return avgLevel;
+                  })()} (Team average)
+                </div>
+                <button
+                  onClick={recruitNewUnit}
+                  disabled={gil < recruitCost}
+                  className={`w-full px-4 py-2 rounded font-bold ${
+                    gil >= recruitCost
+                      ? 'bg-purple-600 text-white hover:bg-purple-700'
+                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  Recruit ({recruitCost} Gil)
+                </button>
+              </div>
             </div>
 
             {Object.entries(equipmentData).map(([categoryName, category]) => (
