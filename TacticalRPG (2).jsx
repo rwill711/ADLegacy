@@ -2022,23 +2022,25 @@ const TacticalRPG = () => {
 
   const calculateHitChance = (attacker, target, skill, distance) => {
     let baseAccuracy = skill.accuracy || 100;
-    
+
     // Distance penalty - attacks at max range are less accurate
-    const distancePenalty = Math.floor((distance / skill.range) * 15);
+    // Reduced from 15 to 10 max penalty for less harsh long-range penalties
+    const distancePenalty = Math.floor((distance / skill.range) * 10);
     baseAccuracy -= distancePenalty;
-    
-    // Evasion based on target's speed - every 2 speed = 1% evasion
-    const evasion = Math.floor(target.spd / 2);
-    
+
+    // Evasion based on target's speed - every 3 speed = 1% evasion
+    // Changed from /2 to /3 to reduce evasion scaling
+    const evasion = Math.floor(target.spd / 3);
+
     // Attacker's speed gives accuracy bonus - every 3 speed = 1% accuracy
     const accuracyBonus = Math.floor(attacker.spd / 3);
-    
+
     // Final hit chance
     let hitChance = baseAccuracy + accuracyBonus - evasion;
-    
-    // Clamp between 5% and 99%
-    hitChance = Math.max(5, Math.min(99, hitChance));
-    
+
+    // Clamp between 10% and 99% (raised minimum from 5% to 10%)
+    hitChance = Math.max(10, Math.min(99, hitChance));
+
     return hitChance;
   };
 

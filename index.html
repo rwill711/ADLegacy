@@ -17184,3 +17184,3445 @@ export default TacticalRPG;
   </script>
 </body>
 </html>
+import React, { useState, useEffect, useRef } from 'react';
+
+// Job data needs to be outside component for TeamSelectionScreen
+const jobDataStatic = {
+  // BASE JOBS
+  knight: { 
+    color: '#4169E1', 
+    tier: 1,
+    armorClass: 'medium',
+    description: 'A stalwart defender skilled with sword and shield.',
+    baseStats: { hp: 45, mp: 10, atk: 8, def: 8, mag: 3, spd: 4 },
+  },
+  rogue: { 
+    color: '#2F4F2F', 
+    tier: 1,
+    armorClass: 'light',
+    description: 'A swift striker who excels at stealth and dirty tricks.',
+    baseStats: { hp: 32, mp: 15, atk: 6, def: 4, mag: 4, spd: 8 },
+  },
+  archer: { 
+    color: '#8B4513', 
+    tier: 1,
+    armorClass: 'light',
+    description: 'A skilled marksman who strikes from a distance.',
+    baseStats: { hp: 34, mp: 12, atk: 7, def: 4, mag: 3, spd: 6 },
+  },
+  whiteMage: {
+    color: '#F0F8FF',
+    tier: 1,
+    armorClass: 'light',
+    description: 'A healer devoted to restoring allies.',
+    baseStats: { hp: 30, mp: 28, atk: 2, def: 4, mag: 10, spd: 4 },
+  },
+  darkMage: {
+    color: '#9370DB',
+    tier: 1,
+    armorClass: 'light',
+    description: 'A wielder of destructive elemental magic.',
+    baseStats: { hp: 28, mp: 30, atk: 3, def: 3, mag: 12, spd: 5 },
+  },
+  // HEAVY ARMOR
+  paladin: {
+    color: '#FFD700',
+    tier: 2,
+    armorClass: 'heavy',
+    description: 'A holy knight who protects allies and smites evil.',
+    baseStats: { hp: 55, mp: 18, atk: 8, def: 12, mag: 6, spd: 3 },
+  },
+  darkKnight: {
+    color: '#2F0F3F',
+    tier: 2,
+    armorClass: 'heavy',
+    description: 'A corrupted knight who sacrifices HP for power.',
+    baseStats: { hp: 52, mp: 15, atk: 11, def: 10, mag: 5, spd: 4 },
+  },
+  // MEDIUM ARMOR
+  warrior: {
+    color: '#8B0000',
+    tier: 2,
+    armorClass: 'medium',
+    description: 'A fierce fighter focused on breaking defenses.',
+    baseStats: { hp: 52, mp: 10, atk: 12, def: 7, mag: 2, spd: 5 },
+  },
+  dragoon: {
+    color: '#4682B4',
+    tier: 2,
+    armorClass: 'medium',
+    description: 'A dragon knight who leaps into battle from above.',
+    baseStats: { hp: 48, mp: 14, atk: 10, def: 8, mag: 4, spd: 5 },
+  },
+  // LIGHT ARMOR - MELEE
+  thief: {
+    color: '#DAA520',
+    tier: 2,
+    armorClass: 'light',
+    description: 'A quick-fingered scoundrel who steals from enemies.',
+    baseStats: { hp: 34, mp: 14, atk: 6, def: 4, mag: 3, spd: 10 },
+  },
+  assassin: {
+    color: '#1C1C1C',
+    tier: 2,
+    armorClass: 'light',
+    description: 'A deadly killer who ends fights with single strikes.',
+    baseStats: { hp: 36, mp: 16, atk: 11, def: 3, mag: 5, spd: 10 },
+  },
+  ninja: {
+    color: '#2F2F4F',
+    tier: 2,
+    armorClass: 'light',
+    description: 'A versatile fighter using ninjutsu and thrown weapons.',
+    baseStats: { hp: 38, mp: 18, atk: 9, def: 5, mag: 6, spd: 9 },
+  },
+  // LIGHT ARMOR - RANGED
+  sniper: {
+    color: '#556B2F',
+    tier: 2,
+    armorClass: 'light',
+    description: 'An elite marksman specializing in called shots.',
+    baseStats: { hp: 32, mp: 14, atk: 9, def: 3, mag: 3, spd: 6 },
+  },
+  ranger: {
+    color: '#228B22',
+    tier: 2,
+    armorClass: 'light',
+    description: 'A wilderness expert who uses nature and traps.',
+    baseStats: { hp: 38, mp: 16, atk: 8, def: 5, mag: 5, spd: 7 },
+  },
+  // MAGES (Tier 2 versions removed - now use tier 1 whiteMage and darkMage as base jobs)
+  timeMage: {
+    color: '#00CED1',
+    tier: 2,
+    armorClass: 'light',
+    description: 'A manipulator of time and space.',
+    baseStats: { hp: 28, mp: 38, atk: 2, def: 3, mag: 11, spd: 6 },
+  }
+};
+
+// Level template definitions for the selection screen
+const levelTemplateInfo = {
+  random: { name: 'Random Battlefield', description: 'A randomly generated battlefield with mixed terrain' },
+  forest: { name: 'Dense Forest', description: 'Many trees and rocks, some shallow water' },
+  volcanic: { name: 'Volcanic Wasteland', description: 'Dangerous lava flows and burnt ground' },
+  lakeside: { name: 'Lakeside', description: 'A large lake with deep water in the center' },
+  plains: { name: 'Open Plains', description: 'Wide open grassland with minimal obstacles' },
+  ruins: { name: 'Ancient Ruins', description: 'Crumbling ruins with rocks and burnt ground' }
+};
+
+// Team Selection Screen Component
+const TeamSelectionScreen = ({ onStartGame }) => {
+  const [gameMode, setGameMode] = useState('normal'); // 'normal' or 'endless'
+  const [playerTeam, setPlayerTeam] = useState([
+    { id: 1, name: 'Arthur', job: 'knight', level: 1 },
+    { id: 2, name: 'Merlin', job: 'whiteMage', level: 1 },
+    { id: 3, name: 'Phoenix', job: 'archer', level: 1 },
+  ]);
+  const [enemyTeam, setEnemyTeam] = useState([
+    { id: 101, name: 'Goblin', job: 'knight', level: 1 },
+    { id: 102, name: 'Dark Sorcerer', job: 'darkMage', level: 2 },
+  ]);
+  const [selectedTab, setSelectedTab] = useState('player');
+  const [selectedLevel, setSelectedLevel] = useState('random');
+
+  const playerNames = ['Arthur', 'Lancelot', 'Gawain', 'Percival', 'Galahad', 'Tristan', 'Merlin', 'Morgana', 'Guinevere', 'Shadow', 'Raven', 'Storm', 'Blade', 'Phoenix', 'Luna'];
+  const enemyNames = ['Goblin', 'Orc', 'Troll', 'Dark Mage', 'Shadow Knight', 'Skeleton', 'Wraith', 'Demon', 'Lich', 'Dragon', 'Imp', 'Ogre', 'Bandit', 'Assassin', 'Necromancer'];
+
+  const baseJobs = Object.entries(jobDataStatic).filter(([_, data]) => data.tier === 1).map(([key]) => key);
+  const advancedJobs = Object.entries(jobDataStatic).filter(([_, data]) => data.tier === 2).map(([key]) => key);
+
+  const addUnit = (team) => {
+    const names = team === 'player' ? playerNames : enemyNames;
+    const currentTeam = team === 'player' ? playerTeam : enemyTeam;
+    const setTeam = team === 'player' ? setPlayerTeam : setEnemyTeam;
+
+    const maxUnits = (team === 'player' && gameMode === 'endless') ? 3 : 6;
+    if (currentTeam.length >= maxUnits) return;
+    
+    const usedNames = currentTeam.map(u => u.name);
+    const availableNames = names.filter(n => !usedNames.includes(n));
+    const newName = availableNames.length > 0 ? availableNames[0] : `Unit ${currentTeam.length + 1}`;
+    
+    const newUnit = {
+      id: team === 'player' ? currentTeam.length + 1 : 100 + currentTeam.length + 1,
+      name: newName,
+      job: 'knight',
+      level: 1
+    };
+    
+    setTeam([...currentTeam, newUnit]);
+  };
+
+  const removeUnit = (team, id) => {
+    const currentTeam = team === 'player' ? playerTeam : enemyTeam;
+    const setTeam = team === 'player' ? setPlayerTeam : setEnemyTeam;
+    
+    if (currentTeam.length <= 1) return;
+    
+    setTeam(currentTeam.filter(u => u.id !== id));
+  };
+
+  const updateUnit = (team, id, field, value) => {
+    const currentTeam = team === 'player' ? playerTeam : enemyTeam;
+    const setTeam = team === 'player' ? setPlayerTeam : setEnemyTeam;
+    
+    setTeam(currentTeam.map(u => {
+      if (u.id === id) {
+        return { ...u, [field]: field === 'level' ? Math.max(1, Math.min(10, parseInt(value) || 1)) : value };
+      }
+      return u;
+    }));
+  };
+
+  const handleStartGame = () => {
+    if (gameMode === 'endless') {
+      // Endless mode validation
+      if (playerTeam.length === 0 || playerTeam.length > 3) {
+        alert('Endless mode requires 1-3 units!');
+        return;
+      }
+      // Check that all units are level 1 and base jobs
+      const allValid = playerTeam.every(u => {
+        const jobInfo = jobDataStatic[u.job];
+        return u.level === 1 && jobInfo && jobInfo.tier === 1;
+      });
+      if (!allValid) {
+        alert('Endless mode requires all units to be level 1 with base jobs (Knight, Rogue, Archer, White Mage, or Dark Mage)!');
+        return;
+      }
+      onStartGame(playerTeam, null, selectedLevel, gameMode);
+    } else {
+      // Normal mode validation
+      if (playerTeam.length === 0 || enemyTeam.length === 0) {
+        alert('Both teams need at least one unit!');
+        return;
+      }
+      onStartGame(playerTeam, enemyTeam, selectedLevel, gameMode);
+    }
+  };
+
+  const renderJobCard = (jobKey, jobInfo) => {
+    const armorColors = {
+      light: 'bg-green-600',
+      medium: 'bg-yellow-600', 
+      heavy: 'bg-red-600'
+    };
+    return (
+      <div key={jobKey} className="bg-gray-700 p-3 rounded-lg border-2 border-gray-600">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-full border-2 border-gray-500" style={{ backgroundColor: jobInfo.color }} />
+          <span className="font-bold text-white capitalize">{jobKey === 'darkKnight' ? 'Dark Knight' : jobKey}</span>
+          {jobInfo.tier === 2 && <span className="text-xs bg-yellow-600 px-1 rounded">Advanced</span>}
+        </div>
+        <div className="flex gap-1 mb-2">
+          {jobInfo.armorClass && (
+            <span className={`text-xs ${armorColors[jobInfo.armorClass]} px-2 py-0.5 rounded capitalize`}>
+              {jobInfo.armorClass} Armor
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-400 mb-2">{jobInfo.description}</p>
+        <div className="grid grid-cols-3 gap-1 text-xs">
+          <div className="text-red-400">HP: {jobInfo.baseStats.hp}</div>
+          <div className="text-blue-400">MP: {jobInfo.baseStats.mp}</div>
+          <div className="text-orange-400">ATK: {jobInfo.baseStats.atk}</div>
+          <div className="text-green-400">DEF: {jobInfo.baseStats.def}</div>
+          <div className="text-purple-400">MAG: {jobInfo.baseStats.mag}</div>
+          <div className="text-cyan-400">SPD: {jobInfo.baseStats.spd}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderUnitEditor = (unit, team) => {
+    const names = team === 'player' ? playerNames : enemyNames;
+    
+    return (
+      <div key={unit.id} className="bg-gray-700 p-3 rounded-lg border-2 transition-colors" style={{ borderColor: jobDataStatic[unit.job]?.color || '#666' }}>
+        <div className="flex justify-between items-start mb-2">
+          <select value={unit.name} onChange={(e) => updateUnit(team, unit.id, 'name', e.target.value)} className="bg-gray-600 text-white px-2 py-1 rounded text-sm flex-1">
+            {names.map(name => (<option key={name} value={name}>{name}</option>))}
+          </select>
+          <button onClick={() => removeUnit(team, unit.id)} className="ml-2 text-red-400 hover:text-red-300 text-lg font-bold" title="Remove unit">×</button>
+        </div>
+        
+        <div className="mb-2">
+          <label className="text-xs text-gray-400 block mb-1">Job:</label>
+          <select
+            value={unit.job}
+            onChange={(e) => updateUnit(team, unit.id, 'job', e.target.value)}
+            className="bg-gray-600 text-white px-2 py-1 rounded text-sm w-full">
+            {gameMode === 'endless' && team === 'player' ? (
+              <optgroup label="Base Jobs (Endless Mode)">
+                {baseJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
+              </optgroup>
+            ) : (
+              <>
+                <optgroup label="Base Jobs">
+                  {baseJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
+                </optgroup>
+                <optgroup label="Advanced Jobs">
+                  {advancedJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
+                </optgroup>
+              </>
+            )}
+          </select>
+        </div>
+
+        <div className="mb-2">
+          <label className="text-xs text-gray-400 block mb-1">Level {gameMode === 'endless' && team === 'player' ? '(Fixed at 1)' : '(1-10)'}:</label>
+          <input
+            type="number"
+            min="1"
+            max="10"
+            value={gameMode === 'endless' && team === 'player' ? 1 : unit.level}
+            onChange={(e) => updateUnit(team, unit.id, 'level', e.target.value)}
+            className="bg-gray-600 text-white px-2 py-1 rounded text-sm w-20"
+            disabled={gameMode === 'endless' && team === 'player'} />
+        </div>
+        
+        <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-800 rounded">
+          <div className="font-semibold text-gray-300 mb-1">{jobDataStatic[unit.job]?.description}</div>
+          <div className="grid grid-cols-3 gap-1">
+            <span className="text-red-400">HP: {jobDataStatic[unit.job]?.baseStats.hp}</span>
+            <span className="text-blue-400">MP: {jobDataStatic[unit.job]?.baseStats.mp}</span>
+            <span className="text-orange-400">ATK: {jobDataStatic[unit.job]?.baseStats.atk}</span>
+            <span className="text-green-400">DEF: {jobDataStatic[unit.job]?.baseStats.def}</span>
+            <span className="text-purple-400">MAG: {jobDataStatic[unit.job]?.baseStats.mag}</span>
+            <span className="text-cyan-400">SPD: {jobDataStatic[unit.job]?.baseStats.spd}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 p-6">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-4xl font-bold text-center text-white mb-2">Tactical RPG</h1>
+        <h2 className="text-xl text-center text-yellow-400 mb-4">Team Selection</h2>
+
+        {/* Game Mode Selection */}
+        <div className="flex justify-center gap-4 mb-6">
+          <button
+            onClick={() => setGameMode('normal')}
+            className={`px-6 py-3 rounded-lg font-bold transition-colors ${gameMode === 'normal' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Normal Mode
+          </button>
+          <button
+            onClick={() => setGameMode('endless')}
+            className={`px-6 py-3 rounded-lg font-bold transition-colors ${gameMode === 'endless' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Endless Mode
+          </button>
+        </div>
+
+        {gameMode === 'endless' && (
+          <div className="bg-purple-900 border-2 border-purple-500 rounded-lg p-4 mb-6 text-center">
+            <h3 className="text-xl font-bold text-purple-200 mb-2">Endless Mode Rules</h3>
+            <p className="text-purple-100 text-sm">
+              • Start with 1-3 units at level 1 (base jobs only)<br/>
+              • Face waves of increasingly difficult enemies<br/>
+              • Earn Gil and EXP after each wave<br/>
+              • Spend EXP to level up and Gil to buy equipment<br/>
+              • Survive as long as you can!
+            </p>
+          </div>
+        )}
+
+        <div className="flex justify-center gap-4 mb-6">
+          <button onClick={() => setSelectedTab('player')} className={`px-6 py-3 rounded-lg font-bold transition-colors ${selectedTab === 'player' ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Your Team ({playerTeam.length}/{gameMode === 'endless' ? '3' : '6'})
+          </button>
+          {gameMode === 'normal' && (
+            <button onClick={() => setSelectedTab('enemy')} className={`px-6 py-3 rounded-lg font-bold transition-colors ${selectedTab === 'enemy' ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+              Enemy Team ({enemyTeam.length}/6)
+            </button>
+          )}
+          <button onClick={() => setSelectedTab('level')} className={`px-6 py-3 rounded-lg font-bold transition-colors ${selectedTab === 'level' ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Battlefield
+          </button>
+          <button onClick={() => setSelectedTab('jobs')} className={`px-6 py-3 rounded-lg font-bold transition-colors ${selectedTab === 'jobs' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+            Job Reference
+          </button>
+        </div>
+
+        {selectedTab === 'player' && (
+          <div className="bg-gray-800 p-6 rounded-xl border-2 border-green-600">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-2xl font-bold text-green-400">Your Team</h3>
+              <button onClick={() => addUnit('player')} disabled={playerTeam.length >= 6} className={`px-4 py-2 rounded-lg font-bold ${playerTeam.length >= 6 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-500'}`}>
+                + Add Unit
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {playerTeam.map(unit => renderUnitEditor(unit, 'player'))}
+            </div>
+          </div>
+        )}
+
+        {selectedTab === 'enemy' && (
+          <div className="bg-gray-800 p-6 rounded-xl border-2 border-red-600">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-2xl font-bold text-red-400">Enemy Team</h3>
+              <button onClick={() => addUnit('enemy')} disabled={enemyTeam.length >= 6} className={`px-4 py-2 rounded-lg font-bold ${enemyTeam.length >= 6 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-500'}`}>
+                + Add Unit
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {enemyTeam.map(unit => renderUnitEditor(unit, 'enemy'))}
+            </div>
+          </div>
+        )}
+
+        {selectedTab === 'level' && (
+          <div className="bg-gray-800 p-6 rounded-xl border-2 border-orange-600">
+            <h3 className="text-2xl font-bold text-orange-400 mb-4">Select Battlefield</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(levelTemplateInfo).map(([key, info]) => (
+                <div 
+                  key={key}
+                  onClick={() => setSelectedLevel(key)}
+                  className={`p-4 rounded-lg cursor-pointer transition-all ${selectedLevel === key ? 'bg-orange-600 border-2 border-orange-400' : 'bg-gray-700 border-2 border-gray-600 hover:border-gray-500'}`}
+                >
+                  <div className="font-bold text-white text-lg mb-1">{info.name}</div>
+                  <div className="text-sm text-gray-300">{info.description}</div>
+                  {key === 'volcanic' && <div className="text-xs text-red-400 mt-2">⚠️ Contains lava - dangerous!</div>}
+                  {key === 'lakeside' && <div className="text-xs text-blue-400 mt-2">💧 Contains deep water</div>}
+                  {key === 'forest' && <div className="text-xs text-green-400 mt-2">🌲 Flammable terrain</div>}
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 p-4 bg-gray-700 rounded-lg">
+              <h4 className="font-bold text-yellow-400 mb-2">Terrain Legend</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                <div><span className="text-green-400">●</span> Grass - Normal movement</div>
+                <div><span className="text-green-600">▲</span> Tree - Blocks movement, flammable</div>
+                <div><span className="text-gray-400">●</span> Rock - Blocks movement</div>
+                <div><span className="text-blue-400">~</span> Water - Slow movement, extinguishes fire</div>
+                <div><span className="text-blue-800">≈</span> Deep Water - Very slow, no actions, blocks heavy armor</div>
+                <div><span className="text-orange-500">🔥</span> Fire - Damages units, may spread</div>
+                <div><span className="text-red-600">●</span> Lava - Heavy damage, high burn chance</div>
+                <div><span className="text-gray-600">▪</span> Burnt Ground - Normal movement</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedTab === 'jobs' && (
+          <div className="bg-gray-800 p-6 rounded-xl border-2 border-purple-600">
+            <h3 className="text-2xl font-bold text-purple-400 mb-4">Base Jobs</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {baseJobs.map(jobKey => renderJobCard(jobKey, jobDataStatic[jobKey]))}
+            </div>
+            <h3 className="text-2xl font-bold text-yellow-400 mb-4">Advanced Jobs</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {advancedJobs.map(jobKey => renderJobCard(jobKey, jobDataStatic[jobKey]))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-center mt-8">
+          <button onClick={handleStartGame} disabled={playerTeam.length === 0 || enemyTeam.length === 0} className={`px-12 py-4 rounded-xl font-bold text-xl transition-all transform hover:scale-105 ${playerTeam.length === 0 || enemyTeam.length === 0 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-green-600 to-blue-600 text-white hover:from-green-500 hover:to-blue-500 shadow-lg'}`}>
+            ⚔️ Start Battle! ⚔️
+          </button>
+        </div>
+        <p className="text-center text-gray-500 mt-4">{playerTeam.length} allies vs {enemyTeam.length} enemies</p>
+      </div>
+    </div>
+  );
+};
+
+const TacticalRPG = () => {
+  const canvasRef = useRef(null);
+  const [selectedUnit, setSelectedUnit] = useState(null);
+  const [inspectedUnit, setInspectedUnit] = useState(null);
+  const [selectedSkill, setSelectedSkill] = useState(null);
+  const [gamePhase, setGamePhase] = useState('setup');
+  const [turnNumber, setTurnNumber] = useState(1);
+  const [message, setMessage] = useState('Select a unit to move');
+  const [turnOrder, setTurnOrder] = useState([]);
+  const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
+  const [messageLog, setMessageLog] = useState([]);
+  const logRef = useRef(null);
+  const aiProcessingRef = useRef(false);
+  const currentTurnIndexRef = useRef(0);
+
+  // Endless Mode State
+  const [gameMode, setGameMode] = useState('normal');
+  const [waveNumber, setWaveNumber] = useState(1);
+  const [gil, setGil] = useState(0);
+  const [inventory, setInventory] = useState([]); // Equipment owned by player
+  const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0 }); // Rewards from last wave
+  const [debugMode, setDebugMode] = useState(false); // Debug mode for bug reporting
+
+  const gameState = useRef({
+    grid: { cols: 15, rows: 15, tileSize: 50 },
+    terrain: [], // Will hold terrain data
+    units: [], // Will be populated when game starts
+    defeatedUnits: [], // Bodies that persist for 3 turns { unit, x, y, turnsRemaining }
+    selectedUnit: null,
+    selectedSkill: null,
+    moveRange: [],
+    skillRange: [],
+    hoveredTile: null
+  });
+
+  // Helper to get default equipment for a job
+  const getDefaultEquipment = (job) => {
+    const equipment = {
+      mainHand: null,
+      offHand: null,
+      armor: null,
+      helmet: null,
+      ring1: null,
+      ring2: null,
+      necklace: null
+    };
+
+    // Heavy armor classes
+    if (['knight', 'paladin', 'warrior'].includes(job)) {
+      equipment.mainHand = 'ironSword';
+      equipment.offHand = 'woodenShield';
+      equipment.armor = 'chainMail';
+      equipment.helmet = 'ironHelm';
+    } else if (job === 'darkKnight') {
+      equipment.mainHand = 'darkBlade';
+      equipment.offHand = 'woodenShield';
+      equipment.armor = 'chainMail';
+      equipment.helmet = 'ironHelm';
+    } else if (job === 'dragoon') {
+      equipment.mainHand = 'ironSpear';
+      equipment.offHand = null;
+      equipment.armor = 'chainMail';
+      equipment.helmet = 'ironHelm';
+    // Light armor - Mages
+    } else if (['whiteMage', 'darkMage', 'blackMage', 'timeMage'].includes(job)) {
+      equipment.mainHand = 'woodenStaff';
+      equipment.offHand = 'tome';
+      equipment.armor = 'clothRobe';
+      equipment.helmet = 'wizardHat';
+    // Light armor - Melee
+    } else if (['rogue', 'thief', 'assassin', 'ninja'].includes(job)) {
+      equipment.mainHand = 'ironDagger';
+      equipment.offHand = 'secondDagger';
+      equipment.armor = 'leatherArmor';
+      equipment.helmet = 'leatherCap';
+    // Light armor - Ranged
+    } else if (['archer', 'sniper', 'ranger'].includes(job)) {
+      equipment.mainHand = 'shortBow';
+      equipment.offHand = 'quiver';
+      equipment.armor = 'leatherArmor';
+      equipment.helmet = 'leatherCap';
+    }
+
+    return equipment;
+  };
+
+  const jobData = {
+    // ==================== BASE JOBS ====================
+    
+    // MEDIUM ARMOR - Base
+    knight: { 
+      color: '#4169E1', 
+      tier: 1,
+      armorClass: 'medium',
+      description: 'A stalwart defender skilled with sword and shield.',
+      baseStats: { hp: 45, mp: 10, atk: 8, def: 8, mag: 3, spd: 4 },
+      skills: [
+        { name: 'Sword Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A basic sword attack.' },
+        { name: 'Shield Bash', mpCost: 4, power: 0.7, range: 1, type: 'physical', targetType: 'enemy', effect: 'stun', accuracy: 85, level: 1, description: 'Bash with shield. May stun.' },
+        { name: 'Parry', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'parry', accuracy: 100, level: 2, description: 'Defensive stance. +50% DEF until next turn.' },
+        { name: 'War Cry', mpCost: 8, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'buff_atk', accuracy: 100, level: 3, description: 'Rally nearby allies. +ATK buff.' },
+        { name: 'Provoke', mpCost: 6, power: 0, range: 3, type: 'status', targetType: 'enemy', effect: 'provoke', accuracy: 80, level: 4, description: 'Force enemy to target you.' },
+        { name: 'Cross Slash', mpCost: 12, power: 1.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 5, description: 'Powerful X-shaped slash.' }
+      ],
+      statGrowth: { hp: 8, mp: 2, atk: 3, def: 3, mag: 1, spd: 1 },
+      unlocks: { paladin: 4, warrior: 3, dragoon: 5 }
+    },
+    
+    // LIGHT ARMOR - Base
+    rogue: { 
+      color: '#2F4F2F', 
+      tier: 1,
+      armorClass: 'light',
+      description: 'A swift striker who excels at stealth and dirty tricks.',
+      baseStats: { hp: 32, mp: 15, atk: 6, def: 4, mag: 4, spd: 8 },
+      skills: [
+        { name: 'Dagger Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A quick dagger strike.' },
+        { name: 'Sneak Attack', mpCost: 6, power: 1.6, range: 1, type: 'physical', targetType: 'enemy', accuracy: 85, level: 1, description: 'Strike from behind for bonus damage.' },
+        { name: 'Poison Strike', mpCost: 8, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'poison', accuracy: 80, level: 2, description: 'Venomous attack. May poison.' },
+        { name: 'Feint', mpCost: 5, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 3, description: 'Fake attack that lowers enemy DEF.' },
+        { name: 'Throw Sand', mpCost: 4, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'blind', accuracy: 75, level: 4, description: 'Blind enemy with dirt.' },
+        { name: 'Coup de Grace', mpCost: 15, power: 2.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 75, level: 5, description: 'Deadly finishing blow.' }
+      ],
+      statGrowth: { hp: 5, mp: 3, atk: 2, def: 1, mag: 2, spd: 4 },
+      unlocks: { thief: 3, assassin: 4, ninja: 5 }
+    },
+    
+    // LIGHT ARMOR - Base (NEW)
+    archer: { 
+      color: '#8B4513', 
+      tier: 1,
+      armorClass: 'light',
+      description: 'A skilled marksman who strikes from a distance.',
+      baseStats: { hp: 34, mp: 12, atk: 7, def: 4, mag: 3, spd: 6 },
+      skills: [
+        { name: 'Bow Shot', mpCost: 0, power: 1.0, range: 4, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Standard ranged attack.' },
+        { name: 'Aim', mpCost: 4, power: 1.3, range: 5, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Careful aimed shot. Higher accuracy.' },
+        { name: 'Leg Shot', mpCost: 6, power: 0.8, range: 4, type: 'physical', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 2, description: 'Shoot the legs. May slow.' },
+        { name: 'Rapid Fire', mpCost: 10, power: 0.6, range: 4, type: 'physical', targetType: 'enemy', hits: 2, accuracy: 75, level: 3, description: 'Fire two quick shots.' },
+        { name: 'Focus', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'focus', accuracy: 100, level: 4, description: 'Concentrate. Next attack +50% damage.' },
+        { name: 'Piercing Shot', mpCost: 14, power: 1.8, range: 5, type: 'physical', targetType: 'enemy', effect: 'armor_pierce', accuracy: 85, level: 5, description: 'Arrow that ignores 50% DEF.' }
+      ],
+      statGrowth: { hp: 5, mp: 2, atk: 3, def: 1, mag: 1, spd: 3 },
+      unlocks: { sniper: 4, ranger: 4 }
+    },
+    
+    // WHITE MAGE - Base (Healer)
+    whiteMage: {
+      color: '#F0F8FF',
+      tier: 1,
+      armorClass: 'light',
+      description: 'A healer devoted to restoring allies.',
+      baseStats: { hp: 30, mp: 28, atk: 2, def: 4, mag: 10, spd: 4 },
+      skills: [
+        { name: 'Staff Strike', mpCost: 0, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Bonk with staff.' },
+        { name: 'Cure', mpCost: 8, power: 25, range: 4, type: 'heal', targetType: 'ally', accuracy: 100, level: 1, description: 'Restore HP to an ally.' },
+        { name: 'Protect', mpCost: 10, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'buff_def', accuracy: 100, level: 2, description: 'Increase ally DEF.' },
+        { name: 'Esuna', mpCost: 12, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'cleanse', accuracy: 100, level: 3, description: 'Remove status ailments.' },
+        { name: 'Cura', mpCost: 16, power: 50, range: 4, type: 'heal', targetType: 'ally', accuracy: 100, level: 4, description: 'Strong healing.' },
+        { name: 'Raise', mpCost: 24, power: 0.5, range: 2, type: 'revive', targetType: 'ally', accuracy: 100, level: 5, description: 'Revive fallen ally with 50% HP.' }
+      ],
+      statGrowth: { hp: 4, mp: 6, atk: 0, def: 2, mag: 3, spd: 1 },
+      unlocks: { timeMage: 5 }
+    },
+
+    // DARK MAGE - Base (Destructive Magic)
+    darkMage: {
+      color: '#9370DB',
+      tier: 1,
+      armorClass: 'light',
+      description: 'A wielder of destructive elemental magic.',
+      baseStats: { hp: 28, mp: 30, atk: 3, def: 3, mag: 12, spd: 5 },
+      skills: [
+        { name: 'Staff Strike', mpCost: 0, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Bonk with staff.' },
+        { name: 'Fire', mpCost: 8, power: 1.3, range: 4, type: 'magic', targetType: 'enemy', accuracy: 90, level: 1, description: 'Basic fire spell.' },
+        { name: 'Blizzard', mpCost: 10, power: 1.4, range: 4, type: 'magic', targetType: 'enemy', effect: 'slow', accuracy: 85, level: 2, description: 'Ice magic. May slow.' },
+        { name: 'Thunder', mpCost: 12, power: 1.6, range: 5, type: 'magic', targetType: 'enemy', accuracy: 80, level: 3, description: 'Lightning strike.' },
+        { name: 'Drain', mpCost: 14, power: 1.2, range: 4, type: 'magic', targetType: 'enemy', effect: 'drain', accuracy: 85, level: 4, description: 'Steal HP from enemy.' },
+        { name: 'Firaga', mpCost: 20, power: 2.2, range: 5, type: 'magic', targetType: 'enemy', accuracy: 85, level: 5, description: 'Powerful fire magic.' }
+      ],
+      statGrowth: { hp: 4, mp: 6, atk: 1, def: 1, mag: 4, spd: 2 },
+      unlocks: { blackMage: 3, timeMage: 5 }
+    },
+
+    // ==================== HEAVY ARMOR JOBS ====================
+    
+    paladin: {
+      color: '#FFD700',
+      tier: 2,
+      armorClass: 'heavy',
+      description: 'A holy knight who protects allies and smites evil.',
+      baseStats: { hp: 55, mp: 18, atk: 8, def: 12, mag: 6, spd: 3 },
+      skills: [
+        { name: 'Sword Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A basic sword attack.' },
+        { name: 'Holy Blade', mpCost: 10, power: 1.4, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Light-infused sword strike.' },
+        { name: 'Cover', mpCost: 6, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'cover', accuracy: 100, level: 1, description: 'Take hits for an ally.' },
+        { name: 'Heal', mpCost: 10, power: 30, range: 2, type: 'heal', targetType: 'ally', accuracy: 100, level: 2, description: 'Minor healing.' },
+        { name: 'Sentinel', mpCost: 12, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'sentinel', accuracy: 100, level: 3, description: 'Greatly increase DEF, draw attacks.' },
+        { name: 'Saint Cross', mpCost: 18, power: 1.8, range: 1, type: 'physical', targetType: 'enemy', effect: 'holy', accuracy: 90, level: 4, description: 'Holy cross attack.' },
+        { name: 'Divine Shield', mpCost: 25, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'invincible', accuracy: 100, level: 5, description: 'Become invulnerable for one turn.' }
+      ],
+      statGrowth: { hp: 10, mp: 3, atk: 2, def: 5, mag: 2, spd: 1 },
+      unlocks: {}
+    },
+    
+    darkKnight: {
+      color: '#2F0F3F',
+      tier: 2,
+      armorClass: 'heavy',
+      description: 'A corrupted knight who sacrifices HP for devastating attacks.',
+      baseStats: { hp: 52, mp: 15, atk: 11, def: 10, mag: 5, spd: 4 },
+      skills: [
+        { name: 'Dark Blade', mpCost: 0, power: 1.1, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Darkness-infused slash.' },
+        { name: 'Soul Eater', mpCost: 0, hpCost: 15, power: 1.8, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Sacrifice HP for power.' },
+        { name: 'Dark Wave', mpCost: 0, hpCost: 10, power: 1.3, range: 2, type: 'physical', targetType: 'enemy', aoe: true, accuracy: 85, level: 2, description: 'Dark pulse hits nearby enemies.' },
+        { name: 'Abyssal Blade', mpCost: 8, hpCost: 8, power: 1.6, range: 1, type: 'physical', targetType: 'enemy', effect: 'drain', accuracy: 90, level: 3, description: 'Drain HP with dark sword.' },
+        { name: 'Nightsword', mpCost: 12, power: 1.5, range: 1, type: 'physical', targetType: 'enemy', effect: 'mp_drain', accuracy: 85, level: 4, description: 'Drain MP from enemy.' },
+        { name: 'Darkness', mpCost: 0, hpCost: 25, power: 2.5, range: 2, type: 'physical', targetType: 'enemy', aoe: true, accuracy: 80, level: 5, description: 'Massive dark explosion.' }
+      ],
+      statGrowth: { hp: 9, mp: 2, atk: 5, def: 4, mag: 1, spd: 1 },
+      unlocks: {}
+    },
+
+    // ==================== MEDIUM ARMOR JOBS ====================
+    
+    warrior: {
+      color: '#8B0000',
+      tier: 2,
+      armorClass: 'medium',
+      description: 'A fierce fighter focused on breaking enemy defenses.',
+      baseStats: { hp: 52, mp: 10, atk: 12, def: 7, mag: 2, spd: 5 },
+      skills: [
+        { name: 'Cleave', mpCost: 0, power: 1.1, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Heavy overhead swing.' },
+        { name: 'Power Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'atk_down', accuracy: 90, level: 1, description: 'Reduce enemy ATK.' },
+        { name: 'Armor Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 2, description: 'Reduce enemy DEF.' },
+        { name: 'Magic Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'mag_down', accuracy: 90, level: 2, description: 'Reduce enemy MAG.' },
+        { name: 'Speed Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'spd_down', accuracy: 90, level: 3, description: 'Reduce enemy SPD.' },
+        { name: 'Full Break', mpCost: 15, power: 1.2, range: 1, type: 'physical', targetType: 'enemy', effect: 'full_break', accuracy: 75, level: 4, description: 'Reduce all enemy stats.' },
+        { name: 'Rend Weapon', mpCost: 12, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', effect: 'disarm', accuracy: 70, level: 5, description: 'Destroy enemy weapon.' }
+      ],
+      statGrowth: { hp: 9, mp: 1, atk: 5, def: 3, mag: 0, spd: 2 },
+      unlocks: {}
+    },
+    
+    dragoon: {
+      color: '#4682B4',
+      tier: 2,
+      armorClass: 'medium',
+      description: 'A dragon knight who leaps into battle from above.',
+      baseStats: { hp: 48, mp: 14, atk: 10, def: 8, mag: 4, spd: 5 },
+      skills: [
+        { name: 'Spear Thrust', mpCost: 0, power: 1.0, range: 2, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Long-range spear attack.' },
+        { name: 'Jump', mpCost: 10, power: 1.8, range: 3, type: 'physical', targetType: 'enemy', effect: 'jump', accuracy: 95, level: 1, description: 'Leap and strike from above. Unavoidable.' },
+        { name: 'Lancet', mpCost: 8, power: 1.0, range: 2, type: 'physical', targetType: 'enemy', effect: 'drain', accuracy: 90, level: 2, description: 'Drain HP with spear.' },
+        { name: 'Reis Wind', mpCost: 12, power: 15, range: 2, type: 'heal', targetType: 'ally', aoe: true, accuracy: 100, level: 3, description: 'Dragon breath heals allies.' },
+        { name: 'Dragon Breath', mpCost: 14, power: 1.5, range: 3, type: 'magic', targetType: 'enemy', accuracy: 85, level: 4, description: 'Elemental dragon fire.' },
+        { name: 'High Jump', mpCost: 18, power: 2.5, range: 4, type: 'physical', targetType: 'enemy', effect: 'jump', accuracy: 100, level: 5, description: 'Devastating aerial strike.' }
+      ],
+      statGrowth: { hp: 8, mp: 2, atk: 4, def: 3, mag: 1, spd: 2 },
+      unlocks: {}
+    },
+
+    // ==================== LIGHT ARMOR JOBS ====================
+    
+    thief: {
+      color: '#DAA520',
+      tier: 2,
+      armorClass: 'light',
+      description: 'A quick-fingered scoundrel who steals from enemies.',
+      baseStats: { hp: 34, mp: 14, atk: 6, def: 4, mag: 3, spd: 10 },
+      skills: [
+        { name: 'Dagger Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Quick dagger strike.' },
+        { name: 'Steal Gil', mpCost: 4, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'steal_gil', accuracy: 80, level: 1, description: 'Steal money from enemy.' },
+        { name: 'Steal Item', mpCost: 6, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'steal_item', accuracy: 70, level: 2, description: 'Steal an item.' },
+        { name: 'Mug', mpCost: 10, power: 1.2, range: 1, type: 'physical', targetType: 'enemy', effect: 'steal_gil', accuracy: 80, level: 3, description: 'Attack and steal.' },
+        { name: 'Steal Weapon', mpCost: 14, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'disarm', accuracy: 60, level: 4, description: 'Steal equipped weapon.' },
+        { name: 'Steal Heart', mpCost: 12, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'charm', accuracy: 50, level: 5, description: 'Charm enemy to your side.' }
+      ],
+      statGrowth: { hp: 5, mp: 2, atk: 2, def: 2, mag: 1, spd: 5 },
+      unlocks: {}
+    },
+    
+    assassin: {
+      color: '#1C1C1C',
+      tier: 2,
+      armorClass: 'light',
+      description: 'A deadly killer who ends fights with single strikes.',
+      baseStats: { hp: 36, mp: 16, atk: 11, def: 3, mag: 5, spd: 10 },
+      skills: [
+        { name: 'Dagger Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Quick dagger strike.' },
+        { name: 'Shadowbind', mpCost: 8, power: 0, range: 3, type: 'status', targetType: 'enemy', effect: 'immobilize', accuracy: 80, level: 1, description: 'Pin enemy shadow to stop movement.' },
+        { name: 'Last Breath', mpCost: 20, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'doom', accuracy: 40, level: 2, description: 'Instant death. Low accuracy.' },
+        { name: 'Rockseal', mpCost: 14, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'petrify', accuracy: 35, level: 3, description: 'Turn enemy to stone.' },
+        { name: 'Oblivion', mpCost: 12, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'silence', accuracy: 75, level: 4, description: 'Silence enemy caster.' },
+        { name: 'Assassinate', mpCost: 25, power: 4.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 60, level: 5, description: 'Lethal strike. High damage if it hits.' }
+      ],
+      statGrowth: { hp: 5, mp: 3, atk: 5, def: 1, mag: 2, spd: 4 },
+      unlocks: {}
+    },
+    
+    ninja: {
+      color: '#2F2F4F',
+      tier: 2,
+      armorClass: 'light',
+      description: 'A versatile fighter using ninjutsu and thrown weapons.',
+      baseStats: { hp: 38, mp: 18, atk: 9, def: 5, mag: 6, spd: 9 },
+      skills: [
+        { name: 'Shuriken', mpCost: 0, power: 0.9, range: 4, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Throw a shuriken.' },
+        { name: 'Throw', mpCost: 8, power: 1.5, range: 5, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Throw a weapon for high damage.' },
+        { name: 'Smoke Bomb', mpCost: 10, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'blind', accuracy: 85, level: 2, description: 'Blind enemies with smoke.' },
+        { name: 'Katon', mpCost: 12, power: 1.4, range: 3, type: 'magic', targetType: 'enemy', effect: 'burn', accuracy: 85, level: 3, description: 'Fire ninjutsu.' },
+        { name: 'Utsusemi', mpCost: 16, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'evade_all', accuracy: 100, level: 4, description: 'Create shadow clones. Evade next 2 attacks.' },
+        { name: 'Dual Wield', mpCost: 14, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', hits: 2, accuracy: 85, level: 5, description: 'Strike twice with both weapons.' }
+      ],
+      statGrowth: { hp: 6, mp: 3, atk: 3, def: 2, mag: 2, spd: 4 },
+      unlocks: {}
+    },
+    
+    sniper: {
+      color: '#556B2F',
+      tier: 2,
+      armorClass: 'light',
+      description: 'An elite marksman specializing in called shots.',
+      baseStats: { hp: 32, mp: 14, atk: 9, def: 3, mag: 3, spd: 6 },
+      skills: [
+        { name: 'Bow Shot', mpCost: 0, power: 1.0, range: 5, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Standard ranged attack.' },
+        { name: 'Beso Toxico', mpCost: 8, power: 1.0, range: 5, type: 'physical', targetType: 'enemy', effect: 'poison', accuracy: 85, level: 1, description: 'Poison arrow.' },
+        { name: 'Death Sickle', mpCost: 10, power: 1.2, range: 5, type: 'physical', targetType: 'enemy', effect: 'doom', accuracy: 30, level: 2, description: 'Arrow of death. May instant kill.' },
+        { name: 'Conceal', mpCost: 8, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'hidden', accuracy: 100, level: 3, description: 'Hide from enemies.' },
+        { name: 'Arm Shot', mpCost: 10, power: 1.0, range: 5, type: 'physical', targetType: 'enemy', effect: 'disable', accuracy: 75, level: 4, description: 'Disable enemy actions.' },
+        { name: 'Doubleshot', mpCost: 16, power: 1.0, range: 5, type: 'physical', targetType: 'enemy', hits: 2, accuracy: 80, level: 5, description: 'Fire two arrows rapidly.' }
+      ],
+      statGrowth: { hp: 4, mp: 2, atk: 4, def: 1, mag: 1, spd: 3 },
+      unlocks: {}
+    },
+    
+    ranger: {
+      color: '#228B22',
+      tier: 2,
+      armorClass: 'light',
+      description: 'A wilderness expert who uses nature and traps.',
+      baseStats: { hp: 38, mp: 16, atk: 8, def: 5, mag: 5, spd: 7 },
+      skills: [
+        { name: 'Bow Shot', mpCost: 0, power: 1.0, range: 4, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Standard ranged attack.' },
+        { name: 'Spite', mpCost: 6, power: 1.3, range: 4, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Precise shot. Bonus vs beasts.' },
+        { name: 'Capture', mpCost: 10, power: 0, range: 3, type: 'status', targetType: 'enemy', effect: 'immobilize', accuracy: 75, level: 2, description: 'Trap enemy in place.' },
+        { name: 'Barrage', mpCost: 14, power: 0.6, range: 4, type: 'physical', targetType: 'enemy', hits: 3, accuracy: 70, level: 3, description: 'Rain of arrows. Hits 3 times.' },
+        { name: 'Heal', mpCost: 8, power: 20, range: 2, type: 'heal', targetType: 'ally', accuracy: 100, level: 4, description: 'Herbal healing.' },
+        { name: 'Hunting', mpCost: 12, power: 2.0, range: 4, type: 'physical', targetType: 'enemy', accuracy: 85, level: 5, description: 'Deadly hunter shot.' }
+      ],
+      statGrowth: { hp: 6, mp: 3, atk: 3, def: 2, mag: 2, spd: 3 },
+      unlocks: {}
+    },
+
+    // ==================== MAGE JOBS ====================
+    // Note: whiteMage and darkMage are now tier 1 base jobs (see above)
+    // blackMage was removed to avoid duplication with darkMage
+
+    timeMage: {
+      color: '#00CED1',
+      tier: 2,
+      armorClass: 'light',
+      description: 'A manipulator of time and space.',
+      baseStats: { hp: 28, mp: 38, atk: 2, def: 3, mag: 11, spd: 6 },
+      skills: [
+        { name: 'Staff Strike', mpCost: 0, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Bonk with staff.' },
+        { name: 'Haste', mpCost: 12, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'haste', accuracy: 100, level: 1, description: 'Speed up ally.' },
+        { name: 'Slow', mpCost: 10, power: 0, range: 4, type: 'status', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 1, description: 'Slow down enemy.' },
+        { name: 'Reflect', mpCost: 14, power: 0, range: 3, type: 'support', targetType: 'ally', effect: 'reflect', accuracy: 100, level: 2, description: 'Reflect magic back.' },
+        { name: 'Gravity', mpCost: 18, power: 0.25, range: 4, type: 'magic', targetType: 'enemy', effect: 'gravity', accuracy: 70, level: 3, description: 'Remove 25% current HP.' },
+        { name: 'Stop', mpCost: 22, power: 0, range: 3, type: 'status', targetType: 'enemy', effect: 'stop', accuracy: 50, level: 4, description: 'Freeze enemy in time.' },
+        { name: 'Quicken', mpCost: 28, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'quicken', accuracy: 100, level: 5, description: 'Grant ally an extra turn.' }
+      ],
+      statGrowth: { hp: 4, mp: 6, atk: 0, def: 1, mag: 4, spd: 3 },
+      unlocks: {}
+    }
+  };
+
+  // Equipment data
+  const equipmentData = {
+    // Weapons - Main Hand
+    weapons: {
+      ironSword: { name: 'Iron Sword', slot: 'mainHand', type: 'sword', stats: { atk: 5 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
+      steelSword: { name: 'Steel Sword', slot: 'mainHand', type: 'sword', stats: { atk: 10 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
+      darkBlade: { name: 'Dark Blade', slot: 'mainHand', type: 'sword', stats: { atk: 8, hp: -5 }, jobs: ['darkKnight'] },
+      woodenStaff: { name: 'Wooden Staff', slot: 'mainHand', type: 'staff', stats: { mag: 4, mp: 5 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
+      oakStaff: { name: 'Oak Staff', slot: 'mainHand', type: 'staff', stats: { mag: 8, mp: 10 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
+      ironDagger: { name: 'Iron Dagger', slot: 'mainHand', type: 'dagger', stats: { atk: 3, spd: 2 }, jobs: ['rogue', 'assassin', 'ninja', 'thief'] },
+      steelDagger: { name: 'Steel Dagger', slot: 'mainHand', type: 'dagger', stats: { atk: 6, spd: 3 }, jobs: ['rogue', 'assassin', 'ninja', 'thief'] },
+      katana: { name: 'Katana', slot: 'mainHand', type: 'katana', stats: { atk: 8, spd: 1 }, jobs: ['ninja', 'assassin'] },
+      shortBow: { name: 'Short Bow', slot: 'mainHand', type: 'bow', stats: { atk: 4 }, jobs: ['archer', 'sniper', 'ranger'] },
+      longBow: { name: 'Long Bow', slot: 'mainHand', type: 'bow', stats: { atk: 7 }, jobs: ['archer', 'sniper', 'ranger'] },
+      huntingBow: { name: 'Hunting Bow', slot: 'mainHand', type: 'bow', stats: { atk: 6, spd: 2 }, jobs: ['ranger'] },
+      ironSpear: { name: 'Iron Spear', slot: 'mainHand', type: 'spear', stats: { atk: 6 }, jobs: ['dragoon'] },
+      dragonLance: { name: 'Dragon Lance', slot: 'mainHand', type: 'spear', stats: { atk: 10, hp: 5 }, jobs: ['dragoon'] },
+    },
+    // Off-hand
+    offHand: {
+      woodenShield: { name: 'Wooden Shield', slot: 'offHand', type: 'shield', stats: { def: 3 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
+      ironShield: { name: 'Iron Shield', slot: 'offHand', type: 'shield', stats: { def: 6 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
+      buckler: { name: 'Buckler', slot: 'offHand', type: 'shield', stats: { def: 2, spd: 1 }, jobs: ['rogue', 'thief'] },
+      tome: { name: 'Tome of Knowledge', slot: 'offHand', type: 'tome', stats: { mag: 3, mp: 5 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
+      secondDagger: { name: 'Parrying Dagger', slot: 'offHand', type: 'dagger', stats: { atk: 2, def: 1 }, jobs: ['rogue', 'assassin', 'ninja', 'thief'] },
+      quiver: { name: 'Quiver', slot: 'offHand', type: 'quiver', stats: { atk: 2 }, jobs: ['archer', 'sniper', 'ranger'] },
+    },
+    // Armor
+    armor: {
+      clothRobe: { name: 'Cloth Robe', slot: 'armor', stats: { def: 1, mag: 2 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
+      leatherArmor: { name: 'Leather Armor', slot: 'armor', stats: { def: 3, spd: 1 }, jobs: ['rogue', 'assassin', 'ninja', 'thief', 'archer', 'sniper', 'ranger'] },
+      chainMail: { name: 'Chain Mail', slot: 'armor', stats: { def: 5 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight', 'dragoon'], heavy: true },
+      plateArmor: { name: 'Plate Armor', slot: 'armor', stats: { def: 10, spd: -2 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'], heavy: true },
+      ninjaGarb: { name: 'Ninja Garb', slot: 'armor', stats: { def: 3, spd: 3 }, jobs: ['ninja', 'assassin'] },
+      rangerVest: { name: 'Ranger Vest', slot: 'armor', stats: { def: 4, spd: 2 }, jobs: ['archer', 'sniper', 'ranger'] },
+      dragonMail: { name: 'Dragon Mail', slot: 'armor', stats: { def: 7, hp: 10 }, jobs: ['dragoon'], heavy: true },
+    },
+    // Helmets
+    helmets: {
+      leatherCap: { name: 'Leather Cap', slot: 'helmet', stats: { def: 1 }, jobs: ['rogue', 'assassin', 'ninja', 'thief', 'archer', 'sniper', 'ranger'] },
+      ironHelm: { name: 'Iron Helm', slot: 'helmet', stats: { def: 3 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight', 'dragoon'] },
+      wizardHat: { name: 'Wizard Hat', slot: 'helmet', stats: { mag: 2, mp: 3 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
+      circlet: { name: 'Silver Circlet', slot: 'helmet', stats: { mag: 3, def: 1 }, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'] },
+      dragonHelm: { name: 'Dragon Helm', slot: 'helmet', stats: { def: 4, atk: 1 }, jobs: ['dragoon'] },
+    },
+    // Rings
+    rings: {
+      powerRing: { name: 'Power Ring', slot: 'ring', stats: { atk: 2 } },
+      guardRing: { name: 'Guard Ring', slot: 'ring', stats: { def: 2 } },
+      magicRing: { name: 'Magic Ring', slot: 'ring', stats: { mag: 2 } },
+      speedRing: { name: 'Speed Ring', slot: 'ring', stats: { spd: 2 } },
+      lifeRing: { name: 'Life Ring', slot: 'ring', stats: { hp: 10 } },
+    },
+    // Necklaces
+    necklaces: {
+      healthAmulet: { name: 'Health Amulet', slot: 'necklace', stats: { hp: 15 } },
+      manaAmulet: { name: 'Mana Amulet', slot: 'necklace', stats: { mp: 10 } },
+      wardingAmulet: { name: 'Warding Amulet', slot: 'necklace', stats: { def: 2, mag: 1 } },
+    }
+  };
+
+  // Helper to get all equipment in a flat list
+  const getAllEquipment = () => {
+    const all = {};
+    Object.values(equipmentData).forEach(category => {
+      Object.entries(category).forEach(([key, item]) => {
+        all[key] = item;
+      });
+    });
+    return all;
+  };
+
+  // Calculate equipment price based on stats
+  const getEquipmentPrice = (item) => {
+    if (!item.stats) return 100;
+    let price = 0;
+    Object.entries(item.stats).forEach(([stat, value]) => {
+      if (stat === 'hp') price += value * 5;
+      else if (stat === 'mp') price += value * 3;
+      else if (stat === 'atk') price += value * 20;
+      else if (stat === 'def') price += value * 20;
+      else if (stat === 'mag') price += value * 20;
+      else if (stat === 'spd') price += value * 15;
+    });
+    return Math.max(100, price);
+  };
+
+  // Calculate total stats including equipment bonuses
+  const calculateTotalStats = (unit) => {
+    const allEquip = getAllEquipment();
+    const bonuses = { hp: 0, mp: 0, atk: 0, def: 0, mag: 0, spd: 0 };
+    
+    // Sum up equipment bonuses
+    Object.values(unit.equipment).forEach(equipKey => {
+      if (equipKey && allEquip[equipKey]) {
+        const item = allEquip[equipKey];
+        if (item.stats) {
+          Object.entries(item.stats).forEach(([stat, value]) => {
+            if (bonuses.hasOwnProperty(stat)) {
+              bonuses[stat] += value;
+            }
+          });
+        }
+      }
+    });
+    
+    return {
+      maxHp: unit.baseHp + bonuses.hp,
+      maxMp: unit.baseMp + bonuses.mp,
+      atk: unit.baseAtk + bonuses.atk,
+      def: unit.baseDef + bonuses.def,
+      mag: unit.baseMag + bonuses.mag,
+      spd: unit.baseSpd + bonuses.spd
+    };
+  };
+
+  // Recalculate and apply stats for a unit (call after equip change or level up)
+  const recalculateUnitStats = (unit) => {
+    const stats = calculateTotalStats(unit);
+    const oldMaxHp = unit.maxHp;
+    const oldMaxMp = unit.maxMp;
+    
+    unit.maxHp = stats.maxHp;
+    unit.maxMp = stats.maxMp;
+    unit.atk = stats.atk;
+    unit.def = stats.def;
+    unit.mag = stats.mag;
+    unit.spd = stats.spd;
+    
+    // Adjust current HP/MP proportionally if max changed
+    if (oldMaxHp > 0) {
+      unit.hp = Math.min(unit.hp, unit.maxHp);
+    }
+    if (oldMaxMp > 0) {
+      unit.mp = Math.min(unit.mp, unit.maxMp);
+    }
+  };
+
+  // Get skills available to a unit based on job and level
+  const getAvailableSkills = (unit) => {
+    const job = jobData[unit.job];
+    if (!job) return [];
+    return job.skills.filter(skill => skill.level <= unit.level);
+  };
+
+  // Create a full unit from selection data
+  const createUnit = (selectionData, team, index, totalCount) => {
+    const job = jobData[selectionData.job];
+    const baseStats = job.baseStats;
+    const growth = job.statGrowth;
+    const level = selectionData.level;
+
+    // Calculate stats with level scaling
+    const levelBonus = level - 1;
+    const baseHp = baseStats.hp + (growth.hp * levelBonus);
+    const baseMp = baseStats.mp + (growth.mp * levelBonus);
+    const baseAtk = baseStats.atk + (growth.atk * levelBonus);
+    const baseDef = baseStats.def + (growth.def * levelBonus);
+    const baseMag = baseStats.mag + (growth.mag * levelBonus);
+    const baseSpd = baseStats.spd + (growth.spd * levelBonus);
+
+    // Calculate spawn position
+    let x, y;
+    if (team === 'player') {
+      const spacing = Math.floor(14 / (totalCount + 1));
+      x = spacing * (index + 1);
+      y = 14 - (index % 2);
+    } else {
+      const spacing = Math.floor(14 / (totalCount + 1));
+      x = spacing * (index + 1);
+      y = index % 2;
+    }
+
+    return {
+      id: selectionData.id,
+      name: selectionData.name,
+      job: selectionData.job,
+      level: level,
+      exp: 0,
+      team: team,
+      x: x,
+      y: y,
+      baseHp: baseHp,
+      baseMp: baseMp,
+      baseAtk: baseAtk,
+      baseDef: baseDef,
+      baseMag: baseMag,
+      baseSpd: baseSpd,
+      hp: baseHp,
+      maxHp: baseHp,
+      mp: baseMp,
+      maxMp: baseMp,
+      atk: baseAtk,
+      def: baseDef,
+      mag: baseMag,
+      spd: baseSpd,
+      equipment: getDefaultEquipment(selectionData.job),
+      hasActed: false,
+      hasMoved: false,
+      effects: [],
+      previousX: null,
+      previousY: null,
+      unlockedJobs: [selectionData.job]
+    };
+  };
+
+  // Continue to next wave in endless mode
+  const continueToNextWave = (newWaveNumber) => {
+    // Get current player units (alive ones)
+    const playerUnits = gameState.current.units.filter(u => u.team === 'player' && u.hp > 0);
+
+    // Heal players to full HP/MP for next wave
+    playerUnits.forEach(unit => {
+      unit.hp = unit.maxHp;
+      unit.mp = unit.maxMp;
+      unit.hasActed = false;
+      unit.hasMoved = false;
+      unit.effects = [];
+    });
+
+    // Generate new enemies for the new wave
+    const enemyUnits = generateEndlessEnemies(newWaveNumber, playerUnits.length);
+
+    // Reset positions for new battle
+    playerUnits.forEach((unit, index) => {
+      const spacing = Math.floor(gameState.current.grid.cols / (playerUnits.length + 1));
+      unit.x = spacing * (index + 1);
+      unit.y = gameState.current.grid.rows - 2;
+      unit.previousX = unit.x;
+      unit.previousY = unit.y;
+    });
+
+    // Update game state
+    gameState.current.units = [...playerUnits, ...enemyUnits];
+    gameState.current.defeatedUnits = [];
+    terrainStateRef.current = {};
+
+    // Give players guaranteed first turn in new wave by boosting their initiative
+    playerUnits.forEach(unit => {
+      unit.newWaveBonus = true;
+    });
+
+    // Start new battle
+    setGamePhase('player');
+    setTurnNumber(1);
+    setMessage(`Wave ${newWaveNumber} begins! Select a unit to move.`);
+    setMessageLog([{ text: `Wave ${newWaveNumber} begins!`, turn: 1, isEnemy: false }]);
+  };
+
+  // Generate enemies for endless mode based on wave number
+  const generateEndlessEnemies = (wave, playerCount) => {
+    const enemyNames = ['Goblin', 'Orc', 'Troll', 'Dark Mage', 'Shadow Knight', 'Skeleton', 'Wraith', 'Demon', 'Lich', 'Dragon', 'Imp', 'Ogre', 'Bandit', 'Assassin', 'Necromancer'];
+    const baseJobs = ['knight', 'rogue', 'archer', 'whiteMage', 'darkMage'];
+    const advancedJobs = ['paladin', 'darkKnight', 'warrior', 'dragoon', 'thief', 'assassin', 'ninja', 'sniper', 'ranger', 'whiteMage', 'blackMage', 'timeMage'];
+
+    // Calculate enemy count (starts equal, adds 1 every 3 waves, max 6)
+    const baseCount = playerCount;
+    const bonusCount = Math.floor((wave - 1) / 3);
+    const enemyCount = Math.min(baseCount + bonusCount, 6);
+
+    // Calculate enemy level (wave number, capped at 10)
+    const enemyLevel = Math.min(wave, 10);
+
+    // Determine job pool (advanced jobs start appearing at wave 3)
+    const jobPool = wave >= 3
+      ? [...baseJobs, ...advancedJobs.slice(0, Math.min((wave - 2) * 2, advancedJobs.length))]
+      : baseJobs;
+
+    // Generate enemy team
+    const enemies = [];
+    for (let i = 0; i < enemyCount; i++) {
+      const job = jobPool[Math.floor(Math.random() * jobPool.length)];
+      const name = enemyNames[i % enemyNames.length];
+      enemies.push({
+        id: 100 + i,
+        name: `${name}`,
+        job: job,
+        level: enemyLevel
+      });
+    }
+
+    return enemies.map((data, index) => createUnit(data, 'enemy', index, enemies.length));
+  };
+
+  // Start game with selected teams
+  const handleStartGame = (playerTeam, enemyTeam, levelTemplate = 'random', mode = 'normal') => {
+    setGameMode(mode);
+
+    const playerUnits = playerTeam.map((data, index) =>
+      createUnit(data, 'player', index, playerTeam.length)
+    );
+
+    let enemyUnits;
+    if (mode === 'endless') {
+      // Generate enemies for endless mode
+      enemyUnits = generateEndlessEnemies(waveNumber, playerTeam.length);
+    } else {
+      enemyUnits = enemyTeam.map((data, index) =>
+        createUnit(data, 'enemy', index, enemyTeam.length)
+      );
+    }
+
+    gameState.current.units = [...playerUnits, ...enemyUnits];
+    gameState.current.terrain = generateTerrain(levelTemplate);
+    gameState.current.defeatedUnits = [];
+    terrainStateRef.current = {}; // Reset terrain state
+
+    gameState.current.units.forEach(unit => {
+      recalculateUnitStats(unit);
+      unit.hp = unit.maxHp;
+      unit.mp = unit.maxMp;
+    });
+
+    const templateName = levelTemplates[levelTemplate]?.name || 'Random Battlefield';
+    const waveTxt = mode === 'endless' ? ` Wave ${waveNumber}!` : '';
+    setGamePhase('player');
+    setTurnNumber(1);
+    setMessage(`Battle begins on ${templateName}!${waveTxt} Select a unit to move.`);
+    setMessageLog([{ text: `Battle begins on ${templateName}!${waveTxt}`, turn: 1, isEnemy: false }]);
+  };
+
+  // Initialize unit stats on first render - no longer needed as units are created dynamically
+  useEffect(() => {
+    if (gameState.current.units.length > 0) {
+      gameState.current.units.forEach(unit => {
+        recalculateUnitStats(unit);
+        unit.hp = unit.maxHp;
+        unit.mp = unit.maxMp;
+      });
+    }
+  }, []);
+
+  // Terrain types with properties
+  const terrainData = {
+    grass: { 
+      color: null, 
+      passable: true, 
+      moveCost: 1, 
+      blocksRanged: false, 
+      flammable: true,
+      damage: 0,
+      symbol: null 
+    },
+    tree: { 
+      color: '#228B22', 
+      passable: false, 
+      moveCost: Infinity, 
+      blocksRanged: true, 
+      flammable: true,
+      damage: 0,
+      symbol: '🌲' 
+    },
+    rock: { 
+      color: '#696969', 
+      passable: false, 
+      moveCost: Infinity, 
+      blocksRanged: false, 
+      flammable: false,
+      damage: 0,
+      symbol: '🪨' 
+    },
+    water: { 
+      color: '#4169E1', 
+      passable: true, 
+      moveCost: 2, 
+      blocksRanged: false, 
+      flammable: false,
+      damage: 0,
+      extinguishes: true,
+      symbol: '~' 
+    },
+    deepWater: {
+      color: '#00008B',
+      passable: true,
+      moveCost: 4,
+      blocksRanged: false,
+      flammable: false,
+      damage: 0,
+      extinguishes: true,
+      noAction: true,  // Units cannot act while on this tile
+      blocksHeavyArmor: true,
+      symbol: '≈'
+    },
+    fire: {
+      color: '#FF4500',
+      passable: true,
+      moveCost: 1,
+      blocksRanged: false,
+      flammable: false,
+      damage: 10,
+      burnChance: 50, // % chance to catch fire status
+      symbol: '🔥',
+      temporary: true,
+      duration: 3 // turns before burning out
+    },
+    lava: {
+      color: '#FF2400',
+      passable: true,
+      moveCost: 2,
+      blocksRanged: false,
+      flammable: false,
+      damage: 20,
+      burnChance: 75,
+      symbol: '�ite',
+      canCool: true
+    },
+    burntGround: {
+      color: '#2F2F2F',
+      passable: true,
+      moveCost: 1,
+      blocksRanged: false,
+      flammable: false,
+      damage: 0,
+      symbol: '▪'
+    },
+    volcano: {
+      color: '#8B0000',
+      passable: false,
+      moveCost: Infinity,
+      blocksRanged: true,
+      flammable: false,
+      damage: 0,
+      spawnsLava: true,
+      symbol: '🌋'
+    },
+    burningTree: {
+      color: '#FF6600',
+      passable: false,
+      moveCost: Infinity,
+      blocksRanged: true,
+      flammable: false,
+      damage: 5, // damages adjacent units
+      symbol: '🔥🌲',
+      temporary: true,
+      duration: 2,
+      becomes: 'burntGround'
+    }
+  };
+
+  // Track dynamic terrain state (fires, lava cooling, etc.)
+  const terrainStateRef = useRef({});
+
+  // Level templates
+  const levelTemplates = {
+    random: {
+      name: 'Random Battlefield',
+      description: 'A randomly generated battlefield',
+      generate: () => generateRandomTerrain()
+    },
+    forest: {
+      name: 'Dense Forest',
+      description: 'A thick forest with many trees and rocks, some shallow water',
+      generate: () => generateForestTerrain()
+    },
+    volcanic: {
+      name: 'Volcanic Wasteland',
+      description: 'A dangerous volcanic region with lava flows',
+      generate: () => generateVolcanicTerrain()
+    },
+    lakeside: {
+      name: 'Lakeside',
+      description: 'A battlefield with a large lake and deep water',
+      generate: () => generateLakesideTerrain()
+    },
+    plains: {
+      name: 'Open Plains',
+      description: 'Wide open grassland with minimal obstacles',
+      generate: () => generatePlainsTerrain()
+    },
+    ruins: {
+      name: 'Ancient Ruins',
+      description: 'Crumbling ruins with many rocks and some burnt ground',
+      generate: () => generateRuinsTerrain()
+    }
+  };
+
+  // Generate base empty terrain grid
+  const createEmptyTerrain = () => {
+    const terrain = [];
+    for (let y = 0; y < 15; y++) {
+      terrain[y] = [];
+      for (let x = 0; x < 15; x++) {
+        terrain[y][x] = 'grass';
+      }
+    }
+    return terrain;
+  };
+
+  // Valid rows for placing terrain (not spawn areas)
+  const getValidRows = () => [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  // Helper to place terrain randomly
+  const placeRandomTerrain = (terrain, type, count, validRows) => {
+    for (let i = 0; i < count; i++) {
+      const x = Math.floor(Math.random() * 15);
+      const y = validRows[Math.floor(Math.random() * validRows.length)];
+      if (terrain[y][x] === 'grass') {
+        terrain[y][x] = type;
+      }
+    }
+  };
+
+  // Helper to place terrain pools (clustered)
+  const placeTerrainPool = (terrain, type, poolSize, validRows) => {
+    const startX = Math.floor(Math.random() * 12);
+    const startY = validRows[Math.floor(Math.random() * validRows.length)];
+    for (let i = 0; i < poolSize; i++) {
+      const x = startX + Math.floor(Math.random() * 4);
+      const y = startY + Math.floor(Math.random() * 3);
+      if (x >= 0 && x < 15 && y >= 2 && y <= 12 && terrain[y] && terrain[y][x] === 'grass') {
+        terrain[y][x] = type;
+      }
+    }
+  };
+
+  // Random terrain (original)
+  const generateRandomTerrain = () => {
+    const terrain = createEmptyTerrain();
+    const validRows = getValidRows();
+    
+    // Trees (10-16)
+    placeRandomTerrain(terrain, 'tree', 10 + Math.floor(Math.random() * 7), validRows);
+    
+    // Rocks (6-10)
+    placeRandomTerrain(terrain, 'rock', 6 + Math.floor(Math.random() * 5), validRows);
+    
+    // Water pools (2 pools of 4-7 tiles each)
+    for (let pool = 0; pool < 2; pool++) {
+      placeTerrainPool(terrain, 'water', 4 + Math.floor(Math.random() * 4), validRows);
+    }
+    
+    return terrain;
+  };
+
+  // Forest terrain - lots of trees, some rocks, minimal water
+  const generateForestTerrain = () => {
+    const terrain = createEmptyTerrain();
+    const validRows = getValidRows();
+    
+    // Many trees (20-30)
+    placeRandomTerrain(terrain, 'tree', 20 + Math.floor(Math.random() * 11), validRows);
+    
+    // Some rocks (4-8)
+    placeRandomTerrain(terrain, 'rock', 4 + Math.floor(Math.random() * 5), validRows);
+    
+    // Small stream (1 pool of 3-5 tiles)
+    placeTerrainPool(terrain, 'water', 3 + Math.floor(Math.random() * 3), validRows);
+    
+    return terrain;
+  };
+
+  // Volcanic terrain - lava, volcanoes, burnt ground
+  const generateVolcanicTerrain = () => {
+    const terrain = createEmptyTerrain();
+    const validRows = getValidRows();
+    
+    // Place 1-2 volcanoes
+    const numVolcanoes = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < numVolcanoes; i++) {
+      const vx = 3 + Math.floor(Math.random() * 9);
+      const vy = validRows[Math.floor(Math.random() * validRows.length)];
+      terrain[vy][vx] = 'volcano';
+      
+      // Lava flows around volcano
+      const directions = [[-1,0], [1,0], [0,-1], [0,1], [-1,-1], [1,1], [-1,1], [1,-1]];
+      directions.forEach(([dx, dy]) => {
+        const lx = vx + dx;
+        const ly = vy + dy;
+        if (lx >= 0 && lx < 15 && ly >= 2 && ly <= 12 && Math.random() > 0.3) {
+          terrain[ly][lx] = 'lava';
+        }
+      });
+    }
+    
+    // Burnt ground patches (8-12)
+    placeRandomTerrain(terrain, 'burntGround', 8 + Math.floor(Math.random() * 5), validRows);
+    
+    // Few rocks (3-5)
+    placeRandomTerrain(terrain, 'rock', 3 + Math.floor(Math.random() * 3), validRows);
+    
+    // No trees or water (volcanic wasteland)
+    
+    return terrain;
+  };
+
+  // Lakeside terrain - large body of water with deep water center
+  const generateLakesideTerrain = () => {
+    const terrain = createEmptyTerrain();
+    const validRows = getValidRows();
+    
+    // Create a lake in the middle
+    const lakeX = 5 + Math.floor(Math.random() * 5);
+    const lakeY = 5 + Math.floor(Math.random() * 5);
+    
+    // Deep water center
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const x = lakeX + dx;
+        const y = lakeY + dy;
+        if (x >= 0 && x < 15 && y >= 2 && y <= 12) {
+          terrain[y][x] = 'deepWater';
+        }
+      }
+    }
+    
+    // Shallow water around the deep water
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const x = lakeX + dx;
+        const y = lakeY + dy;
+        if (x >= 0 && x < 15 && y >= 2 && y <= 12 && terrain[y][x] === 'grass') {
+          if (Math.random() > 0.3) {
+            terrain[y][x] = 'water';
+          }
+        }
+      }
+    }
+    
+    // Trees near water (8-12)
+    placeRandomTerrain(terrain, 'tree', 8 + Math.floor(Math.random() * 5), validRows);
+    
+    // Some rocks (3-5)
+    placeRandomTerrain(terrain, 'rock', 3 + Math.floor(Math.random() * 3), validRows);
+    
+    return terrain;
+  };
+
+  // Plains terrain - wide open with minimal obstacles
+  const generatePlainsTerrain = () => {
+    const terrain = createEmptyTerrain();
+    const validRows = getValidRows();
+    
+    // Few trees (3-5)
+    placeRandomTerrain(terrain, 'tree', 3 + Math.floor(Math.random() * 3), validRows);
+    
+    // Few rocks (2-4)
+    placeRandomTerrain(terrain, 'rock', 2 + Math.floor(Math.random() * 3), validRows);
+    
+    // Maybe a small pond (0-1 pools)
+    if (Math.random() > 0.5) {
+      placeTerrainPool(terrain, 'water', 2 + Math.floor(Math.random() * 3), validRows);
+    }
+    
+    return terrain;
+  };
+
+  // Ruins terrain - lots of rocks, burnt ground, scattered obstacles
+  const generateRuinsTerrain = () => {
+    const terrain = createEmptyTerrain();
+    const validRows = getValidRows();
+    
+    // Many rocks (12-18) - crumbled walls
+    placeRandomTerrain(terrain, 'rock', 12 + Math.floor(Math.random() * 7), validRows);
+    
+    // Burnt ground (6-10) - old fires
+    placeRandomTerrain(terrain, 'burntGround', 6 + Math.floor(Math.random() * 5), validRows);
+    
+    // Few trees growing back (2-4)
+    placeRandomTerrain(terrain, 'tree', 2 + Math.floor(Math.random() * 3), validRows);
+    
+    // Maybe some water in a broken fountain
+    if (Math.random() > 0.5) {
+      placeTerrainPool(terrain, 'water', 2 + Math.floor(Math.random() * 2), validRows);
+    }
+    
+    return terrain;
+  };
+
+  // Main terrain generation function (used by handleStartGame)
+  const generateTerrain = (templateName = 'random') => {
+    const template = levelTemplates[templateName] || levelTemplates.random;
+    return template.generate();
+  };
+
+  // Set a tile on fire
+  const igniteFlammable = (x, y) => {
+    const terrain = gameState.current.terrain;
+    if (!terrain[y] || !terrain[y][x]) return false;
+    
+    const currentTile = terrain[y][x];
+    const tData = terrainData[currentTile];
+    
+    if (!tData || !tData.flammable) return false;
+    
+    if (currentTile === 'tree') {
+      terrain[y][x] = 'burningTree';
+      terrainStateRef.current[`${x},${y}`] = { duration: 2 };
+      return true;
+    } else if (currentTile === 'grass') {
+      terrain[y][x] = 'fire';
+      terrainStateRef.current[`${x},${y}`] = { duration: 3 };
+      return true;
+    }
+    
+    return false;
+  };
+
+  // Process terrain effects at start of turn
+  const processTerrainEffects = () => {
+    const terrain = gameState.current.terrain;
+    const toUpdate = [];
+    
+    // Process temporary terrain (fires burning out, etc.)
+    Object.entries(terrainStateRef.current).forEach(([key, state]) => {
+      const [x, y] = key.split(',').map(Number);
+      state.duration--;
+      
+      if (state.duration <= 0) {
+        const currentTile = terrain[y][x];
+        const tData = terrainData[currentTile];
+        
+        if (tData && tData.becomes) {
+          toUpdate.push({ x, y, newTile: tData.becomes });
+        } else if (currentTile === 'fire') {
+          toUpdate.push({ x, y, newTile: 'burntGround' });
+        }
+        delete terrainStateRef.current[key];
+      }
+    });
+    
+    // Apply updates
+    toUpdate.forEach(({ x, y, newTile }) => {
+      terrain[y][x] = newTile;
+      addMessage(`The fire at ${String.fromCharCode(65 + x)}${15 - y} burns out.`);
+    });
+    
+    // Spread fire to adjacent flammable tiles (small chance)
+    const fireSpread = [];
+    for (let y = 0; y < 15; y++) {
+      for (let x = 0; x < 15; x++) {
+        if (terrain[y][x] === 'fire' || terrain[y][x] === 'burningTree') {
+          const directions = [[-1,0], [1,0], [0,-1], [0,1]];
+          directions.forEach(([dx, dy]) => {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15) {
+              const adjacentTile = terrain[ny][nx];
+              const adjData = terrainData[adjacentTile];
+              if (adjData && adjData.flammable && Math.random() < 0.15) {
+                fireSpread.push({ x: nx, y: ny });
+              }
+            }
+          });
+        }
+      }
+    }
+    
+    fireSpread.forEach(({ x, y }) => {
+      if (igniteFlammable(x, y)) {
+        addMessage(`Fire spreads to ${String.fromCharCode(65 + x)}${15 - y}!`);
+      }
+    });
+  };
+
+  // Check if unit can pass through terrain (considering armor)
+  const canPassTerrain = (unit, terrainType) => {
+    const tData = terrainData[terrainType];
+    if (!tData || !tData.passable) return false;
+    
+    // Check heavy armor restriction for deep water
+    if (tData.blocksHeavyArmor && unit.equipment) {
+      const allEquip = getAllEquipment();
+      const armor = unit.equipment.armor ? allEquip[unit.equipment.armor] : null;
+      if (armor && armor.heavy) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  // Apply terrain damage and effects to a unit
+  const applyTerrainDamage = (unit) => {
+    const terrain = gameState.current.terrain;
+    const tileTerrain = terrain[unit.y] ? terrain[unit.y][unit.x] : 'grass';
+    const tData = terrainData[tileTerrain];
+    
+    if (!tData) return;
+    
+    // Apply damage
+    if (tData.damage > 0) {
+      unit.hp = Math.max(0, unit.hp - tData.damage);
+      addMessage(`${unit.name} takes ${tData.damage} damage from ${tileTerrain}!`);
+      
+      // Check for burn status
+      if (tData.burnChance && Math.random() * 100 < tData.burnChance) {
+        if (!unit.effects.includes('burning')) {
+          unit.effects.push('burning');
+          addMessage(`${unit.name} catches fire!`);
+        }
+      }
+    }
+    
+    // Water extinguishes burning
+    if (tData.extinguishes && unit.effects.includes('burning')) {
+      unit.effects = unit.effects.filter(e => e !== 'burning');
+      addMessage(`${unit.name}'s flames are extinguished by the water!`);
+    }
+  };
+
+  const addMessage = (msg) => {
+    setMessage(msg);
+  };
+
+  const logAction = (msg, isEnemy = false) => {
+    setMessage(msg);
+    setMessageLog(prev => [...prev, { text: msg, turn: turnNumber, isEnemy }]);
+  };
+
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [messageLog]);
+
+  useEffect(() => {
+    // Skip if in setup phase or game ended
+    if (gamePhase === 'setup' || gamePhase === 'victory' || gamePhase === 'defeat') return;
+    // Skip if no units yet
+    if (gameState.current.units.length === 0) return;
+
+    // Process terrain effects at start of round (fire spreading, burning out, etc.)
+    if (turnNumber > 1) {
+      processTerrainEffects();
+    }
+
+    // Decrement body timers and remove expired bodies
+    if (turnNumber > 1) {
+      gameState.current.defeatedUnits = gameState.current.defeatedUnits.filter(body => {
+        body.turnsRemaining--;
+        if (body.turnsRemaining <= 0) {
+          addMessage(`${body.unit.name}'s body fades away...`);
+          return false;
+        }
+        return true;
+      });
+    }
+    
+    const aliveUnits = gameState.current.units.filter(u => u.hp > 0);
+    // Roll d20 + speed for initiative
+    const withInitiative = aliveUnits.map(u => {
+      const newWaveBonus = u.newWaveBonus ? 100 : 0;
+      // Clear the bonus flag after applying it
+      if (u.newWaveBonus) {
+        u.newWaveBonus = false;
+      }
+      return {
+        unit: u,
+        initiative: Math.floor(Math.random() * 20) + 1 + u.spd + (u.effects.includes('slow') ? -3 : 0) + newWaveBonus
+      };
+    });
+    const sorted = withInitiative.sort((a, b) => b.initiative - a.initiative).map(i => i.unit);
+    
+    // Log the initiative rolls
+    if (sorted.length > 0) {
+      const initMsg = sorted.map(u => {
+        const roll = withInitiative.find(w => w.unit === u);
+        return `${u.name}: ${roll.initiative}`;
+      }).join(', ');
+      addMessage(`Turn ${turnNumber} initiative: ${initMsg}`);
+    }
+    
+    setTurnOrder(sorted);
+    setCurrentTurnIndex(0);
+    currentTurnIndexRef.current = 0;
+    
+    // If first unit is enemy, start their AI after state updates
+    if (sorted.length > 0 && sorted[0].team === 'enemy') {
+      aiProcessingRef.current = false; // Reset before starting
+      setTimeout(() => enemyAI(sorted[0]), 500);
+    } else if (sorted.length > 0) {
+      addMessage(`${sorted[0].name}'s turn!`);
+    }
+  }, [turnNumber, gamePhase]);
+
+  // Debug mode keyboard shortcut
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      // Press 'D' key to toggle debug mode
+      if (e.key === 'd' || e.key === 'D') {
+        // Don't toggle if typing in an input field
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        setDebugMode(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
+  const calculateTurnOrder = () => {
+    // This is now only used for reference, main logic is in useEffect
+    const aliveUnits = gameState.current.units.filter(u => u.hp > 0);
+    const sorted = [...aliveUnits].sort((a, b) => {
+      const aSpd = a.spd + (a.effects.includes('slow') ? -3 : 0);
+      const bSpd = b.spd + (b.effects.includes('slow') ? -3 : 0);
+      return bSpd - aSpd;
+    });
+    setTurnOrder(sorted);
+    setCurrentTurnIndex(0);
+  };
+
+  const calculateMoveRange = (unit) => {
+    const range = [];
+    const moveSpeed = Math.floor(unit.spd / 2) + 1;
+    const terrain = gameState.current.terrain;
+    
+    // Check if unit has heavy armor (for deep water restriction)
+    const allEquip = getAllEquipment();
+    const unitArmor = unit.equipment?.armor ? allEquip[unit.equipment.armor] : null;
+    const hasHeavyArmor = unitArmor && unitArmor.heavy;
+    
+    // Use BFS to calculate reachable tiles considering terrain costs
+    const visited = new Map();
+    const queue = [{ x: unit.x, y: unit.y, cost: 0 }];
+    visited.set(`${unit.x},${unit.y}`, 0);
+    
+    while (queue.length > 0) {
+      const current = queue.shift();
+      
+      // Check all 4 directions
+      const directions = [
+        { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
+        { dx: -1, dy: 0 }, { dx: 1, dy: 0 }
+      ];
+      
+      for (const dir of directions) {
+        const nx = current.x + dir.dx;
+        const ny = current.y + dir.dy;
+        
+        // Check bounds
+        if (nx < 0 || nx >= 15 || ny < 0 || ny >= 15) continue;
+        
+        // Get terrain at this tile
+        const tileTerrain = terrain[ny] ? terrain[ny][nx] : 'grass';
+        const tData = terrainData[tileTerrain];
+        
+        // Skip impassable terrain
+        if (!tData || !tData.passable) continue;
+        
+        // Heavy armor cannot cross deep water
+        if (tData.blocksHeavyArmor && hasHeavyArmor) continue;
+        
+        // Calculate cost to reach this tile
+        let moveCost = tData.moveCost;
+        // Rogues/thieves move through water at normal cost
+        if ((tileTerrain === 'water' || tileTerrain === 'deepWater') && 
+            ['rogue', 'thief', 'ninja', 'assassin'].includes(unit.job)) {
+          moveCost = Math.max(1, moveCost - 1);
+        }
+        const newCost = current.cost + moveCost;
+        
+        // Skip if over move budget
+        if (newCost > moveSpeed) continue;
+        
+        // Skip if already visited with lower cost
+        const key = `${nx},${ny}`;
+        if (visited.has(key) && visited.get(key) <= newCost) continue;
+        
+        // Check if occupied by another unit or a body
+        const occupied = gameState.current.units.find(u => u.x === nx && u.y === ny && u.hp > 0);
+        const hasBody = gameState.current.defeatedUnits.find(d => d.x === nx && d.y === ny);
+        
+        visited.set(key, newCost);
+        queue.push({ x: nx, y: ny, cost: newCost });
+        
+        // Add to range if not occupied, no body, and not starting position
+        if (!occupied && !hasBody && (nx !== unit.x || ny !== unit.y)) {
+          // Remove if already in range (we found a better path)
+          const existingIdx = range.findIndex(r => r.x === nx && r.y === ny);
+          if (existingIdx >= 0) range.splice(existingIdx, 1);
+          range.push({ x: nx, y: ny });
+        }
+      }
+    }
+    
+    return range;
+  };
+
+  // Check if there's a clear line of sight (no trees blocking)
+  const hasLineOfSight = (x1, y1, x2, y2) => {
+    const terrain = gameState.current.terrain;
+    
+    // Bresenham's line algorithm to check tiles between attacker and target
+    const dx = Math.abs(x2 - x1);
+    const dy = Math.abs(y2 - y1);
+    const sx = x1 < x2 ? 1 : -1;
+    const sy = y1 < y2 ? 1 : -1;
+    let err = dx - dy;
+    
+    let x = x1;
+    let y = y1;
+    
+    while (x !== x2 || y !== y2) {
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y += sy;
+      }
+      
+      // Don't check the target tile itself
+      if (x === x2 && y === y2) break;
+      
+      // Check if this tile blocks ranged attacks
+      const tileTerrain = terrain[y] ? terrain[y][x] : 'grass';
+      if (terrainData[tileTerrain].blocksRanged) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  const calculateSkillRange = (unit, skill) => {
+    const range = [];
+    const terrain = gameState.current.terrain;
+    
+    // Handle terrain-targeting skills
+    if (skill.type === 'terrain') {
+      // Hide skill - range 0, check if adjacent to a tree
+      if (skill.targetType === 'tree_hide') {
+        const directions = [
+          { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
+          { dx: -1, dy: 0 }, { dx: 1, dy: 0 }
+        ];
+        for (const dir of directions) {
+          const nx = unit.x + dir.dx;
+          const ny = unit.y + dir.dy;
+          if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15) {
+            const tileTerrain = terrain[ny] ? terrain[ny][nx] : 'grass';
+            if (tileTerrain === 'tree') {
+              range.push({ x: nx, y: ny });
+            }
+          }
+        }
+        return range;
+      }
+      
+      // Cut Tree or Push Rock - target adjacent terrain
+      for (let x = 0; x < gameState.current.grid.cols; x++) {
+        for (let y = 0; y < gameState.current.grid.rows; y++) {
+          const dist = Math.abs(x - unit.x) + Math.abs(y - unit.y);
+          if (dist === 1) {
+            const tileTerrain = terrain[y] ? terrain[y][x] : 'grass';
+            if (skill.targetType === 'tree' && tileTerrain === 'tree') {
+              range.push({ x, y });
+            } else if (skill.targetType === 'rock' && tileTerrain === 'rock') {
+              range.push({ x, y });
+            }
+          }
+        }
+      }
+      return range;
+    }
+    
+    for (let x = 0; x < gameState.current.grid.cols; x++) {
+      for (let y = 0; y < gameState.current.grid.rows; y++) {
+        const dist = Math.abs(x - unit.x) + Math.abs(y - unit.y);
+        if (dist <= skill.range && dist > 0) {
+          const target = gameState.current.units.find(u => u.x === x && u.y === y && u.hp > 0 && u !== unit);
+          // Can't target hidden enemies (unless you're on their team)
+          if (target && (!target.effects.includes('hidden') || target.team === unit.team)) {
+            // For ranged attacks (range > 1), check line of sight
+            if (skill.range > 1) {
+              if (hasLineOfSight(unit.x, unit.y, x, y)) {
+                range.push({ x, y });
+              }
+            } else {
+              // Melee attacks don't need line of sight
+              range.push({ x, y });
+            }
+          }
+        }
+      }
+    }
+    return range;
+  };
+
+  const gainExp = (unit, amount) => {
+    unit.exp += amount;
+    const expNeeded = unit.level * 100;
+    
+    if (unit.exp >= expNeeded) {
+      unit.exp -= expNeeded;
+      unit.level++;
+      
+      // Apply stat growth to base stats
+      const growth = jobData[unit.job].statGrowth;
+      unit.baseHp += growth.hp;
+      unit.baseMp += growth.mp;
+      unit.baseAtk += growth.atk;
+      unit.baseDef += growth.def;
+      unit.baseMag += growth.mag;
+      unit.baseSpd += growth.spd;
+      
+      // Recalculate total stats with equipment
+      recalculateUnitStats(unit);
+      
+      // Heal HP/MP gain from level up
+      unit.hp += growth.hp;
+      unit.mp += growth.mp;
+      
+      addMessage(`${unit.name} reached level ${unit.level}!`);
+      
+      // Check for new skills unlocked
+      const newSkills = jobData[unit.job].skills.filter(s => s.level === unit.level);
+      newSkills.forEach(skill => {
+        addMessage(`${unit.name} learned ${skill.name}!`);
+      });
+      
+      // Check for job unlocks
+      const currentJob = jobData[unit.job];
+      if (currentJob.unlocks && unit.unlockedJobs) {
+        Object.entries(currentJob.unlocks).forEach(([jobKey, levelReq]) => {
+          if (unit.level >= levelReq && !unit.unlockedJobs.includes(jobKey)) {
+            unit.unlockedJobs.push(jobKey);
+            addMessage(`${unit.name} unlocked the ${jobData[jobKey]?.description ? jobKey.charAt(0).toUpperCase() + jobKey.slice(1) : jobKey} job!`);
+          }
+        });
+      }
+    }
+  };
+
+  const applyEffect = (target, effect) => {
+    if (!effect) return;
+    
+    if (effect === 'poison') {
+      if (!target.effects.includes('poison')) {
+        target.effects.push('poison');
+        addMessage(`${target.name} is poisoned!`);
+      }
+    } else if (effect === 'slow') {
+      if (!target.effects.includes('slow')) {
+        target.effects.push('slow');
+        addMessage(`${target.name} is slowed!`);
+      }
+    } else if (effect === 'sleep') {
+      if (!target.effects.includes('sleep')) {
+        target.effects.push('sleep');
+        addMessage(`${target.name} fell asleep!`);
+      }
+    } else if (effect === 'stun') {
+      if (!target.effects.includes('stun')) {
+        target.effects.push('stun');
+        addMessage(`${target.name} is stunned!`);
+      }
+    } else if (effect === 'buff_atk') {
+      if (!target.effects.includes('buff_atk')) {
+        target.effects.push('buff_atk');
+        target.atk += 5;
+        addMessage(`${target.name}'s attack increased!`);
+      }
+    }
+  };
+
+  const processEffects = (unit) => {
+    // MP Regeneration: Base 2 + (MAG / 4) per turn
+    const mpRegen = Math.floor(2 + unit.mag / 4);
+    if (unit.mp < unit.maxMp) {
+      const oldMp = unit.mp;
+      unit.mp = Math.min(unit.maxMp, unit.mp + mpRegen);
+      const actualRegen = unit.mp - oldMp;
+      if (actualRegen > 0) {
+        addMessage(`${unit.name} recovers ${actualRegen} MP`);
+      }
+    }
+    
+    // Apply terrain damage (standing on fire, lava, etc.)
+    applyTerrainDamage(unit);
+    
+    // Process status effects
+    unit.effects = unit.effects.filter(effect => {
+      if (effect === 'poison') {
+        unit.hp = Math.max(0, unit.hp - 5);
+        addMessage(`${unit.name} takes 5 poison damage!`);
+        return true;
+      }
+      if (effect === 'burning') {
+        unit.hp = Math.max(0, unit.hp - 8);
+        addMessage(`${unit.name} takes 8 burn damage!`);
+        // 30% chance to stop burning each turn
+        if (Math.random() < 0.3) {
+          addMessage(`${unit.name} is no longer burning!`);
+          return false;
+        }
+        return true;
+      }
+      return true;
+    });
+  };
+
+  const calculateHitChance = (attacker, target, skill, distance) => {
+    let baseAccuracy = skill.accuracy || 100;
+
+    // Distance penalty - attacks at max range are less accurate
+    // Reduced from 15 to 10 max penalty for less harsh long-range penalties
+    const distancePenalty = Math.floor((distance / skill.range) * 10);
+    baseAccuracy -= distancePenalty;
+
+    // Evasion based on target's speed - every 3 speed = 1% evasion
+    // Changed from /2 to /3 to reduce evasion scaling
+    const evasion = Math.floor(target.spd / 3);
+
+    // Attacker's speed gives accuracy bonus - every 3 speed = 1% accuracy
+    const accuracyBonus = Math.floor(attacker.spd / 3);
+
+    // Final hit chance
+    let hitChance = baseAccuracy + accuracyBonus - evasion;
+
+    // Clamp between 10% and 99% (raised minimum from 5% to 10%)
+    hitChance = Math.max(10, Math.min(99, hitChance));
+
+    return hitChance;
+  };
+
+  const useTerrainSkill = (unit, targetX, targetY, skill) => {
+    if (unit.mp < skill.mpCost) return;
+    
+    unit.mp -= skill.mpCost;
+    const terrain = gameState.current.terrain;
+    const isEnemy = unit.team === 'enemy';
+    
+    if (skill.targetType === 'tree') {
+      // Cut Tree - remove the tree
+      terrain[targetY][targetX] = 'grass';
+      logAction(`${unit.name} cut down a tree!`, isEnemy);
+    } else if (skill.targetType === 'rock') {
+      // Push Rock - push it away from the unit
+      const dx = targetX - unit.x;
+      const dy = targetY - unit.y;
+      const newX = targetX + dx;
+      const newY = targetY + dy;
+      
+      // Check if destination is valid
+      if (newX >= 0 && newX < 15 && newY >= 0 && newY < 15) {
+        const destTerrain = terrain[newY] ? terrain[newY][newX] : 'grass';
+        const occupied = gameState.current.units.find(u => u.x === newX && u.y === newY && u.hp > 0);
+        const hasBody = gameState.current.defeatedUnits.find(d => d.x === newX && d.y === newY);
+        
+        if (destTerrain === 'grass' && !occupied && !hasBody) {
+          terrain[targetY][targetX] = 'grass';
+          terrain[newY][newX] = 'rock';
+          logAction(`${unit.name} pushed a rock!`, isEnemy);
+        } else if (occupied) {
+          // Rock crushes enemy for damage!
+          const damage = 15;
+          occupied.hp = Math.max(0, occupied.hp - damage);
+          terrain[targetY][targetX] = 'grass';
+          logAction(`${unit.name} pushed a rock onto ${occupied.name} for ${damage} damage!`, isEnemy);
+          if (occupied.hp <= 0) {
+            logAction(`${occupied.name} was crushed!`, isEnemy);
+            // Create body for crushed unit
+            gameState.current.defeatedUnits.push({
+              unit: occupied,
+              x: occupied.x,
+              y: occupied.y,
+              turnsRemaining: 3
+            });
+          }
+        } else {
+          // Can't push - blocked by terrain or body
+          logAction(`${unit.name} tried to push the rock but it won't budge!`, isEnemy);
+          unit.mp += skill.mpCost; // Refund MP
+          return;
+        }
+      } else {
+        // Edge of map - rock falls off
+        terrain[targetY][targetX] = 'grass';
+        logAction(`${unit.name} pushed the rock off the battlefield!`, isEnemy);
+      }
+    } else if (skill.targetType === 'tree_hide') {
+      // Hide in Tree - unit becomes hidden
+      if (!unit.effects.includes('hidden')) {
+        unit.effects.push('hidden');
+        logAction(`${unit.name} hides in the tree!`, isEnemy);
+      }
+    }
+  };
+
+  const useSkill = (attacker, target, skill) => {
+    if (attacker.mp < skill.mpCost) return;
+    
+    attacker.mp -= skill.mpCost;
+    const isEnemy = attacker.team === 'enemy';
+    
+    // Attacking reveals hidden units
+    const wasHidden = attacker.effects.includes('hidden');
+    if (wasHidden) {
+      attacker.effects = attacker.effects.filter(e => e !== 'hidden');
+    }
+
+    // Calculate distance
+    const distance = Math.abs(attacker.x - target.x) + Math.abs(attacker.y - target.y);
+    
+    // Calculate hit chance
+    const hitChance = calculateHitChance(attacker, target, skill, distance);
+    const roll = Math.random() * 100;
+    
+    // Miss check (except for heal and support which always hit)
+    if (skill.type !== 'heal' && skill.type !== 'support' && roll > hitChance) {
+      logAction(`${attacker.name} used ${skill.name} but MISSED! (${hitChance.toFixed(0)}% chance)`, isEnemy);
+      gainExp(attacker, 5);
+      return;
+    }
+
+    if (skill.type === 'heal') {
+      const healAmount = skill.power;
+      target.hp = Math.min(target.maxHp, target.hp + healAmount);
+      logAction(`${attacker.name} healed ${target.name} for ${healAmount} HP!`, isEnemy);
+      gainExp(attacker, 15);
+    } else if (skill.type === 'status' || skill.type === 'support') {
+      applyEffect(target, skill.effect);
+      logAction(`${attacker.name} used ${skill.name} on ${target.name}!`, isEnemy);
+      gainExp(attacker, 20);
+    } else {
+      const basePower = skill.type === 'magic' ? attacker.mag : attacker.atk;
+      const atkBonus = attacker.effects.includes('buff_atk') ? 5 : 0;
+      // Bonus damage from attacking while hidden
+      const hiddenBonus = wasHidden ? 1.5 : 1.0;
+      const defense = skill.type === 'magic' ? target.def / 2 : target.def;
+      const damage = Math.max(1, Math.floor((basePower + atkBonus) * skill.power * hiddenBonus - defense));
+      
+      target.hp = Math.max(0, target.hp - damage);
+      const hiddenMsg = wasHidden ? ' (Ambush!)' : '';
+      logAction(`${attacker.name} used ${skill.name}! HIT for ${damage} damage!${hiddenMsg} (${hitChance.toFixed(0)}% chance)`, isEnemy);
+      
+      if (skill.effect) {
+        applyEffect(target, skill.effect);
+      }
+      
+      if (target.hp <= 0) {
+        gainExp(attacker, 50);
+        logAction(`${target.name} was defeated!`, isEnemy);
+        // Create a body at the defeated unit's location
+        gameState.current.defeatedUnits.push({
+          unit: target,
+          x: target.x,
+          y: target.y,
+          turnsRemaining: 3
+        });
+      } else {
+        gainExp(attacker, 10);
+      }
+    }
+  };
+
+  const nextTurn = () => {
+    const currentUnit = turnOrder[currentTurnIndexRef.current];
+    if (currentUnit) {
+      processEffects(currentUnit);
+    }
+
+    // Clear selected unit and skill states
+    gameState.current.selectedUnit = null;
+    gameState.current.selectedSkill = null;
+    gameState.current.moveRange = [];
+    gameState.current.skillRange = [];
+    setSelectedUnit(null);
+    setSelectedSkill(null);
+    setInspectedUnit(null);
+
+    let nextIndex = currentTurnIndexRef.current + 1;
+    
+    if (nextIndex >= turnOrder.length) {
+      // Reset all units for new round
+      gameState.current.units.forEach(u => {
+        u.hasActed = false;
+        u.hasMoved = false;
+        u.previousX = null;
+        u.previousY = null;
+        if (u.effects.includes('sleep') || u.effects.includes('stun')) {
+          u.effects = u.effects.filter(e => e !== 'sleep' && e !== 'stun');
+        }
+      });
+      // This will trigger the useEffect which handles the new turn
+      setTurnNumber(t => t + 1);
+      return;
+    }
+    
+    // Update both ref and state
+    currentTurnIndexRef.current = nextIndex;
+    setCurrentTurnIndex(nextIndex);
+    
+    const nextUnit = turnOrder[nextIndex];
+    if (nextUnit && nextUnit.team === 'enemy') {
+      aiProcessingRef.current = false; // Reset before starting new enemy turn
+      setTimeout(() => enemyAI(nextUnit), 500);
+    } else if (nextUnit) {
+      addMessage(`${nextUnit.name}'s turn!`);
+    }
+  };
+
+  const enemyAI = (enemy) => {
+    // Guard: don't act if AI is already processing this specific unit
+    if (aiProcessingRef.current) {
+      console.log(`[AI] Blocked: AI already processing`);
+      return;
+    }
+    
+    // Guard: don't act if unit already acted or moved this turn
+    if (enemy.hasActed) {
+      console.log(`[AI] ${enemy.name} already acted, skipping to next turn`);
+      setTimeout(nextTurn, 500);
+      return;
+    }
+    
+    // Guard: verify this enemy is actually alive
+    if (enemy.hp <= 0) {
+      console.log(`[AI] ${enemy.name} is dead, skipping`);
+      setTimeout(nextTurn, 500);
+      return;
+    }
+    
+    // Lock AI processing
+    aiProcessingRef.current = true;
+    console.log(`[AI] ${enemy.name}'s turn starting`);
+    
+    if (enemy.effects.includes('sleep')) {
+      addMessage(`${enemy.name} is asleep and cannot act!`);
+      enemy.hasActed = true;
+      aiProcessingRef.current = false;
+      setTimeout(nextTurn, 1000);
+      return;
+    }
+
+    if (enemy.effects.includes('stun')) {
+      addMessage(`${enemy.name} is stunned and cannot act!`);
+      enemy.hasActed = true;
+      aiProcessingRef.current = false;
+      setTimeout(nextTurn, 1000);
+      return;
+    }
+
+    const players = gameState.current.units.filter(u => u.team === 'player' && u.hp > 0);
+    
+    if (players.length === 0) {
+      setGamePhase('defeat');
+      aiProcessingRef.current = false;
+      return;
+    }
+
+    let nearestPlayer = null;
+    let minDist = Infinity;
+    players.forEach(p => {
+      const dist = Math.abs(p.x - enemy.x) + Math.abs(p.y - enemy.y);
+      if (dist < minDist) {
+        minDist = dist;
+        nearestPlayer = p;
+      }
+    });
+
+    const skill = jobData[enemy.job].skills[0];
+    
+    // Helper to check win/loss after attack
+    const checkGameEnd = () => {
+      const alivePlayers = gameState.current.units.filter(u => u.team === 'player' && u.hp > 0);
+      if (alivePlayers.length === 0) {
+        setGamePhase('defeat');
+        return true;
+      }
+      return false;
+    };
+    
+    // Helper to finish turn safely
+    const finishTurn = () => {
+      enemy.hasActed = true;
+      aiProcessingRef.current = false;
+      console.log(`[AI] ${enemy.name}'s turn finished`);
+      if (!checkGameEnd()) {
+        setTimeout(nextTurn, 1000);
+      }
+    };
+    
+    // If in range, attack and end turn
+    if (minDist <= skill.range && enemy.mp >= skill.mpCost) {
+      console.log(`[AI] ${enemy.name} attacking ${nearestPlayer.name}`);
+      useSkill(enemy, nearestPlayer, skill);
+      enemy.hasMoved = true;
+      finishTurn();
+      return;
+    }
+
+    // Otherwise, move toward nearest player
+    const moveRange = calculateMoveRange(enemy);
+    let bestMove = null;
+    let bestDist = minDist;
+    
+    moveRange.forEach(tile => {
+      const dist = Math.abs(tile.x - nearestPlayer.x) + Math.abs(tile.y - nearestPlayer.y);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestMove = tile;
+      }
+    });
+
+    if (bestMove && !enemy.hasMoved) {
+      console.log(`[AI] ${enemy.name} moving from (${enemy.x},${enemy.y}) to (${bestMove.x},${bestMove.y})`);
+      enemy.x = bestMove.x;
+      enemy.y = bestMove.y;
+      enemy.hasMoved = true;
+      
+      // Recalculate nearest player after moving
+      const playersAfterMove = gameState.current.units.filter(u => u.team === 'player' && u.hp > 0);
+      let targetAfterMove = null;
+      let minDistAfterMove = Infinity;
+      playersAfterMove.forEach(p => {
+        const dist = Math.abs(p.x - enemy.x) + Math.abs(p.y - enemy.y);
+        if (dist < minDistAfterMove) {
+          minDistAfterMove = dist;
+          targetAfterMove = p;
+        }
+      });
+      
+      // Check if can attack after moving
+      if (targetAfterMove && minDistAfterMove <= skill.range && enemy.mp >= skill.mpCost) {
+        setTimeout(() => {
+          console.log(`[AI] ${enemy.name} attacking ${targetAfterMove.name} after move`);
+          useSkill(enemy, targetAfterMove, skill);
+          finishTurn();
+        }, 500);
+        return;
+      }
+    }
+    
+    // No attack possible, just end turn
+    console.log(`[AI] ${enemy.name} ending turn (no valid action)`);
+    finishTurn();
+  };
+
+  const handleCanvasClick = (e) => {
+    if (gamePhase !== 'player') return;
+    
+    const currentUnit = turnOrder[currentTurnIndex];
+    if (!currentUnit || currentUnit.team !== 'player') return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const gridX = Math.floor((x - 50) / 50);
+    const gridY = Math.floor((y - 50) / 50);
+
+    if (gridX < 0 || gridY < 0 || gridX >= 15 || gridY >= 15) return;
+
+    const gs = gameState.current;
+    
+    // Right-click or Shift+Click to inspect any unit
+    if (e.shiftKey || e.button === 2) {
+      e.preventDefault();
+      const unit = gs.units.find(u => u.x === gridX && u.y === gridY && u.hp > 0);
+      if (unit) {
+        setInspectedUnit(unit);
+        addMessage(`Inspecting ${unit.name}`);
+      }
+      return;
+    }
+    
+    // If a skill is selected and clicking on empty space, deselect the skill
+    if (gs.selectedSkill && !gs.skillRange.find(tile => tile.x === gridX && tile.y === gridY)) {
+      const clickedUnit = gs.units.find(u => u.x === gridX && u.y === gridY);
+      if (!clickedUnit) {
+        gs.selectedSkill = null;
+        gs.skillRange = [];
+        gs.moveRange = gs.selectedUnit.hasMoved ? [] : calculateMoveRange(gs.selectedUnit);
+        setSelectedSkill(null);
+        addMessage('Skill cancelled. Choose another action.');
+        return;
+      }
+    }
+    
+    if (gs.selectedSkill) {
+      if (gs.skillRange.find(tile => tile.x === gridX && tile.y === gridY)) {
+        // Handle terrain skills
+        if (gs.selectedSkill.type === 'terrain') {
+          useTerrainSkill(gs.selectedUnit, gridX, gridY, gs.selectedSkill);
+          gs.selectedUnit.hasActed = true;
+          gs.selectedUnit = null;
+          gs.skillRange = [];
+          gs.moveRange = [];
+          setSelectedUnit(null);
+          setSelectedSkill(null);
+          setTimeout(nextTurn, 1000);
+          return;
+        }
+        
+        const target = gs.units.find(u => u.x === gridX && u.y === gridY);
+        if (target) {
+          useSkill(gs.selectedUnit, target, gs.selectedSkill);
+          gs.selectedUnit.hasActed = true;
+          gs.selectedUnit = null;
+          gs.skillRange = [];
+          gs.moveRange = [];
+          setSelectedUnit(null);
+          setSelectedSkill(null);
+          
+          const aliveEnemies = gs.units.filter(u => u.team === 'enemy' && u.hp > 0);
+          if (aliveEnemies.length === 0) {
+            if (gameMode === 'endless') {
+              // Calculate rewards for endless mode
+              const defeatedEnemies = gs.units.filter(u => u.team === 'enemy');
+              const gilEarned = defeatedEnemies.reduce((sum, enemy) => {
+                return sum + (50 * enemy.level * waveNumber);
+              }, 0);
+              const expEarned = defeatedEnemies.reduce((sum, enemy) => {
+                return sum + (30 * enemy.level);
+              }, 0);
+
+              setWaveRewards({ gil: gilEarned, exp: expEarned });
+              setGil(prev => prev + gilEarned);
+
+              // Give EXP to all surviving player units
+              gs.units.filter(u => u.team === 'player' && u.hp > 0).forEach(unit => {
+                unit.exp += expEarned;
+              });
+
+              setGamePhase('rewards');
+            } else {
+              setGamePhase('victory');
+            }
+            return;
+          }
+          
+          setTimeout(nextTurn, 1000);
+        }
+      }
+      return;
+    }
+    
+    if (gs.selectedUnit && gs.selectedUnit.x === gridX && gs.selectedUnit.y === gridY) {
+      gs.selectedUnit = null;
+      gs.moveRange = [];
+      gs.skillRange = [];
+      setSelectedUnit(null);
+      setSelectedSkill(null);
+      addMessage('Unit deselected.');
+      return;
+    }
+    
+    if (!gs.selectedUnit) {
+      const unit = gs.units.find(u => u.x === gridX && u.y === gridY && u === currentUnit && u.hp > 0);
+      if (unit) {
+        if (unit.effects.includes('sleep')) {
+          addMessage(`${unit.name} is asleep and cannot act!`);
+          return;
+        }
+        gs.selectedUnit = unit;
+        gs.moveRange = unit.hasMoved ? [] : calculateMoveRange(unit);
+        setSelectedUnit(unit);
+        addMessage(`${unit.name} selected. ${!unit.hasActed ? 'You can use skills.' : ''} ${!unit.hasMoved ? 'You can move.' : ''}`);
+      }
+      return;
+    }
+
+    if (!gs.selectedUnit.hasMoved && gs.moveRange.find(tile => tile.x === gridX && tile.y === gridY)) {
+      gs.selectedUnit.previousX = gs.selectedUnit.x;
+      gs.selectedUnit.previousY = gs.selectedUnit.y;
+      gs.selectedUnit.x = gridX;
+      gs.selectedUnit.y = gridY;
+      gs.selectedUnit.hasMoved = true;
+      gs.moveRange = [];
+      // Moving reveals hidden units
+      if (gs.selectedUnit.effects.includes('hidden')) {
+        gs.selectedUnit.effects = gs.selectedUnit.effects.filter(e => e !== 'hidden');
+        addMessage(`${gs.selectedUnit.name} is no longer hidden!`);
+      }
+      addMessage('Move complete. Choose a skill or end turn. You can undo your move if needed.');
+      return;
+    }
+  };
+
+  const handleSkillClick = (skill) => {
+    const gs = gameState.current;
+    if (!gs.selectedUnit || gs.selectedUnit.mp < skill.mpCost || gs.selectedUnit.hasActed) return;
+    
+    gs.selectedSkill = skill;
+    gs.skillRange = calculateSkillRange(gs.selectedUnit, skill);
+    gs.moveRange = [];
+    setSelectedSkill(skill);
+    addMessage(`Select a target for ${skill.name}`);
+  };
+
+  const undoMove = () => {
+    const gs = gameState.current;
+    if (!gs.selectedUnit || !gs.selectedUnit.hasMoved || gs.selectedUnit.hasActed) return;
+    if (gs.selectedUnit.previousX === null || gs.selectedUnit.previousY === null) return;
+    
+    gs.selectedUnit.x = gs.selectedUnit.previousX;
+    gs.selectedUnit.y = gs.selectedUnit.previousY;
+    gs.selectedUnit.hasMoved = false;
+    gs.selectedUnit.previousX = null;
+    gs.selectedUnit.previousY = null;
+    gs.moveRange = calculateMoveRange(gs.selectedUnit);
+    addMessage(`Move undone. ${gs.selectedUnit.name} can move again.`);
+  };
+
+  useEffect(() => {
+    // Don't render canvas during setup phase
+    if (gamePhase === 'setup') return;
+    if (!canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    const render = () => {
+      ctx.clearRect(0, 0, 850, 850);
+      
+      const gs = gameState.current;
+      const terrain = gs.terrain;
+      
+      // Draw grid labels (files A-O on top and bottom)
+      ctx.fillStyle = '#AAA';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      const files = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+      for (let x = 0; x < 15; x++) {
+        ctx.fillText(files[x], 75 + x * 50, 40); // Top
+        ctx.fillText(files[x], 75 + x * 50, 825); // Bottom
+      }
+      
+      // Draw grid labels (ranks 1-15, with 1 at bottom from player perspective)
+      for (let y = 0; y < 15; y++) {
+        const rank = 15 - y; // 15 at top (y=0), 1 at bottom (y=14)
+        ctx.fillText(rank.toString(), 25, 80 + y * 50); // Left
+        ctx.fillText(rank.toString(), 825, 80 + y * 50); // Right
+      }
+      
+      // Draw tiles with terrain
+      for (let y = 0; y < 15; y++) {
+        for (let x = 0; x < 15; x++) {
+          const px = 50 + x * 50;
+          const py = 50 + y * 50;
+          
+          // Base grass color
+          ctx.fillStyle = (x + y) % 2 === 0 ? '#3A5F3A' : '#2F4F2F';
+          ctx.fillRect(px, py, 50, 50);
+          
+          // Draw terrain overlay
+          const tileTerrain = terrain[y] ? terrain[y][x] : 'grass';
+          if (tileTerrain !== 'grass') {
+            const tData = terrainData[tileTerrain];
+            
+            if (tileTerrain === 'water') {
+              ctx.fillStyle = 'rgba(65, 105, 225, 0.5)';
+              ctx.fillRect(px, py, 50, 50);
+              ctx.fillStyle = 'rgba(100, 149, 237, 0.7)';
+              ctx.font = '20px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText('~', px + 25, py + 35);
+            } else if (tileTerrain === 'deepWater') {
+              ctx.fillStyle = 'rgba(0, 0, 139, 0.7)';
+              ctx.fillRect(px, py, 50, 50);
+              ctx.fillStyle = 'rgba(30, 60, 180, 0.9)';
+              ctx.font = '20px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText('≈', px + 25, py + 35);
+            } else if (tileTerrain === 'tree') {
+              // Draw tree as a simple graphic instead of emoji for reliability
+              // Tree trunk
+              ctx.fillStyle = '#8B4513';
+              ctx.fillRect(px + 20, py + 30, 10, 15);
+              // Tree foliage (triangle)
+              ctx.fillStyle = '#228B22';
+              ctx.beginPath();
+              ctx.moveTo(px + 25, py + 5);
+              ctx.lineTo(px + 10, py + 32);
+              ctx.lineTo(px + 40, py + 32);
+              ctx.closePath();
+              ctx.fill();
+              // Darker outline
+              ctx.strokeStyle = '#006400';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            } else if (tileTerrain === 'burningTree') {
+              // Burning tree trunk
+              ctx.fillStyle = '#4a2000';
+              ctx.fillRect(px + 20, py + 30, 10, 15);
+              // Burning foliage
+              ctx.fillStyle = '#FF4500';
+              ctx.beginPath();
+              ctx.moveTo(px + 25, py + 5);
+              ctx.lineTo(px + 10, py + 32);
+              ctx.lineTo(px + 40, py + 32);
+              ctx.closePath();
+              ctx.fill();
+              // Fire glow
+              ctx.fillStyle = 'rgba(255, 200, 0, 0.5)';
+              ctx.beginPath();
+              ctx.arc(px + 25, py + 20, 18, 0, Math.PI * 2);
+              ctx.fill();
+              // Flame symbols
+              ctx.font = '14px Arial';
+              ctx.fillText('🔥', px + 15, py + 25);
+              ctx.fillText('🔥', px + 30, py + 20);
+            } else if (tileTerrain === 'rock') {
+              ctx.fillStyle = '#696969';
+              ctx.beginPath();
+              ctx.ellipse(px + 25, py + 30, 18, 14, 0, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = '#808080';
+              ctx.beginPath();
+              ctx.ellipse(px + 25, py + 28, 14, 10, 0, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (tileTerrain === 'fire') {
+              // Fire base glow
+              ctx.fillStyle = 'rgba(255, 100, 0, 0.4)';
+              ctx.fillRect(px, py, 50, 50);
+              // Animated-looking flames
+              ctx.font = '24px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText('🔥', px + 25, py + 35);
+            } else if (tileTerrain === 'lava') {
+              // Lava pool
+              ctx.fillStyle = '#FF2400';
+              ctx.fillRect(px + 5, py + 5, 40, 40);
+              ctx.fillStyle = '#FF6600';
+              ctx.beginPath();
+              ctx.ellipse(px + 25, py + 25, 15, 12, 0, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = '#FFCC00';
+              ctx.beginPath();
+              ctx.ellipse(px + 25, py + 25, 8, 6, 0, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (tileTerrain === 'volcano') {
+              // Volcano mountain
+              ctx.fillStyle = '#4a3728';
+              ctx.beginPath();
+              ctx.moveTo(px + 25, py + 5);
+              ctx.lineTo(px + 5, py + 45);
+              ctx.lineTo(px + 45, py + 45);
+              ctx.closePath();
+              ctx.fill();
+              // Crater
+              ctx.fillStyle = '#8B0000';
+              ctx.beginPath();
+              ctx.ellipse(px + 25, py + 12, 8, 5, 0, 0, Math.PI * 2);
+              ctx.fill();
+              // Glow
+              ctx.fillStyle = '#FF4500';
+              ctx.beginPath();
+              ctx.ellipse(px + 25, py + 12, 5, 3, 0, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (tileTerrain === 'burntGround') {
+              ctx.fillStyle = 'rgba(47, 47, 47, 0.7)';
+              ctx.fillRect(px, py, 50, 50);
+              // Ash marks
+              ctx.fillStyle = '#1a1a1a';
+              ctx.fillRect(px + 10, py + 15, 8, 3);
+              ctx.fillRect(px + 30, py + 25, 10, 3);
+              ctx.fillRect(px + 18, py + 35, 6, 3);
+            }
+          }
+          
+          ctx.strokeStyle = '#1a2a1a';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px, py, 50, 50);
+        }
+      }
+
+      gs.moveRange.forEach(tile => {
+        ctx.fillStyle = 'rgba(100, 150, 255, 0.3)';
+        ctx.fillRect(50 + tile.x * 50, 50 + tile.y * 50, 50, 50);
+      });
+
+      gs.skillRange.forEach(tile => {
+        ctx.fillStyle = 'rgba(255, 100, 100, 0.4)';
+        ctx.fillRect(50 + tile.x * 50, 50 + tile.y * 50, 50, 50);
+      });
+
+      // Draw defeated unit bodies
+      gs.defeatedUnits.forEach(body => {
+        const px = 50 + body.x * 50 + 25;
+        const py = 50 + body.y * 50 + 25;
+        
+        // Draw body as a fallen figure (darker, rotated)
+        ctx.globalAlpha = 0.6;
+        
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.beginPath();
+        ctx.ellipse(px, py + 10, 18, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Body (horizontal/fallen)
+        ctx.fillStyle = body.unit.team === 'player' ? '#4a4a8a' : '#8a4a4a';
+        ctx.fillRect(px - 18, py - 5, 36, 14);
+        
+        // Head
+        ctx.fillStyle = body.unit.team === 'player' ? '#8B8B00' : '#4B0000';
+        ctx.beginPath();
+        ctx.arc(px - 14, py, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // X eyes to show defeated
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px - 16, py - 2);
+        ctx.lineTo(px - 12, py + 2);
+        ctx.moveTo(px - 12, py - 2);
+        ctx.lineTo(px - 16, py + 2);
+        ctx.stroke();
+        
+        // Turns remaining indicator
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#FFF';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        const turnsText = `${body.turnsRemaining}`;
+        ctx.strokeText(turnsText, px + 15, py - 10);
+        ctx.fillText(turnsText, px + 15, py - 10);
+        
+        ctx.globalAlpha = 1.0;
+      });
+
+      gs.units.filter(u => u.hp > 0).forEach(unit => {
+        const px = 50 + unit.x * 50 + 25;
+        const py = 50 + unit.y * 50 + 15;
+        
+        // Hidden units are semi-transparent (only visible to their own team)
+        const isHidden = unit.effects.includes('hidden');
+        if (isHidden) {
+          ctx.globalAlpha = 0.5;
+        }
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(px, py + 25, 15, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = jobData[unit.job].color;
+        ctx.fillRect(px - 12, py, 24, 30);
+        
+        ctx.fillStyle = unit.team === 'player' ? '#FFD700' : '#8B0000';
+        ctx.beginPath();
+        ctx.arc(px, py - 5, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px - 12, py, 24, 30);
+        
+        const hpPercent = unit.hp / unit.maxHp;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(px - 15, py - 15, 30, 5);
+        const barColor = unit.team === 'enemy' ? 
+          (hpPercent > 0.5 ? '#F00' : hpPercent > 0.25 ? '#C00' : '#800') :
+          (hpPercent > 0.5 ? '#0F0' : hpPercent > 0.25 ? '#FF0' : '#F00');
+        ctx.fillStyle = barColor;
+        ctx.fillRect(px - 15, py - 15, 30 * hpPercent, 5);
+        
+        if (unit.effects.length > 0) {
+          ctx.font = 'bold 12px Arial';
+          ctx.fillStyle = '#FFF';
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          let effectY = py + 42;
+          unit.effects.forEach(effect => {
+            const symbol = effect === 'poison' ? 'â˜ ' : effect === 'slow' ? 'ðŸŒ' : effect === 'sleep' ? 'ðŸ’¤' : effect === 'hidden' ? 'ðŸ‘' : 'âš¡';
+            ctx.strokeText(symbol, px - 5, effectY);
+            ctx.fillText(symbol, px - 5, effectY);
+            effectY += 12;
+          });
+        }
+        
+        // Job initials on body
+        ctx.fillStyle = '#FFF';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.font = 'bold 9px Arial';
+        ctx.textAlign = 'center';
+        const jobInitials = {
+          'knight': 'K',
+          'rogue': 'R',
+          'archer': 'A',
+          'whiteMage': 'WM',
+          'darkMage': 'DM',
+          'paladin': 'P',
+          'darkKnight': 'DK',
+          'warrior': 'W',
+          'dragoon': 'Dr',
+          'thief': 'T',
+          'assassin': 'As',
+          'ninja': 'N',
+          'sniper': 'Sn',
+          'ranger': 'Rg',
+          'blackMage': 'BM',
+          'timeMage': 'TM'
+        };
+        const initials = jobInitials[unit.job] || '?';
+        ctx.strokeText(initials, px, py + 15);
+        ctx.fillText(initials, px, py + 15);
+
+        ctx.fillStyle = '#FFF';
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Lv${unit.level}`, px, py + 45);
+
+        // Reset alpha
+        ctx.globalAlpha = 1.0;
+      });
+
+      if (gs.selectedUnit) {
+        const px = 50 + gs.selectedUnit.x * 50;
+        const py = 50 + gs.selectedUnit.y * 50;
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(px, py, 50, 50);
+      }
+
+      const currentUnit = turnOrder[currentTurnIndex];
+      if (currentUnit) {
+        const px = 50 + currentUnit.x * 50;
+        const py = 50 + currentUnit.y * 50;
+        ctx.strokeStyle = '#00FFFF';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(px, py, 50, 50);
+        ctx.setLineDash([]);
+      }
+    };
+
+    const interval = setInterval(render, 50);
+    return () => clearInterval(interval);
+  }, [turnOrder, currentTurnIndex, gamePhase]);
+
+  // Show team selection screen during setup
+  if (gamePhase === 'setup') {
+    return <TeamSelectionScreen onStartGame={handleStartGame} />;
+  }
+
+  return (
+    <div className="flex gap-4 p-4 bg-gray-900 min-h-screen">
+      <div className="flex flex-col items-center">
+        <h1 className="text-3xl font-bold text-white mb-2">Tactical RPG</h1>
+        <div className="text-yellow-400 mb-2">Turn {turnNumber}</div>
+        <canvas 
+          ref={canvasRef} 
+          width={850} 
+          height={850}
+          onClick={handleCanvasClick}
+          onContextMenu={(e) => e.preventDefault()}
+          className="border-4 border-gray-700 rounded cursor-pointer bg-gray-800"
+        />
+        <div className="mt-2 text-white text-center">{message}</div>
+        <div 
+          ref={logRef}
+          className="mt-2 w-full max-w-3xl h-32 overflow-y-auto bg-gray-800 border border-gray-700 rounded p-2"
+        >
+          {messageLog.map((msg, idx) => (
+            <div key={idx} className={`text-sm ${msg.isEnemy ? 'text-red-400' : 'text-green-400'}`}>
+              <span className="text-yellow-500">[T{msg.turn}]</span> {msg.text}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1 text-gray-400 text-sm text-center">Shift+Click or Right-Click any unit to inspect</div>
+        {gamePhase === 'player' && selectedUnit && (
+          <div className="flex gap-2">
+            <button 
+              onClick={nextTurn}
+              className="mt-2 px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              End Turn
+            </button>
+            {selectedUnit.hasMoved && !selectedUnit.hasActed && (
+              <button 
+                onClick={undoMove}
+                className="mt-2 px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+              >
+                Undo Move
+              </button>
+            )}
+          </div>
+        )}
+        {gamePhase === 'rewards' && (
+          <div className="mt-4 p-6 bg-purple-900 border-2 border-purple-500 rounded-lg">
+            <div className="text-center mb-4">
+              <div className="text-3xl font-bold text-yellow-400 mb-2">Wave {waveNumber} Complete!</div>
+              <div className="text-xl text-purple-100 mb-4">
+                <div>Gil Earned: <span className="text-yellow-400 font-bold">+{waveRewards.gil}</span></div>
+                <div>EXP Earned: <span className="text-green-400 font-bold">+{waveRewards.exp}</span></div>
+              </div>
+              <div className="text-lg text-purple-200 mb-4">
+                <div>Total Gil: <span className="text-yellow-300 font-bold">{gil}</span></div>
+                <div>Current Wave: <span className="text-cyan-300 font-bold">{waveNumber}</span></div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => setGamePhase('levelup')}
+                className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors">
+                Level Up Units
+              </button>
+              <button
+                onClick={() => setGamePhase('shop')}
+                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                Visit Shop (Gil: {gil})
+              </button>
+              <button
+                onClick={() => {
+                  const nextWave = waveNumber + 1;
+                  setWaveNumber(nextWave);
+                  continueToNextWave(nextWave);
+                }}
+                className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-colors">
+                Continue to Wave {waveNumber + 1}
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
+                End Run
+              </button>
+            </div>
+          </div>
+        )}
+        {gamePhase === 'levelup' && (
+          <div className="mt-4 p-6 bg-green-900 border-2 border-green-500 rounded-lg max-h-96 overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-2xl font-bold text-green-300 mb-2">Level Up Units</div>
+              <div className="text-sm text-green-200">Cost: Level × 100 EXP</div>
+            </div>
+
+            {gameState.current.units.filter(u => u.team === 'player' && u.hp > 0).map(unit => {
+              const expNeeded = unit.level * 100;
+              const canLevelUp = unit.exp >= expNeeded && unit.level < 10;
+
+              return (
+                <div key={unit.id} className="mb-4 p-4 bg-gray-800 rounded-lg border-2" style={{ borderColor: jobData[unit.job]?.color || '#666' }}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="text-lg font-bold text-white">{unit.name}</div>
+                      <div className="text-sm text-gray-300">
+                        {unit.job.charAt(0).toUpperCase() + unit.job.slice(1)} - Level {unit.level}
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        EXP: {unit.exp}/{expNeeded} {unit.level >= 10 && '(MAX)'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (canLevelUp) {
+                          unit.exp -= expNeeded;
+                          unit.level += 1;
+                          recalculateUnitStats(unit);
+                          unit.hp = unit.maxHp;
+                          unit.mp = unit.maxMp;
+                          setMessage(`${unit.name} leveled up to ${unit.level}!`);
+                          // Force re-render
+                          setGamePhase('levelup');
+                        }
+                      }}
+                      disabled={!canLevelUp}
+                      className={`px-4 py-2 rounded font-bold transition-colors ${
+                        canLevelUp
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      }`}>
+                      {unit.level >= 10 ? 'MAX' : canLevelUp ? 'Level Up!' : 'Need EXP'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-300">
+                    <div>HP: {unit.maxHp}</div>
+                    <div>MP: {unit.maxMp}</div>
+                    <div>ATK: {unit.atk}</div>
+                    <div>DEF: {unit.def}</div>
+                    <div>MAG: {unit.mag}</div>
+                    <div>SPD: {unit.spd}</div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => setGamePhase('rewards')}
+              className="w-full mt-4 px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
+              Back to Rewards
+            </button>
+          </div>
+        )}
+        {gamePhase === 'shop' && (
+          <div className="mt-4 p-6 bg-blue-900 border-2 border-blue-500 rounded-lg max-h-96 overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-2xl font-bold text-blue-300 mb-2">Equipment Shop</div>
+              <div className="text-lg text-yellow-300">Gil: {gil}</div>
+            </div>
+
+            {Object.entries(equipmentData).map(([categoryName, category]) => (
+              <div key={categoryName} className="mb-6">
+                <h3 className="text-xl font-bold text-blue-200 mb-3 capitalize">{categoryName}</h3>
+                <div className="grid gap-2">
+                  {Object.entries(category).map(([itemKey, item]) => {
+                    const price = getEquipmentPrice(item);
+                    const owned = inventory.includes(itemKey);
+                    const canAfford = gil >= price;
+
+                    return (
+                      <div key={itemKey} className="p-3 bg-gray-800 rounded border-2 border-gray-600">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <div className="font-bold text-white">
+                              {item.name}
+                              {owned && <span className="ml-2 text-xs bg-green-600 px-2 py-1 rounded">OWNED</span>}
+                            </div>
+                            <div className="text-xs text-gray-400 mb-1">
+                              {item.jobs ? `Jobs: ${item.jobs.join(', ')}` : 'All Jobs'}
+                            </div>
+                            <div className="text-sm text-gray-300">
+                              {Object.entries(item.stats || {}).map(([stat, val]) => (
+                                <span key={stat} className="mr-2">
+                                  {stat.toUpperCase()}: {val > 0 ? '+' : ''}{val}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-yellow-400 mb-1">{price}G</div>
+                            <button
+                              onClick={() => {
+                                if (!owned && canAfford) {
+                                  setGil(prev => prev - price);
+                                  setInventory(prev => [...prev, itemKey]);
+                                  setMessage(`Purchased ${item.name}!`);
+                                }
+                              }}
+                              disabled={owned || !canAfford}
+                              className={`px-3 py-1 rounded text-sm font-bold ${
+                                owned
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                  : canAfford
+                                  ? 'bg-green-600 text-white hover:bg-green-700'
+                                  : 'bg-red-900 text-red-400 cursor-not-allowed'
+                              }`}>
+                              {owned ? 'Owned' : canAfford ? 'Buy' : 'Too Expensive'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={() => setGamePhase('equip')}
+              className="w-full mb-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-colors">
+              Manage Equipment
+            </button>
+            <button
+              onClick={() => setGamePhase('rewards')}
+              className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
+              Back to Rewards
+            </button>
+          </div>
+        )}
+        {gamePhase === 'equip' && (
+          <div className="mt-4 p-6 bg-purple-900 border-2 border-purple-500 rounded-lg max-h-96 overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-2xl font-bold text-purple-300 mb-2">Manage Equipment</div>
+            </div>
+
+            {gameState.current.units.filter(u => u.team === 'player' && u.hp > 0).map(unit => {
+              const allEquip = getAllEquipment();
+              const availableEquip = inventory.filter(itemKey => {
+                const item = allEquip[itemKey];
+                if (!item) return false;
+                if (!item.jobs) return true; // Accessories work for all
+                return item.jobs.includes(unit.job);
+              });
+
+              return (
+                <div key={unit.id} className="mb-4 p-4 bg-gray-800 rounded-lg border-2" style={{ borderColor: jobData[unit.job]?.color || '#666' }}>
+                  <div className="text-lg font-bold text-white mb-2">{unit.name} - {unit.job}</div>
+
+                  {['mainHand', 'offHand', 'armor', 'helmet'].map(slot => {
+                    const currentItem = unit.equipment[slot];
+                    const slotEquip = availableEquip.filter(key => allEquip[key]?.slot === slot);
+
+                    return (
+                      <div key={slot} className="mb-2">
+                        <label className="text-xs text-gray-400 block mb-1 capitalize">
+                          {slot === 'mainHand' ? 'Main Hand' : slot === 'offHand' ? 'Off Hand' : slot}:
+                        </label>
+                        <select
+                          value={currentItem || ''}
+                          onChange={(e) => {
+                            unit.equipment[slot] = e.target.value || null;
+                            recalculateUnitStats(unit);
+                            setGamePhase('equip'); // Force re-render
+                          }}
+                          className="w-full bg-gray-700 text-white px-2 py-1 rounded text-sm">
+                          <option value="">None</option>
+                          {slotEquip.map(key => (
+                            <option key={key} value={key}>{allEquip[key].name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+
+                  <div className="mt-2 text-xs text-gray-300 grid grid-cols-3 gap-1">
+                    <div>HP: {unit.maxHp}</div>
+                    <div>MP: {unit.maxMp}</div>
+                    <div>ATK: {unit.atk}</div>
+                    <div>DEF: {unit.def}</div>
+                    <div>MAG: {unit.mag}</div>
+                    <div>SPD: {unit.spd}</div>
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => setGamePhase('shop')}
+              className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
+              Back to Shop
+            </button>
+          </div>
+        )}
+        {(gamePhase === 'victory' || gamePhase === 'defeat') && (
+          <div className="mt-4 text-center">
+            <div className="text-3xl font-bold mb-2" style={{color: gamePhase === 'victory' ? '#FFD700' : '#FF0000'}}>
+              {gamePhase === 'victory' ? 'Victory!' : 'Defeat!'}
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Play Again
+            </button>
+          </div>
+        )}
+      </div>
+      
+      <div className="bg-gray-800 p-4 rounded text-white w-80">
+        <h2 className="text-xl font-bold mb-3 text-yellow-400">Turn Order</h2>
+        <div className="mb-4 space-y-1">
+          {turnOrder.map((unit, idx) => (
+            <div
+              key={unit.id}
+              className={`text-sm p-1 rounded ${idx === currentTurnIndex ? 'bg-cyan-600' : 'bg-gray-700'}`}
+            >
+              <span className={unit.team === 'enemy' ? 'text-red-400' : 'text-white'}>
+                {unit.name}
+              </span> (SPD: {unit.spd}) {unit.effects.includes('slow') && 'ðŸŒ'}
+            </div>
+          ))}
+        </div>
+        
+        <h2 className="text-xl font-bold mb-3 text-yellow-400">
+          {inspectedUnit ? 'Inspecting' : selectedUnit ? 'Active Unit' : 'Unit Info'}
+        </h2>
+        {inspectedUnit ? (
+          <div className="overflow-y-auto max-h-96">
+            <button
+              onClick={() => setInspectedUnit(null)}
+              className="mb-2 px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+            >
+              â† Back
+            </button>
+            <div className="font-bold text-lg">{inspectedUnit.name}</div>
+            <div className={`text-sm ${inspectedUnit.team === 'player' ? 'text-green-400' : 'text-red-400'}`}>
+              {inspectedUnit.team === 'player' ? 'Ally' : 'Enemy'}
+            </div>
+            <div className="text-gray-300">Job: {inspectedUnit.job.charAt(0).toUpperCase() + inspectedUnit.job.slice(1)}</div>
+            <div className="text-gray-300">Level: {inspectedUnit.level}</div>
+            <div className="text-xs text-gray-400 italic">{jobData[inspectedUnit.job]?.description}</div>
+            <div className="mt-2 h-4 bg-gray-700 rounded">
+              <div className="h-full bg-green-500 rounded" style={{width: `${(inspectedUnit.hp / inspectedUnit.maxHp) * 100}%`}}></div>
+            </div>
+            <div className="text-sm">HP: {inspectedUnit.hp}/{inspectedUnit.maxHp}</div>
+            <div className="mt-1 h-4 bg-gray-700 rounded">
+              <div className="h-full bg-blue-500 rounded" style={{width: `${(inspectedUnit.mp / inspectedUnit.maxMp) * 100}%`}}></div>
+            </div>
+            <div className="text-sm">MP: {inspectedUnit.mp}/{inspectedUnit.maxMp}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <div>ATK: {inspectedUnit.atk}</div>
+              <div>DEF: {inspectedUnit.def}</div>
+              <div>MAG: {inspectedUnit.mag}</div>
+              <div>SPD: {inspectedUnit.spd}</div>
+            </div>
+            <div className="mt-2 text-xs text-gray-400">
+              Evasion: {Math.floor(inspectedUnit.spd / 2)}%
+            </div>
+            <div className="text-xs text-gray-400">
+              MP Regen: {Math.floor(2 + inspectedUnit.mag / 4)}/turn
+            </div>
+            
+            {/* Equipment Section */}
+            <div className="mt-4">
+              <div className="font-bold mb-2 text-yellow-400">Equipment:</div>
+              <div className="text-xs space-y-1">
+                {(() => {
+                  const allEquip = getAllEquipment();
+                  const slots = [
+                    { key: 'mainHand', label: 'ðŸ—¡ï¸ Main Hand' },
+                    { key: 'offHand', label: 'ðŸ›¡ï¸ Off Hand' },
+                    { key: 'armor', label: 'ðŸ‘• Armor' },
+                    { key: 'helmet', label: 'â›‘ï¸ Helmet' },
+                    { key: 'ring1', label: 'ðŸ’ Ring 1' },
+                    { key: 'ring2', label: 'ðŸ’ Ring 2' },
+                    { key: 'necklace', label: 'ðŸ“¿ Necklace' }
+                  ];
+                  return slots.map(slot => {
+                    const equipKey = inspectedUnit.equipment?.[slot.key];
+                    const item = equipKey ? allEquip[equipKey] : null;
+                    return (
+                      <div key={slot.key} className="flex justify-between bg-gray-700 p-1 rounded">
+                        <span className="text-gray-400">{slot.label}:</span>
+                        <span className={item ? 'text-white' : 'text-gray-500'}>
+                          {item ? item.name : '(empty)'}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <div className="font-bold mb-2">Skills:</div>
+              {getAvailableSkills(inspectedUnit).map(skill => (
+                <div key={skill.name} className="text-sm text-gray-300 mb-2 p-2 bg-gray-700 rounded">
+                  <div className="font-semibold">{skill.name}</div>
+                  <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
+                  <div className="text-xs">Base Accuracy: {skill.accuracy}%</div>
+                  <div className="text-xs text-gray-400">{skill.type}</div>
+                </div>
+              ))}
+              {/* Show locked skills */}
+              {jobData[inspectedUnit.job]?.skills.filter(s => s.level > inspectedUnit.level).length > 0 && (
+                <div className="mt-2 text-xs text-gray-500">
+                  <div className="italic">Locked skills:</div>
+                  {jobData[inspectedUnit.job].skills.filter(s => s.level > inspectedUnit.level).map(skill => (
+                    <div key={skill.name} className="text-gray-600">â€¢ {skill.name} (Lv {skill.level})</div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {inspectedUnit.effects.length > 0 && (
+              <div className="mt-3">
+                <div className="font-bold">Status Effects:</div>
+                {inspectedUnit.effects.map((effect, idx) => (
+                  <div key={idx} className="text-sm text-yellow-400">â€¢ {effect}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : selectedUnit ? (
+          <div>
+            <div className="font-bold text-lg">{selectedUnit.name}</div>
+            <div className="text-gray-300">Job: {selectedUnit.job}</div>
+            <div className="text-gray-300">Level: {selectedUnit.level}</div>
+            <div className="text-gray-300">EXP: {selectedUnit.exp}/{selectedUnit.level * 100}</div>
+            <div className="mt-2 h-4 bg-gray-700 rounded">
+              <div className="h-full bg-green-500 rounded" style={{width: `${(selectedUnit.hp / selectedUnit.maxHp) * 100}%`}}></div>
+            </div>
+            <div className="text-sm">HP: {selectedUnit.hp}/{selectedUnit.maxHp}</div>
+            <div className="mt-1 h-4 bg-gray-700 rounded">
+              <div className="h-full bg-blue-500 rounded" style={{width: `${(selectedUnit.mp / selectedUnit.maxMp) * 100}%`}}></div>
+            </div>
+            <div className="text-sm">MP: {selectedUnit.mp}/{selectedUnit.maxMp}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <div>ATK: {selectedUnit.atk}</div>
+              <div>DEF: {selectedUnit.def}</div>
+              <div>MAG: {selectedUnit.mag}</div>
+              <div>SPD: {selectedUnit.spd}</div>
+            </div>
+            <div className="mt-2 text-xs text-gray-400">
+              Evasion: {Math.floor(selectedUnit.spd / 2)}%
+            </div>
+            <div className="text-xs text-gray-400">
+              MP Regen: {Math.floor(2 + selectedUnit.mag / 4)}/turn
+            </div>
+            
+            <div className="mt-4">
+              <div className="font-bold mb-2">Skills:</div>
+              {jobData[selectedUnit.job].skills.map(skill => (
+                <button
+                  key={skill.name}
+                  onClick={() => handleSkillClick(skill)}
+                  disabled={selectedUnit.mp < skill.mpCost || selectedUnit.hasActed}
+                  className={`w-full text-left p-2 mb-2 rounded ${
+                    selectedSkill?.name === skill.name 
+                      ? 'bg-yellow-600' 
+                      : selectedUnit.mp < skill.mpCost || selectedUnit.hasActed
+                      ? 'bg-gray-600 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  <div className="font-semibold">{skill.name}</div>
+                  <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
+                  <div className="text-xs">Base Accuracy: {skill.accuracy}%</div>
+                  <div className="text-xs text-gray-300">{skill.type} - targets any unit</div>
+                </button>
+              ))}
+              {selectedSkill && (
+                <button
+                  onClick={() => {
+                    gameState.current.selectedSkill = null;
+                    gameState.current.skillRange = [];
+                    gameState.current.moveRange = gameState.current.selectedUnit.hasMoved ? [] : calculateMoveRange(gameState.current.selectedUnit);
+                    setSelectedSkill(null);
+                    addMessage('Skill cancelled.');
+                  }}
+                  className="w-full p-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Cancel Skill
+                </button>
+              )}
+            </div>
+            
+            {selectedUnit.effects.length > 0 && (
+              <div className="mt-3">
+                <div className="font-bold">Status Effects:</div>
+                {selectedUnit.effects.map((effect, idx) => (
+                  <div key={idx} className="text-sm text-yellow-400">â€¢ {effect}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-gray-400">Select your unit when it's their turn</div>
+        )}
+      </div>
+
+      {/* Debug Mode Panel */}
+      {debugMode && (
+        <div className="fixed top-4 right-4 bg-black bg-opacity-90 border-2 border-green-500 rounded-lg p-4 max-w-md max-h-screen overflow-y-auto text-xs text-green-400 font-mono z-50">
+          <div className="flex justify-between items-center mb-2 border-b border-green-500 pb-2">
+            <div className="text-lg font-bold">DEBUG MODE</div>
+            <button
+              onClick={() => setDebugMode(false)}
+              className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+            >
+              X
+            </button>
+          </div>
+          <div className="space-y-2">
+            <div className="text-yellow-400 font-bold">Game State:</div>
+            <div>Phase: {gamePhase}</div>
+            <div>Mode: {gameMode}</div>
+            <div>Turn: {turnNumber}</div>
+            <div>Wave: {waveNumber}</div>
+            <div>Gil: {gil}</div>
+            <div>Current Turn Index: {currentTurnIndex}/{turnOrder.length}</div>
+
+            <div className="text-yellow-400 font-bold mt-3">Turn Order:</div>
+            {turnOrder.map((unit, idx) => (
+              <div key={idx} className={idx === currentTurnIndex ? 'text-white bg-green-900 px-1' : ''}>
+                <span className={unit.team === 'enemy' ? 'text-red-400' : 'text-green-400'}>
+                  {idx + 1}. {unit.name}
+                </span> ({unit.team}) - SPD: {unit.spd} - HP: {unit.hp}/{unit.maxHp}
+              </div>
+            ))}
+
+            <div className="text-yellow-400 font-bold mt-3">All Units ({gameState.current.units.length}):</div>
+            {gameState.current.units.map((unit, idx) => (
+              <div key={idx} className={unit.hp <= 0 ? 'text-red-400' : ''}>
+                {unit.name} [{unit.x},{unit.y}] {unit.team} L{unit.level} - HP:{unit.hp}/{unit.maxHp} MP:{unit.mp}/{unit.maxMp} - {unit.hasMoved ? 'M' : '-'}{unit.hasActed ? 'A' : '-'}
+              </div>
+            ))}
+
+            {selectedUnit && (
+              <>
+                <div className="text-yellow-400 font-bold mt-3">Selected Unit:</div>
+                <div>{selectedUnit.name} ({selectedUnit.job})</div>
+                <div>Position: [{selectedUnit.x}, {selectedUnit.y}]</div>
+                <div>Stats: ATK:{selectedUnit.atk} DEF:{selectedUnit.def} MAG:{selectedUnit.mag} SPD:{selectedUnit.spd}</div>
+                <div>Status: {selectedUnit.hasMoved ? 'Moved' : 'Can Move'} | {selectedUnit.hasActed ? 'Acted' : 'Can Act'}</div>
+                {selectedUnit.effects.length > 0 && <div>Effects: {selectedUnit.effects.join(', ')}</div>}
+              </>
+            )}
+
+            {inspectedUnit && (
+              <>
+                <div className="text-yellow-400 font-bold mt-3">Inspected Unit:</div>
+                <div>{inspectedUnit.name} ({inspectedUnit.job})</div>
+                <div>Position: [{inspectedUnit.x}, {inspectedUnit.y}]</div>
+                <div>HP: {inspectedUnit.hp}/{inspectedUnit.maxHp}</div>
+              </>
+            )}
+
+            <div className="text-yellow-400 font-bold mt-3">Refs:</div>
+            <div>AI Processing: {aiProcessingRef.current ? 'true' : 'false'}</div>
+            <div>Current Turn Index Ref: {currentTurnIndexRef.current}</div>
+
+            <div className="text-gray-400 mt-3 pt-2 border-t border-green-500">
+              Press 'D' to toggle debug mode
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default TacticalRPG;
+
+  </script>
+
+  <!-- Render the component -->
+  <script type="text/babel">
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<TacticalRPG />);
+  </script>
+</body>
+</html>
