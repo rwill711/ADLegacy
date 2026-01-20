@@ -138,7 +138,7 @@ const TeamSelectionScreen = ({ onStartGame }) => {
   const [playerTeam, setPlayerTeam] = useState([
     { id: 1, name: 'Arthur', job: 'knight', level: 1 },
     { id: 2, name: 'Merlin', job: 'mage', level: 1 },
-    { id: 3, name: 'Shadow', job: 'rogue', level: 1 },
+    { id: 3, name: 'Phoenix', job: 'archer', level: 1 },
   ]);
   const [enemyTeam, setEnemyTeam] = useState([
     { id: 101, name: 'Goblin', job: 'knight', level: 1 },
@@ -273,8 +273,7 @@ const TeamSelectionScreen = ({ onStartGame }) => {
           <select
             value={unit.job}
             onChange={(e) => updateUnit(team, unit.id, 'job', e.target.value)}
-            className="bg-gray-600 text-white px-2 py-1 rounded text-sm w-full"
-            disabled={gameMode === 'endless' && team === 'player'}>
+            className="bg-gray-600 text-white px-2 py-1 rounded text-sm w-full">
             {gameMode === 'endless' && team === 'player' ? (
               <optgroup label="Base Jobs (Endless Mode)">
                 {baseJobs.map(job => (<option key={job} value={job}>{job.charAt(0).toUpperCase() + job.slice(1)}</option>))}
