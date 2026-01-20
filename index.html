@@ -35,6 +35,8 @@
 
   <!-- TacticalRPG Component -->
   <script type="text/babel">
+// Extract React hooks from global React object
+const { useState, useEffect, useRef } = React;
 
 // Job data needs to be outside component for TeamSelectionScreen
 const jobDataStatic = {
