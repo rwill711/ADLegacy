@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+// Extract React hooks from global React object (for browser compatibility)
+const { useState, useEffect, useRef } = React;
 
 // Job data needs to be outside component for TeamSelectionScreen
 const jobDataStatic = {
@@ -3454,4 +3455,4 @@ const TacticalRPG = () => {
   );
 };
 
-export default TacticalRPG;
+// No export needed for browser - component will be used directly
