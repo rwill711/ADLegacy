@@ -512,8 +512,11 @@ const TacticalRPG = () => {
   const gameState = useRef({
     grid: { cols: 15, rows: 15, tileSize: 50 },
     terrain: [], // Will hold terrain data
+    elevation: [], // Height map: 0 (ground) to 3 (high platform) - [y][x] format
     units: [], // Will be populated when game starts
     defeatedUnits: [], // Bodies that persist for 3 turns { unit, x, y, turnsRemaining }
+    objects: [], // Interactive objects: chests, walls, volcanos { id, type, x, y, ... }
+    volcanoState: { lastEruptionTurn: -10 }, // Track volcano eruptions
     selectedUnit: null,
     selectedSkill: null,
     moveRange: [],
@@ -1048,6 +1051,7 @@ const TacticalRPG = () => {
       team: team,
       x: x,
       y: y,
+      facing: team === 'player' ? 'N' : 'S', // Players face North (up), enemies face South (down)
       baseHp: baseHp,
       baseMp: baseMp,
       baseAtk: baseAtk,
@@ -1068,6 +1072,7 @@ const TacticalRPG = () => {
       effects: [],
       previousX: null,
       previousY: null,
+      previousFacing: null,
       unlockedJobs: [selectionData.job]
     };
   };
@@ -1170,7 +1175,10 @@ const TacticalRPG = () => {
 
     gameState.current.units = [...playerUnits, ...enemyUnits];
     gameState.current.terrain = generateTerrain(levelTemplate);
+    gameState.current.elevation = generateElevation(levelTemplate);
+    gameState.current.objects = generateObjects(levelTemplate, waveNumber);
     gameState.current.defeatedUnits = [];
+    gameState.current.volcanoState = { lastEruptionTurn: -10 };
     terrainStateRef.current = {}; // Reset terrain state
 
     gameState.current.units.forEach(unit => {
@@ -1302,6 +1310,100 @@ const TacticalRPG = () => {
       temporary: true,
       duration: 2,
       becomes: 'burntGround'
+    }
+  };
+
+  // Object types with properties
+  const objectData = {
+    chest_common: {
+      name: 'Treasure Chest',
+      color: '#8B4513',
+      symbol: '📦',
+      passable: false,
+      hp: 20,
+      maxHp: 20,
+      destructible: false,
+      interactive: true,
+      rarity: 'common',
+      minGold: 50,
+      maxGold: 150,
+      itemChance: 10 // 10% chance for item at low levels
+    },
+    chest_rare: {
+      name: 'Rare Chest',
+      color: '#4169E1',
+      symbol: '💎',
+      passable: false,
+      hp: 30,
+      maxHp: 30,
+      destructible: false,
+      interactive: true,
+      rarity: 'rare',
+      minGold: 200,
+      maxGold: 400,
+      itemChance: 30
+    },
+    chest_epic: {
+      name: 'Epic Chest',
+      color: '#9370DB',
+      symbol: '👑',
+      passable: false,
+      hp: 40,
+      maxHp: 40,
+      destructible: false,
+      interactive: true,
+      rarity: 'epic',
+      minGold: 400,
+      maxGold: 800,
+      itemChance: 60
+    },
+    chest_legendary: {
+      name: 'Legendary Chest',
+      color: '#FFD700',
+      symbol: '⭐',
+      passable: false,
+      hp: 50,
+      maxHp: 50,
+      destructible: false,
+      interactive: true,
+      rarity: 'legendary',
+      minGold: 800,
+      maxGold: 1500,
+      itemChance: 90
+    },
+    volcano: {
+      name: 'Volcano',
+      color: '#8B0000',
+      symbol: '🌋',
+      passable: false,
+      hp: 999,
+      maxHp: 999,
+      destructible: false,
+      interactive: false,
+      eruptionInterval: 5, // Erupts every 5 turns
+      lavaSpawnCount: 8 // Spawns 8 lava tiles per eruption
+    },
+    wall_wood: {
+      name: 'Wooden Wall',
+      color: '#8B4513',
+      symbol: '█',
+      passable: false,
+      hp: 30,
+      maxHp: 30,
+      destructible: true,
+      flammable: true,
+      interactive: false
+    },
+    wall_rock: {
+      name: 'Stone Wall',
+      color: '#696969',
+      symbol: '█',
+      passable: false,
+      hp: 60,
+      maxHp: 60,
+      destructible: true,
+      flammable: false,
+      interactive: false
     }
   };
 
@@ -1540,6 +1642,163 @@ const TacticalRPG = () => {
     return template.generate();
   };
 
+  // Generate elevation map (height levels 0-3)
+  const generateElevation = (templateName = 'random') => {
+    const elevation = [];
+
+    // Initialize all tiles to ground level (0)
+    for (let y = 0; y < 15; y++) {
+      elevation[y] = [];
+      for (let x = 0; x < 15; x++) {
+        elevation[y][x] = 0;
+      }
+    }
+
+    // Add some elevated platforms based on template
+    if (templateName === 'ruins' || Math.random() < 0.4) {
+      // Create 1-3 elevated platforms
+      const platformCount = Math.floor(Math.random() * 3) + 1;
+
+      for (let i = 0; i < platformCount; i++) {
+        // Random platform center (avoid edges and spawn zones)
+        const cx = Math.floor(Math.random() * 9) + 3; // 3-11
+        const cy = Math.floor(Math.random() * 9) + 3; // 3-11
+        const height = Math.floor(Math.random() * 2) + 1; // 1-2
+        const size = Math.floor(Math.random() * 2) + 1; // 1-2
+
+        // Create platform
+        for (let dy = -size; dy <= size; dy++) {
+          for (let dx = -size; dx <= size; dx++) {
+            const px = cx + dx;
+            const py = cy + dy;
+            if (px >= 0 && px < 15 && py >= 0 && py < 15) {
+              // Create stepped elevation (center higher)
+              const dist = Math.abs(dx) + Math.abs(dy);
+              elevation[py][px] = Math.max(elevation[py][px], Math.max(0, height - Math.floor(dist / 2)));
+            }
+          }
+        }
+      }
+    }
+
+    return elevation;
+  };
+
+  // Generate interactive objects for the level
+  const generateObjects = (templateName = 'random', waveLevel = 1) => {
+    const objects = [];
+    let nextId = 0;
+
+    // Helper to check if position is valid (not occupied by terrain or other objects)
+    const isValidPosition = (x, y) => {
+      const terrain = gameState.current.terrain;
+      if (!terrain[y] || !terrain[y][x]) return true;
+      const tile = terrain[y][x];
+      // Can't place on impassable terrain
+      if (tile === 'tree' || tile === 'rock' || tile === 'deepWater' || tile === 'volcano') return false;
+      // Check if another object is here
+      return !objects.some(obj => obj.x === x && obj.y === y);
+    };
+
+    // Helper to find random valid position
+    const findRandomPosition = (minDist = 2) => {
+      for (let attempts = 0; attempts < 100; attempts++) {
+        const x = Math.floor(Math.random() * 13) + 1; // 1-13 to avoid edges
+        const y = Math.floor(Math.random() * 13) + 1;
+        // Check not too close to player/enemy spawn
+        if (y < minDist || y > 12) continue;
+        if (isValidPosition(x, y)) return { x, y };
+      }
+      return null;
+    };
+
+    // Determine chest rarity based on wave level
+    const getChestRarity = () => {
+      const roll = Math.random() * 100;
+      if (waveLevel >= 15 && roll < 10) return 'chest_legendary';
+      if (waveLevel >= 10 && roll < 25) return 'chest_epic';
+      if (waveLevel >= 5 && roll < 40) return 'chest_rare';
+      return 'chest_common';
+    };
+
+    // Add treasure chests (1-3 depending on level template)
+    const chestCount = templateName === 'ruins' ? 2 : templateName === 'volcanic' ? 1 : Math.floor(Math.random() * 2) + 1;
+    for (let i = 0; i < chestCount; i++) {
+      const pos = findRandomPosition();
+      if (pos) {
+        objects.push({
+          id: nextId++,
+          type: getChestRarity(),
+          x: pos.x,
+          y: pos.y,
+          opened: false,
+          ...objectData[getChestRarity()]
+        });
+      }
+    }
+
+    // Add volcano for volcanic template or high wave levels
+    if (templateName === 'volcanic' || (waveLevel >= 8 && Math.random() < 0.3)) {
+      // Place volcano in corner or center
+      const positions = [
+        { x: 1, y: 1 }, { x: 13, y: 1 }, { x: 1, y: 13 }, { x: 13, y: 13 }, { x: 7, y: 7 }
+      ];
+      const pos = positions[Math.floor(Math.random() * positions.length)];
+      if (isValidPosition(pos.x, pos.y)) {
+        objects.push({
+          id: nextId++,
+          type: 'volcano',
+          x: pos.x,
+          y: pos.y,
+          ...objectData.volcano
+        });
+      }
+    }
+
+    // Add walls for ruins template
+    if (templateName === 'ruins') {
+      // Create a small ruined structure
+      const centerX = 7 + Math.floor(Math.random() * 3) - 1;
+      const centerY = 7 + Math.floor(Math.random() * 3) - 1;
+
+      // Add walls in a broken square pattern
+      const wallPositions = [
+        { x: centerX - 1, y: centerY - 1 }, { x: centerX, y: centerY - 1 }, { x: centerX + 1, y: centerY - 1 },
+        { x: centerX - 1, y: centerY }, /* center gap */ { x: centerX + 1, y: centerY },
+        { x: centerX - 1, y: centerY + 1 }, /* gap */ { x: centerX + 1, y: centerY + 1 }
+      ];
+
+      wallPositions.forEach((pos, idx) => {
+        // Skip some walls for "broken" effect
+        if (idx === 3 || idx === 6 || Math.random() < 0.3) return;
+        if (isValidPosition(pos.x, pos.y)) {
+          const wallType = Math.random() < 0.7 ? 'wall_rock' : 'wall_wood';
+          objects.push({
+            id: nextId++,
+            type: wallType,
+            x: pos.x,
+            y: pos.y,
+            ...objectData[wallType]
+          });
+        }
+      });
+
+      // Add chest inside the ruins
+      if (isValidPosition(centerX, centerY)) {
+        objects.push({
+          id: nextId++,
+          type: 'chest_epic', // Ruins always have good loot
+          x: centerX,
+          y: centerY,
+          opened: false,
+          ...objectData.chest_epic
+        });
+      }
+    }
+
+    return objects;
+  };
+
   // Set a tile on fire
   const igniteFlammable = (x, y) => {
     const terrain = gameState.current.terrain;
@@ -1576,20 +1835,26 @@ const TacticalRPG = () => {
       if (state.duration <= 0) {
         const currentTile = terrain[y][x];
         const tData = terrainData[currentTile];
-        
+
         if (tData && tData.becomes) {
           toUpdate.push({ x, y, newTile: tData.becomes });
         } else if (currentTile === 'fire') {
           toUpdate.push({ x, y, newTile: 'burntGround' });
+        } else if (currentTile === 'lava') {
+          toUpdate.push({ x, y, newTile: 'burntGround', type: 'lava' });
         }
         delete terrainStateRef.current[key];
       }
     });
     
     // Apply updates
-    toUpdate.forEach(({ x, y, newTile }) => {
+    toUpdate.forEach(({ x, y, newTile, type }) => {
       terrain[y][x] = newTile;
-      addMessage(`The fire at ${String.fromCharCode(65 + x)}${15 - y} burns out.`);
+      if (type === 'lava') {
+        addMessage(`The lava at ${String.fromCharCode(65 + x)}${15 - y} cools into scorched earth.`);
+      } else {
+        addMessage(`The fire at ${String.fromCharCode(65 + x)}${15 - y} burns out.`);
+      }
     });
     
     // Spread fire to adjacent flammable tiles (small chance)
@@ -1812,12 +2077,30 @@ const TacticalRPG = () => {
         // Calculate cost to reach this tile
         let moveCost = tData.moveCost;
         // Rogues/thieves move through water at normal cost
-        if ((tileTerrain === 'water' || tileTerrain === 'deepWater') && 
+        if ((tileTerrain === 'water' || tileTerrain === 'deepWater') &&
             ['rogue', 'thief', 'ninja', 'assassin'].includes(unit.job)) {
           moveCost = Math.max(1, moveCost - 1);
         }
+
+        // Add elevation change cost (climbing/jumping)
+        const elevation = gameState.current.elevation;
+        if (elevation && elevation[ny] && elevation[current.y]) {
+          const currentHeight = elevation[current.y][current.x] || 0;
+          const targetHeight = elevation[ny][nx] || 0;
+          const heightDiff = targetHeight - currentHeight;
+
+          // Climbing up costs extra movement (1 extra per level)
+          if (heightDiff > 0) {
+            moveCost += heightDiff;
+          }
+          // Jumping down more than 2 levels is not allowed
+          if (heightDiff < -2) {
+            continue; // Skip this tile - too high to jump down
+          }
+        }
+
         const newCost = current.cost + moveCost;
-        
+
         // Skip if over move budget
         if (newCost > moveSpeed) continue;
         
@@ -1825,15 +2108,16 @@ const TacticalRPG = () => {
         const key = `${nx},${ny}`;
         if (visited.has(key) && visited.get(key) <= newCost) continue;
         
-        // Check if occupied by another unit or a body
+        // Check if occupied by another unit, body, or object
         const occupied = gameState.current.units.find(u => u.x === nx && u.y === ny && u.hp > 0);
         const hasBody = gameState.current.defeatedUnits.find(d => d.x === nx && d.y === ny);
-        
+        const hasObject = gameState.current.objects.find(obj => obj.x === nx && obj.y === ny && !obj.passable);
+
         visited.set(key, newCost);
         queue.push({ x: nx, y: ny, cost: newCost });
-        
-        // Add to range if not occupied, no body, and not starting position
-        if (!occupied && !hasBody && (nx !== unit.x || ny !== unit.y)) {
+
+        // Add to range if not occupied, no body, no object, and not starting position
+        if (!occupied && !hasBody && !hasObject && (nx !== unit.x || ny !== unit.y)) {
           // Remove if already in range (we found a better path)
           const existingIdx = range.findIndex(r => r.x === nx && r.y === ny);
           if (existingIdx >= 0) range.splice(existingIdx, 1);
@@ -1872,10 +2156,16 @@ const TacticalRPG = () => {
       
       // Don't check the target tile itself
       if (x === x2 && y === y2) break;
-      
+
       // Check if this tile blocks ranged attacks
       const tileTerrain = terrain[y] ? terrain[y][x] : 'grass';
       if (terrainData[tileTerrain].blocksRanged) {
+        return false;
+      }
+
+      // Check if an object blocks line of sight
+      const blockingObject = gameState.current.objects.find(obj => obj.x === x && obj.y === y && !obj.passable);
+      if (blockingObject) {
         return false;
       }
     }
@@ -1930,6 +2220,19 @@ const TacticalRPG = () => {
         const dist = Math.abs(x - unit.x) + Math.abs(y - unit.y);
         if (dist <= skill.range && dist > 0) {
           const target = gameState.current.units.find(u => u.x === x && u.y === y && u.hp > 0 && u !== unit);
+          const targetObject = gameState.current.objects.find(obj => obj.x === x && obj.y === y && obj.destructible);
+
+          // Can target destructible objects with physical/magic attacks
+          if (targetObject && (skill.type === 'physical' || skill.type === 'magic')) {
+            if (skill.range > 1) {
+              if (hasLineOfSight(unit.x, unit.y, x, y)) {
+                range.push({ x, y });
+              }
+            } else {
+              range.push({ x, y });
+            }
+          }
+
           // Can't target hidden enemies (unless you're on their team)
           if (target && (!target.effects.includes('hidden') || target.team === unit.team)) {
             // For ranged attacks (range > 1), check line of sight
@@ -2167,9 +2470,63 @@ const TacticalRPG = () => {
     }
   };
 
+  // Calculate height advantage bonus
+  const calculateHeightBonus = (attacker, target) => {
+    const elevation = gameState.current.elevation;
+    if (!elevation || !elevation[attacker.y] || !elevation[target.y]) {
+      return { multiplier: 1.0, type: '' };
+    }
+
+    const attackerHeight = elevation[attacker.y][attacker.x] || 0;
+    const targetHeight = elevation[target.y][target.x] || 0;
+    const heightDiff = attackerHeight - targetHeight;
+
+    // +10% damage per level of height advantage (max +30%)
+    if (heightDiff > 0) {
+      const bonus = Math.min(heightDiff * 0.1, 0.3);
+      return { multiplier: 1.0 + bonus, type: `Height+${heightDiff}!` };
+    }
+
+    // No penalty for being lower (just no bonus)
+    return { multiplier: 1.0, type: '' };
+  };
+
+  // Calculate facing bonus based on attacker and target positions
+  const calculateFacingBonus = (attacker, target) => {
+    // Calculate attack direction
+    const dx = target.x - attacker.x;
+    const dy = target.y - attacker.y;
+
+    // Determine primary attack direction
+    let attackDir;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      attackDir = dx > 0 ? 'E' : 'W';
+    } else {
+      attackDir = dy > 0 ? 'S' : 'N';
+    }
+
+    // Check if attack is from behind (backstab)
+    const opposites = { N: 'S', S: 'N', E: 'W', W: 'E' };
+    if (target.facing && attackDir === opposites[target.facing]) {
+      return { multiplier: 1.5, type: 'Backstab!' };
+    }
+
+    // Check if attack is from side (flank)
+    const sides = {
+      N: ['E', 'W'], S: ['E', 'W'],
+      E: ['N', 'S'], W: ['N', 'S']
+    };
+    if (target.facing && sides[target.facing] && sides[target.facing].includes(attackDir)) {
+      return { multiplier: 1.25, type: 'Flank!' };
+    }
+
+    // Attack from front (no bonus)
+    return { multiplier: 1.0, type: '' };
+  };
+
   const useSkill = (attacker, target, skill) => {
     if (attacker.mp < skill.mpCost) return;
-    
+
     attacker.mp -= skill.mpCost;
     const isEnemy = attacker.team === 'enemy';
     
@@ -2207,12 +2564,18 @@ const TacticalRPG = () => {
       const atkBonus = attacker.effects.includes('buff_atk') ? 5 : 0;
       // Bonus damage from attacking while hidden
       const hiddenBonus = wasHidden ? 1.5 : 1.0;
+      // Facing bonus (backstab/flank) - only for physical attacks
+      const facingData = skill.type === 'physical' ? calculateFacingBonus(attacker, target) : { multiplier: 1.0, type: '' };
+      // Height advantage bonus (works for both physical and magic ranged attacks)
+      const heightData = calculateHeightBonus(attacker, target);
       const defense = skill.type === 'magic' ? target.def / 2 : target.def;
-      const damage = Math.max(1, Math.floor((basePower + atkBonus) * skill.power * hiddenBonus - defense));
-      
+      const damage = Math.max(1, Math.floor((basePower + atkBonus) * skill.power * hiddenBonus * facingData.multiplier * heightData.multiplier - defense));
+
       target.hp = Math.max(0, target.hp - damage);
       const hiddenMsg = wasHidden ? ' (Ambush!)' : '';
-      logAction(`${attacker.name} used ${skill.name}! HIT for ${damage} damage!${hiddenMsg} (${hitChance.toFixed(0)}% chance)`, isEnemy);
+      const facingMsg = facingData.type ? ` (${facingData.type})` : '';
+      const heightMsg = heightData.type ? ` (${heightData.type})` : '';
+      logAction(`${attacker.name} used ${skill.name}! HIT for ${damage} damage!${hiddenMsg}${facingMsg}${heightMsg} (${hitChance.toFixed(0)}% chance)`, isEnemy);
       
       if (skill.effect) {
         applyEffect(target, skill.effect);
@@ -2262,6 +2625,17 @@ const TacticalRPG = () => {
           u.effects = u.effects.filter(e => e !== 'sleep' && e !== 'stun');
         }
       });
+
+      // Check for volcano eruptions
+      const volcanos = gameState.current.objects.filter(obj => obj.type === 'volcano');
+      volcanos.forEach(volcano => {
+        const turnsSinceEruption = turnNumber - gameState.current.volcanoState.lastEruptionTurn;
+        if (turnsSinceEruption >= volcano.eruptionInterval) {
+          eruptVolcano(volcano);
+          gameState.current.volcanoState.lastEruptionTurn = turnNumber;
+        }
+      });
+
       // This will trigger the useEffect which handles the new turn
       setTurnNumber(t => t + 1);
       return;
@@ -2490,6 +2864,25 @@ const TacticalRPG = () => {
           return;
         }
         
+        // Check if targeting an object (wall) with a physical attack
+        const targetObject = gs.objects.find(obj => obj.x === gridX && obj.y === gridY && obj.destructible);
+        if (targetObject && (gs.selectedSkill.type === 'physical' || gs.selectedSkill.type === 'magic')) {
+          // Attack the object
+          const damage = gs.selectedSkill.type === 'physical'
+            ? Math.floor(gs.selectedUnit.atk * 1.5)
+            : Math.floor(gs.selectedUnit.mag * 1.5);
+
+          damageObject(targetObject, damage, gs.selectedUnit);
+          gs.selectedUnit.hasActed = true;
+          gs.selectedUnit = null;
+          gs.skillRange = [];
+          gs.moveRange = [];
+          setSelectedUnit(null);
+          setSelectedSkill(null);
+          setTimeout(nextTurn, 1000);
+          return;
+        }
+
         const target = gs.units.find(u => u.x === gridX && u.y === gridY);
         if (target) {
           useSkill(gs.selectedUnit, target, gs.selectedSkill);
@@ -2561,6 +2954,20 @@ const TacticalRPG = () => {
     if (!gs.selectedUnit.hasMoved && gs.moveRange.find(tile => tile.x === gridX && tile.y === gridY)) {
       gs.selectedUnit.previousX = gs.selectedUnit.x;
       gs.selectedUnit.previousY = gs.selectedUnit.y;
+      gs.selectedUnit.previousFacing = gs.selectedUnit.facing;
+
+      // Update facing direction based on movement
+      const dx = gridX - gs.selectedUnit.x;
+      const dy = gridY - gs.selectedUnit.y;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal movement dominates
+        gs.selectedUnit.facing = dx > 0 ? 'E' : 'W';
+      } else if (dy !== 0) {
+        // Vertical movement
+        gs.selectedUnit.facing = dy > 0 ? 'S' : 'N';
+      }
+      // If dx and dy are both 0, facing doesn't change
+
       gs.selectedUnit.x = gridX;
       gs.selectedUnit.y = gridY;
       gs.selectedUnit.hasMoved = true;
@@ -2571,7 +2978,45 @@ const TacticalRPG = () => {
         addMessage(`${gs.selectedUnit.name} is no longer hidden!`);
       }
       addMessage('Move complete. Choose a skill or end turn. You can undo your move if needed.');
+
+      // Check if unit is adjacent to an interactable object (chest)
+      const adjacentChest = gs.objects.find(obj =>
+        obj.type.startsWith('chest_') &&
+        !obj.opened &&
+        Math.abs(obj.x - gridX) <= 1 &&
+        Math.abs(obj.y - gridY) <= 1 &&
+        (obj.x !== gridX || obj.y !== gridY) // Not on same tile
+      );
+
+      if (adjacentChest) {
+        addMessage(`${gs.selectedUnit.name} found a treasure chest! Click near it again to open it.`);
+      }
+
       return;
+    }
+
+    // Check if clicking on adjacent chest to open it
+    if (gs.selectedUnit) {
+      const clickedChest = gs.objects.find(obj =>
+        obj.type.startsWith('chest_') &&
+        !obj.opened &&
+        obj.x === gridX &&
+        obj.y === gridY
+      );
+
+      if (clickedChest) {
+        // Check if unit is adjacent
+        const isAdjacent = Math.abs(clickedChest.x - gs.selectedUnit.x) <= 1 &&
+                          Math.abs(clickedChest.y - gs.selectedUnit.y) <= 1;
+
+        if (isAdjacent) {
+          openChest(clickedChest, gs.selectedUnit);
+          return;
+        } else {
+          addMessage(`${gs.selectedUnit.name} must be adjacent to the chest to open it!`);
+          return;
+        }
+      }
     }
   };
 
@@ -2586,6 +3031,102 @@ const TacticalRPG = () => {
     addMessage(`Select a target for ${skill.name}`);
   };
 
+  // Open a treasure chest
+  const openChest = (chest, unit) => {
+    chest.opened = true;
+    const objData = objectData[chest.type];
+
+    // Calculate gold reward
+    const goldAmount = Math.floor(Math.random() * (objData.maxGold - objData.minGold + 1)) + objData.minGold;
+    setGil(prev => prev + goldAmount);
+
+    addMessage(`${unit.name} opened a ${objData.name} and found ${goldAmount} gil!`);
+
+    // Check for item drop
+    if (Math.random() * 100 < objData.itemChance) {
+      // TODO: Add item generation when item system is ready
+      addMessage(`...and found a rare item! (Item system coming soon)`);
+    }
+  };
+
+  // Damage an object (wall)
+  const damageObject = (obj, damage, attacker) => {
+    if (!obj.destructible) {
+      addMessage(`The ${objectData[obj.type].name} cannot be destroyed!`);
+      return false;
+    }
+
+    obj.hp -= damage;
+    addMessage(`${attacker.name} attacks the ${objectData[obj.type].name} for ${damage} damage!`);
+
+    if (obj.hp <= 0) {
+      // Remove destroyed object
+      const index = gameState.current.objects.indexOf(obj);
+      if (index > -1) {
+        gameState.current.objects.splice(index, 1);
+        addMessage(`The ${objectData[obj.type].name} has been destroyed!`);
+
+        // If it was a wood wall, maybe start a fire
+        if (obj.type === 'wall_wood' && Math.random() < 0.3) {
+          gameState.current.terrain[obj.y][obj.x] = 'fire';
+          addMessage(`The destroyed wooden wall catches fire!`);
+        }
+      }
+      return true;
+    }
+
+    return false;
+  };
+
+  // Volcano eruption - spawns lava around the volcano
+  const eruptVolcano = (volcano) => {
+    addMessage(`🌋 The volcano erupts! Lava flows across the battlefield!`);
+
+    const terrain = gameState.current.terrain;
+    const spawnCount = volcano.lavaSpawnCount;
+    let spawned = 0;
+
+    // Spawn lava near the volcano base first
+    const adjacentTiles = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue; // Skip volcano itself
+        const nx = volcano.x + dx;
+        const ny = volcano.y + dy;
+        if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15) {
+          adjacentTiles.push({ x: nx, y: ny });
+        }
+      }
+    }
+
+    // Place lava on adjacent tiles first
+    adjacentTiles.forEach(tile => {
+      if (spawned >= spawnCount) return;
+      const currentTile = terrain[tile.y][tile.x];
+      // Can place lava on passable terrain
+      if (currentTile === 'grass' || currentTile === 'burntGround' || currentTile === 'fire') {
+        terrain[tile.y][tile.x] = 'lava';
+        terrainStateRef.current[`${tile.x},${tile.y}`] = { type: 'lava', duration: 2 };
+        spawned++;
+      }
+    });
+
+    // Spawn remaining lava randomly on the map
+    while (spawned < spawnCount) {
+      const x = Math.floor(Math.random() * 15);
+      const y = Math.floor(Math.random() * 15);
+      const currentTile = terrain[y][x];
+
+      if (currentTile === 'grass' || currentTile === 'burntGround') {
+        terrain[y][x] = 'lava';
+        terrainStateRef.current[`${x},${y}`] = { type: 'lava', duration: 2 };
+        spawned++;
+      }
+    }
+
+    addMessage(`${spawned} lava pools appear! They will cool down in 2 turns.`);
+  };
+
   const undoMove = () => {
     const gs = gameState.current;
     if (!gs.selectedUnit || !gs.selectedUnit.hasMoved || gs.selectedUnit.hasActed) return;
@@ -2593,9 +3134,13 @@ const TacticalRPG = () => {
     
     gs.selectedUnit.x = gs.selectedUnit.previousX;
     gs.selectedUnit.y = gs.selectedUnit.previousY;
+    if (gs.selectedUnit.previousFacing) {
+      gs.selectedUnit.facing = gs.selectedUnit.previousFacing;
+    }
     gs.selectedUnit.hasMoved = false;
     gs.selectedUnit.previousX = null;
     gs.selectedUnit.previousY = null;
+    gs.selectedUnit.previousFacing = null;
     gs.moveRange = calculateMoveRange(gs.selectedUnit);
     addMessage(`Move undone. ${gs.selectedUnit.name} can move again.`);
   };
@@ -2636,11 +3181,44 @@ const TacticalRPG = () => {
         for (let x = 0; x < 15; x++) {
           const px = 50 + x * 50;
           const py = 50 + y * 50;
-          
-          // Base grass color
-          ctx.fillStyle = (x + y) % 2 === 0 ? '#3A5F3A' : '#2F4F2F';
+
+          // Get elevation for this tile
+          const elevation = gs.elevation && gs.elevation[y] ? (gs.elevation[y][x] || 0) : 0;
+
+          // Base grass color - lighter for higher elevations
+          let baseColor1, baseColor2;
+          switch (elevation) {
+            case 0: // Ground level
+              baseColor1 = '#3A5F3A';
+              baseColor2 = '#2F4F2F';
+              break;
+            case 1: // Low platform
+              baseColor1 = '#4A6F4A';
+              baseColor2 = '#3F5F3F';
+              break;
+            case 2: // Medium platform
+              baseColor1 = '#5A7F5A';
+              baseColor2 = '#4F6F4F';
+              break;
+            case 3: // High platform
+              baseColor1 = '#6A8F6A';
+              baseColor2 = '#5F7F5F';
+              break;
+            default:
+              baseColor1 = '#3A5F3A';
+              baseColor2 = '#2F4F2F';
+          }
+          ctx.fillStyle = (x + y) % 2 === 0 ? baseColor1 : baseColor2;
           ctx.fillRect(px, py, 50, 50);
-          
+
+          // Draw elevation indicator in corner if elevated
+          if (elevation > 0) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`+${elevation}`, px + 2, py + 10);
+          }
+
           // Draw terrain overlay
           const tileTerrain = terrain[y] ? terrain[y][x] : 'grass';
           if (tileTerrain !== 'grass') {
@@ -2821,6 +3399,94 @@ const TacticalRPG = () => {
         ctx.globalAlpha = 1.0;
       });
 
+      // Draw interactive objects (chests, walls, volcanos)
+      gs.objects.forEach(obj => {
+        const objData = objectData[obj.type];
+        if (!objData) return;
+
+        const px = 50 + obj.x * 50;
+        const py = 50 + obj.y * 50;
+
+        if (obj.type.startsWith('chest_')) {
+          // Draw chest
+          ctx.fillStyle = objData.color;
+          ctx.fillRect(px + 10, py + 20, 30, 20);
+          // Lid
+          ctx.fillStyle = obj.opened ? '#654321' : objData.color;
+          ctx.fillRect(px + 8, py + 18, 34, 8);
+          // Lock
+          if (!obj.opened) {
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(px + 25, py + 30, 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // Rarity glow
+          if (!obj.opened && obj.type !== 'chest_common') {
+            ctx.strokeStyle = objData.color;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 300) * 0.2;
+            ctx.strokeRect(px + 8, py + 18, 34, 22);
+            ctx.globalAlpha = 1.0;
+          }
+        } else if (obj.type === 'volcano') {
+          // Volcano (similar to terrain volcano but as object)
+          ctx.fillStyle = '#4a3728';
+          ctx.beginPath();
+          ctx.moveTo(px + 25, py + 5);
+          ctx.lineTo(px + 5, py + 45);
+          ctx.lineTo(px + 45, py + 45);
+          ctx.closePath();
+          ctx.fill();
+          // Crater
+          ctx.fillStyle = '#8B0000';
+          ctx.beginPath();
+          ctx.ellipse(px + 25, py + 12, 8, 5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // Glow (pulsing for active volcano)
+          const glowIntensity = 0.5 + Math.sin(Date.now() / 500) * 0.5;
+          ctx.fillStyle = `rgba(255, 69, 0, ${glowIntensity})`;
+          ctx.beginPath();
+          ctx.ellipse(px + 25, py + 12, 5, 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (obj.type.startsWith('wall_')) {
+          // Draw wall
+          const isWood = obj.type === 'wall_wood';
+          ctx.fillStyle = isWood ? '#8B4513' : '#696969';
+          ctx.fillRect(px + 5, py + 5, 40, 40);
+          // Texture/damage
+          const healthPercent = obj.hp / obj.maxHp;
+          if (healthPercent < 1) {
+            // Show cracks/damage
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(px + 15, py + 10);
+            ctx.lineTo(px + 25, py + 25);
+            ctx.lineTo(px + 20, py + 40);
+            ctx.stroke();
+          }
+          if (isWood) {
+            // Wood grain
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 3; i++) {
+              ctx.beginPath();
+              ctx.moveTo(px + 10, py + 15 + i * 10);
+              ctx.lineTo(px + 40, py + 15 + i * 10);
+              ctx.stroke();
+            }
+          }
+          // HP bar if damaged
+          if (healthPercent < 1 && healthPercent > 0) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(px + 8, py + 2, 34, 4);
+            ctx.fillStyle = healthPercent > 0.5 ? '#0F0' : healthPercent > 0.25 ? '#FF0' : '#F00';
+            ctx.fillRect(px + 8, py + 2, 34 * healthPercent, 4);
+          }
+        }
+      });
+
       gs.units.filter(u => u.hp > 0).forEach(unit => {
         const px = 50 + unit.x * 50 + 25;
         const py = 50 + unit.y * 50 + 15;
@@ -2847,7 +3513,41 @@ const TacticalRPG = () => {
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 2;
         ctx.strokeRect(px - 12, py, 24, 30);
-        
+
+        // Draw facing indicator (small triangle/arrow)
+        if (unit.facing) {
+          ctx.fillStyle = unit.team === 'player' ? '#FFFFFF' : '#FFFF00';
+          ctx.beginPath();
+          const arrowSize = 6;
+          switch (unit.facing) {
+            case 'N': // Pointing up
+              ctx.moveTo(px, py - 2);
+              ctx.lineTo(px - arrowSize, py + arrowSize);
+              ctx.lineTo(px + arrowSize, py + arrowSize);
+              break;
+            case 'S': // Pointing down
+              ctx.moveTo(px, py + 32);
+              ctx.lineTo(px - arrowSize, py + 32 - arrowSize);
+              ctx.lineTo(px + arrowSize, py + 32 - arrowSize);
+              break;
+            case 'E': // Pointing right
+              ctx.moveTo(px + 14, py + 15);
+              ctx.lineTo(px + 14 - arrowSize, py + 15 - arrowSize);
+              ctx.lineTo(px + 14 - arrowSize, py + 15 + arrowSize);
+              break;
+            case 'W': // Pointing left
+              ctx.moveTo(px - 14, py + 15);
+              ctx.lineTo(px - 14 + arrowSize, py + 15 - arrowSize);
+              ctx.lineTo(px - 14 + arrowSize, py + 15 + arrowSize);
+              break;
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
         const hpPercent = unit.hp / unit.maxHp;
         ctx.fillStyle = '#000';
         ctx.fillRect(px - 15, py - 15, 30, 5);
@@ -2940,7 +3640,8 @@ const TacticalRPG = () => {
   return (
     <div className="flex gap-4 p-4 bg-gray-900 min-h-screen">
       <div className="flex flex-col items-center">
-        <h1 className="text-3xl font-bold text-white mb-2">Tactical RPG</h1>
+        <h1 className="text-3xl font-bold text-white mb-1">Tactical RPG</h1>
+        <div className="text-xs text-gray-500 mb-1">Alpha 1.01</div>
         <div className="text-yellow-400 mb-2">Turn {turnNumber}</div>
         <canvas 
           ref={canvasRef} 
