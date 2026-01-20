@@ -469,6 +469,7 @@ const TacticalRPG = () => {
   const logRef = useRef(null);
   const aiProcessingRef = useRef(false);
   const currentTurnIndexRef = useRef(0);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   // Endless Mode State
   const [gameMode, setGameMode] = useState('normal');
@@ -2216,6 +2217,24 @@ const TacticalRPG = () => {
     }
   };
 
+  // Debug helper functions
+  const forceEndTurn = () => {
+    console.log('[DEBUG] Force ending turn');
+    const currentUnit = turnOrder[currentTurnIndexRef.current];
+    if (currentUnit) {
+      currentUnit.hasActed = true;
+      currentUnit.hasMoved = true;
+    }
+    aiProcessingRef.current = false;
+    nextTurn();
+  };
+
+  const resetAILock = () => {
+    console.log('[DEBUG] Resetting AI lock');
+    aiProcessingRef.current = false;
+    addMessage('[DEBUG] AI processing lock reset');
+  };
+
   const enemyAI = (enemy) => {
     // Guard: don't act if AI is already processing this specific unit
     if (aiProcessingRef.current) {
@@ -2870,6 +2889,57 @@ const TacticalRPG = () => {
             )}
           </div>
         )}
+
+        {/* Debug Panel - Always available during gameplay */}
+        {gamePhase !== 'setup' && gamePhase !== 'rewards' && gamePhase !== 'victory' && gamePhase !== 'defeat' && gamePhase !== 'levelup' && gamePhase !== 'shop' && gamePhase !== 'equip' && (
+          <div className="mt-4 w-full max-w-3xl">
+            <button
+              onClick={() => setShowDebugPanel(!showDebugPanel)}
+              className="w-full px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm"
+            >
+              {showDebugPanel ? '▼ Hide Debug Panel' : '▶ Show Debug Panel'}
+            </button>
+
+            {showDebugPanel && (
+              <div className="mt-2 p-4 bg-gray-800 border-2 border-yellow-500 rounded">
+                <div className="text-yellow-400 font-bold mb-2">DEBUG CONTROLS</div>
+
+                <div className="space-y-1 text-sm text-white mb-3">
+                  <div>Game Phase: <span className="text-cyan-400">{gamePhase}</span></div>
+                  <div>Turn Index: <span className="text-cyan-400">{currentTurnIndex} / {turnOrder.length - 1}</span></div>
+                  <div>Current Unit: <span className="text-cyan-400">
+                    {turnOrder[currentTurnIndex]
+                      ? `${turnOrder[currentTurnIndex].name} (${turnOrder[currentTurnIndex].team})`
+                      : 'None'}
+                  </span></div>
+                  <div>AI Processing: <span className={aiProcessingRef.current ? 'text-red-400' : 'text-green-400'}>
+                    {aiProcessingRef.current ? 'LOCKED' : 'FREE'}
+                  </span></div>
+                </div>
+
+                <div className="space-y-2">
+                  <button
+                    onClick={forceEndTurn}
+                    className="w-full px-4 py-2 bg-red-700 text-white rounded hover:bg-red-600 font-bold"
+                  >
+                    ⚠ Force End Turn
+                  </button>
+                  <button
+                    onClick={resetAILock}
+                    className="w-full px-4 py-2 bg-orange-700 text-white rounded hover:bg-orange-600 font-bold"
+                  >
+                    🔓 Reset AI Lock
+                  </button>
+                </div>
+
+                <div className="mt-3 text-xs text-gray-400">
+                  Use these controls if the turn gets stuck or AI won't finish its turn.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {gamePhase === 'rewards' && (
           <div className="mt-4 p-6 bg-purple-900 border-2 border-purple-500 rounded-lg">
             <div className="text-center mb-4">
