@@ -3167,11 +3167,13 @@ const TacticalRPG = () => {
         <h2 className="text-xl font-bold mb-3 text-yellow-400">Turn Order</h2>
         <div className="mb-4 space-y-1">
           {turnOrder.map((unit, idx) => (
-            <div 
-              key={unit.id} 
+            <div
+              key={unit.id}
               className={`text-sm p-1 rounded ${idx === currentTurnIndex ? 'bg-cyan-600' : 'bg-gray-700'}`}
             >
-              {unit.name} (SPD: {unit.spd}) {unit.effects.includes('slow') && 'ðŸŒ'}
+              <span className={unit.team === 'enemy' ? 'text-red-400' : 'text-white'}>
+                {unit.name}
+              </span> (SPD: {unit.spd}) {unit.effects.includes('slow') && 'ðŸŒ'}
             </div>
           ))}
         </div>
@@ -3378,7 +3380,9 @@ const TacticalRPG = () => {
             <div className="text-yellow-400 font-bold mt-3">Turn Order:</div>
             {turnOrder.map((unit, idx) => (
               <div key={idx} className={idx === currentTurnIndex ? 'text-white bg-green-900 px-1' : ''}>
-                {idx + 1}. {unit.name} ({unit.team}) - SPD: {unit.spd} - HP: {unit.hp}/{unit.maxHp}
+                <span className={unit.team === 'enemy' ? 'text-red-400' : 'text-green-400'}>
+                  {idx + 1}. {unit.name}
+                </span> ({unit.team}) - SPD: {unit.spd} - HP: {unit.hp}/{unit.maxHp}
               </div>
             ))}
 
