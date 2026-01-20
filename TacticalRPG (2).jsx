@@ -476,7 +476,8 @@ const TacticalRPG = () => {
   const [gil, setGil] = useState(0);
   const [inventory, setInventory] = useState([]); // Equipment owned by player
   const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0 }); // Rewards from last wave
-  
+  const [debugMode, setDebugMode] = useState(false); // Debug mode for bug reporting
+
   const gameState = useRef({
     grid: { cols: 15, rows: 15, tileSize: 50 },
     terrain: [], // Will hold terrain data
@@ -1723,6 +1724,21 @@ const TacticalRPG = () => {
       addMessage(`${sorted[0].name}'s turn!`);
     }
   }, [turnNumber, gamePhase]);
+
+  // Debug mode keyboard shortcut
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      // Press 'D' key to toggle debug mode
+      if (e.key === 'd' || e.key === 'D') {
+        // Don't toggle if typing in an input field
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        setDebugMode(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
 
   const calculateTurnOrder = () => {
     // This is now only used for reference, main logic is in useEffect
@@ -3334,6 +3350,72 @@ const TacticalRPG = () => {
           <div className="text-gray-400">Select your unit when it's their turn</div>
         )}
       </div>
+
+      {/* Debug Mode Panel */}
+      {debugMode && (
+        <div className="fixed top-4 right-4 bg-black bg-opacity-90 border-2 border-green-500 rounded-lg p-4 max-w-md max-h-screen overflow-y-auto text-xs text-green-400 font-mono z-50">
+          <div className="flex justify-between items-center mb-2 border-b border-green-500 pb-2">
+            <div className="text-lg font-bold">DEBUG MODE</div>
+            <button
+              onClick={() => setDebugMode(false)}
+              className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+            >
+              X
+            </button>
+          </div>
+          <div className="space-y-2">
+            <div className="text-yellow-400 font-bold">Game State:</div>
+            <div>Phase: {gamePhase}</div>
+            <div>Mode: {gameMode}</div>
+            <div>Turn: {turnNumber}</div>
+            <div>Wave: {waveNumber}</div>
+            <div>Gil: {gil}</div>
+            <div>Current Turn Index: {currentTurnIndex}/{turnOrder.length}</div>
+
+            <div className="text-yellow-400 font-bold mt-3">Turn Order:</div>
+            {turnOrder.map((unit, idx) => (
+              <div key={idx} className={idx === currentTurnIndex ? 'text-white bg-green-900 px-1' : ''}>
+                {idx + 1}. {unit.name} ({unit.team}) - SPD: {unit.spd} - HP: {unit.hp}/{unit.maxHp}
+              </div>
+            ))}
+
+            <div className="text-yellow-400 font-bold mt-3">All Units ({gameState.current.units.length}):</div>
+            {gameState.current.units.map((unit, idx) => (
+              <div key={idx} className={unit.hp <= 0 ? 'text-red-400' : ''}>
+                {unit.name} [{unit.x},{unit.y}] {unit.team} L{unit.level} - HP:{unit.hp}/{unit.maxHp} MP:{unit.mp}/{unit.maxMp} - {unit.hasMoved ? 'M' : '-'}{unit.hasActed ? 'A' : '-'}
+              </div>
+            ))}
+
+            {selectedUnit && (
+              <>
+                <div className="text-yellow-400 font-bold mt-3">Selected Unit:</div>
+                <div>{selectedUnit.name} ({selectedUnit.job})</div>
+                <div>Position: [{selectedUnit.x}, {selectedUnit.y}]</div>
+                <div>Stats: ATK:{selectedUnit.atk} DEF:{selectedUnit.def} MAG:{selectedUnit.mag} SPD:{selectedUnit.spd}</div>
+                <div>Status: {selectedUnit.hasMoved ? 'Moved' : 'Can Move'} | {selectedUnit.hasActed ? 'Acted' : 'Can Act'}</div>
+                {selectedUnit.effects.length > 0 && <div>Effects: {selectedUnit.effects.join(', ')}</div>}
+              </>
+            )}
+
+            {inspectedUnit && (
+              <>
+                <div className="text-yellow-400 font-bold mt-3">Inspected Unit:</div>
+                <div>{inspectedUnit.name} ({inspectedUnit.job})</div>
+                <div>Position: [{inspectedUnit.x}, {inspectedUnit.y}]</div>
+                <div>HP: {inspectedUnit.hp}/{inspectedUnit.maxHp}</div>
+              </>
+            )}
+
+            <div className="text-yellow-400 font-bold mt-3">Refs:</div>
+            <div>AI Processing: {aiProcessingRef.current ? 'true' : 'false'}</div>
+            <div>Current Turn Index Ref: {currentTurnIndexRef.current}</div>
+
+            <div className="text-gray-400 mt-3 pt-2 border-t border-green-500">
+              Press 'D' to toggle debug mode
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
