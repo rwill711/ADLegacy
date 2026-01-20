@@ -2647,7 +2647,7 @@ const TacticalRPG = () => {
     
     const nextUnit = turnOrder[nextIndex];
     if (nextUnit && nextUnit.team === 'enemy') {
-      aiProcessingRef.current = false; // Reset before starting new enemy turn
+      // Don't reset aiProcessingRef here - let enemyAI manage it
       setTimeout(() => enemyAI(nextUnit), 500);
     } else if (nextUnit) {
       addMessage(`${nextUnit.name}'s turn!`);
@@ -2673,16 +2673,15 @@ const TacticalRPG = () => {
   };
 
   const enemyAI = (enemy) => {
-    // Guard: don't act if AI is already processing this specific unit
-    if (aiProcessingRef.current) {
-      console.log(`[AI] Blocked: AI already processing`);
+    // Guard: don't act if unit already acted (check this FIRST)
+    if (enemy.hasActed) {
+      console.warn(`[AI BUG] ${enemy.name} already acted but enemyAI was called again - skipping`);
       return;
     }
-    
-    // Guard: don't act if unit already acted or moved this turn
-    if (enemy.hasActed) {
-      console.log(`[AI] ${enemy.name} already acted, skipping to next turn`);
-      setTimeout(nextTurn, 500);
+
+    // Guard: don't act if AI is already processing
+    if (aiProcessingRef.current) {
+      console.warn(`[AI BUG] AI already processing but ${enemy.name} was called - this should not happen`);
       return;
     }
     
@@ -2693,10 +2692,11 @@ const TacticalRPG = () => {
       return;
     }
     
-    // Lock AI processing
+    // Lock AI processing and mark unit as having acted to prevent double-turns
     aiProcessingRef.current = true;
+    enemy.hasActed = true; // Set immediately to prevent race conditions
     console.log(`[AI] ${enemy.name}'s turn starting`);
-    
+
     if (enemy.effects.includes('sleep')) {
       addMessage(`${enemy.name} is asleep and cannot act!`);
       enemy.hasActed = true;
@@ -2777,6 +2777,16 @@ const TacticalRPG = () => {
 
     if (bestMove && !enemy.hasMoved) {
       console.log(`[AI] ${enemy.name} moving from (${enemy.x},${enemy.y}) to (${bestMove.x},${bestMove.y})`);
+
+      // Update facing direction based on movement
+      const dx = bestMove.x - enemy.x;
+      const dy = bestMove.y - enemy.y;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        enemy.facing = dx > 0 ? 'E' : 'W';
+      } else if (dy !== 0) {
+        enemy.facing = dy > 0 ? 'S' : 'N';
+      }
+
       enemy.x = bestMove.x;
       enemy.y = bestMove.y;
       enemy.hasMoved = true;
