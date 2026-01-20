@@ -512,6 +512,7 @@ const TacticalRPG = () => {
   const gameState = useRef({
     grid: { cols: 15, rows: 15, tileSize: 50 },
     terrain: [], // Will hold terrain data
+    elevation: [], // Height map: 0 (ground) to 3 (high platform) - [y][x] format
     units: [], // Will be populated when game starts
     defeatedUnits: [], // Bodies that persist for 3 turns { unit, x, y, turnsRemaining }
     objects: [], // Interactive objects: chests, walls, volcanos { id, type, x, y, ... }
@@ -1050,6 +1051,7 @@ const TacticalRPG = () => {
       team: team,
       x: x,
       y: y,
+      facing: team === 'player' ? 'N' : 'S', // Players face North (up), enemies face South (down)
       baseHp: baseHp,
       baseMp: baseMp,
       baseAtk: baseAtk,
@@ -1070,6 +1072,7 @@ const TacticalRPG = () => {
       effects: [],
       previousX: null,
       previousY: null,
+      previousFacing: null,
       unlockedJobs: [selectionData.job]
     };
   };
@@ -1172,6 +1175,7 @@ const TacticalRPG = () => {
 
     gameState.current.units = [...playerUnits, ...enemyUnits];
     gameState.current.terrain = generateTerrain(levelTemplate);
+    gameState.current.elevation = generateElevation(levelTemplate);
     gameState.current.objects = generateObjects(levelTemplate, waveNumber);
     gameState.current.defeatedUnits = [];
     gameState.current.volcanoState = { lastEruptionTurn: -10 };
@@ -1638,6 +1642,48 @@ const TacticalRPG = () => {
     return template.generate();
   };
 
+  // Generate elevation map (height levels 0-3)
+  const generateElevation = (templateName = 'random') => {
+    const elevation = [];
+
+    // Initialize all tiles to ground level (0)
+    for (let y = 0; y < 15; y++) {
+      elevation[y] = [];
+      for (let x = 0; x < 15; x++) {
+        elevation[y][x] = 0;
+      }
+    }
+
+    // Add some elevated platforms based on template
+    if (templateName === 'ruins' || Math.random() < 0.4) {
+      // Create 1-3 elevated platforms
+      const platformCount = Math.floor(Math.random() * 3) + 1;
+
+      for (let i = 0; i < platformCount; i++) {
+        // Random platform center (avoid edges and spawn zones)
+        const cx = Math.floor(Math.random() * 9) + 3; // 3-11
+        const cy = Math.floor(Math.random() * 9) + 3; // 3-11
+        const height = Math.floor(Math.random() * 2) + 1; // 1-2
+        const size = Math.floor(Math.random() * 2) + 1; // 1-2
+
+        // Create platform
+        for (let dy = -size; dy <= size; dy++) {
+          for (let dx = -size; dx <= size; dx++) {
+            const px = cx + dx;
+            const py = cy + dy;
+            if (px >= 0 && px < 15 && py >= 0 && py < 15) {
+              // Create stepped elevation (center higher)
+              const dist = Math.abs(dx) + Math.abs(dy);
+              elevation[py][px] = Math.max(elevation[py][px], Math.max(0, height - Math.floor(dist / 2)));
+            }
+          }
+        }
+      }
+    }
+
+    return elevation;
+  };
+
   // Generate interactive objects for the level
   const generateObjects = (templateName = 'random', waveLevel = 1) => {
     const objects = [];
@@ -2031,12 +2077,30 @@ const TacticalRPG = () => {
         // Calculate cost to reach this tile
         let moveCost = tData.moveCost;
         // Rogues/thieves move through water at normal cost
-        if ((tileTerrain === 'water' || tileTerrain === 'deepWater') && 
+        if ((tileTerrain === 'water' || tileTerrain === 'deepWater') &&
             ['rogue', 'thief', 'ninja', 'assassin'].includes(unit.job)) {
           moveCost = Math.max(1, moveCost - 1);
         }
+
+        // Add elevation change cost (climbing/jumping)
+        const elevation = gameState.current.elevation;
+        if (elevation && elevation[ny] && elevation[current.y]) {
+          const currentHeight = elevation[current.y][current.x] || 0;
+          const targetHeight = elevation[ny][nx] || 0;
+          const heightDiff = targetHeight - currentHeight;
+
+          // Climbing up costs extra movement (1 extra per level)
+          if (heightDiff > 0) {
+            moveCost += heightDiff;
+          }
+          // Jumping down more than 2 levels is not allowed
+          if (heightDiff < -2) {
+            continue; // Skip this tile - too high to jump down
+          }
+        }
+
         const newCost = current.cost + moveCost;
-        
+
         // Skip if over move budget
         if (newCost > moveSpeed) continue;
         
@@ -2406,9 +2470,63 @@ const TacticalRPG = () => {
     }
   };
 
+  // Calculate height advantage bonus
+  const calculateHeightBonus = (attacker, target) => {
+    const elevation = gameState.current.elevation;
+    if (!elevation || !elevation[attacker.y] || !elevation[target.y]) {
+      return { multiplier: 1.0, type: '' };
+    }
+
+    const attackerHeight = elevation[attacker.y][attacker.x] || 0;
+    const targetHeight = elevation[target.y][target.x] || 0;
+    const heightDiff = attackerHeight - targetHeight;
+
+    // +10% damage per level of height advantage (max +30%)
+    if (heightDiff > 0) {
+      const bonus = Math.min(heightDiff * 0.1, 0.3);
+      return { multiplier: 1.0 + bonus, type: `Height+${heightDiff}!` };
+    }
+
+    // No penalty for being lower (just no bonus)
+    return { multiplier: 1.0, type: '' };
+  };
+
+  // Calculate facing bonus based on attacker and target positions
+  const calculateFacingBonus = (attacker, target) => {
+    // Calculate attack direction
+    const dx = target.x - attacker.x;
+    const dy = target.y - attacker.y;
+
+    // Determine primary attack direction
+    let attackDir;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      attackDir = dx > 0 ? 'E' : 'W';
+    } else {
+      attackDir = dy > 0 ? 'S' : 'N';
+    }
+
+    // Check if attack is from behind (backstab)
+    const opposites = { N: 'S', S: 'N', E: 'W', W: 'E' };
+    if (target.facing && attackDir === opposites[target.facing]) {
+      return { multiplier: 1.5, type: 'Backstab!' };
+    }
+
+    // Check if attack is from side (flank)
+    const sides = {
+      N: ['E', 'W'], S: ['E', 'W'],
+      E: ['N', 'S'], W: ['N', 'S']
+    };
+    if (target.facing && sides[target.facing] && sides[target.facing].includes(attackDir)) {
+      return { multiplier: 1.25, type: 'Flank!' };
+    }
+
+    // Attack from front (no bonus)
+    return { multiplier: 1.0, type: '' };
+  };
+
   const useSkill = (attacker, target, skill) => {
     if (attacker.mp < skill.mpCost) return;
-    
+
     attacker.mp -= skill.mpCost;
     const isEnemy = attacker.team === 'enemy';
     
@@ -2446,12 +2564,18 @@ const TacticalRPG = () => {
       const atkBonus = attacker.effects.includes('buff_atk') ? 5 : 0;
       // Bonus damage from attacking while hidden
       const hiddenBonus = wasHidden ? 1.5 : 1.0;
+      // Facing bonus (backstab/flank) - only for physical attacks
+      const facingData = skill.type === 'physical' ? calculateFacingBonus(attacker, target) : { multiplier: 1.0, type: '' };
+      // Height advantage bonus (works for both physical and magic ranged attacks)
+      const heightData = calculateHeightBonus(attacker, target);
       const defense = skill.type === 'magic' ? target.def / 2 : target.def;
-      const damage = Math.max(1, Math.floor((basePower + atkBonus) * skill.power * hiddenBonus - defense));
-      
+      const damage = Math.max(1, Math.floor((basePower + atkBonus) * skill.power * hiddenBonus * facingData.multiplier * heightData.multiplier - defense));
+
       target.hp = Math.max(0, target.hp - damage);
       const hiddenMsg = wasHidden ? ' (Ambush!)' : '';
-      logAction(`${attacker.name} used ${skill.name}! HIT for ${damage} damage!${hiddenMsg} (${hitChance.toFixed(0)}% chance)`, isEnemy);
+      const facingMsg = facingData.type ? ` (${facingData.type})` : '';
+      const heightMsg = heightData.type ? ` (${heightData.type})` : '';
+      logAction(`${attacker.name} used ${skill.name}! HIT for ${damage} damage!${hiddenMsg}${facingMsg}${heightMsg} (${hitChance.toFixed(0)}% chance)`, isEnemy);
       
       if (skill.effect) {
         applyEffect(target, skill.effect);
@@ -2830,6 +2954,20 @@ const TacticalRPG = () => {
     if (!gs.selectedUnit.hasMoved && gs.moveRange.find(tile => tile.x === gridX && tile.y === gridY)) {
       gs.selectedUnit.previousX = gs.selectedUnit.x;
       gs.selectedUnit.previousY = gs.selectedUnit.y;
+      gs.selectedUnit.previousFacing = gs.selectedUnit.facing;
+
+      // Update facing direction based on movement
+      const dx = gridX - gs.selectedUnit.x;
+      const dy = gridY - gs.selectedUnit.y;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal movement dominates
+        gs.selectedUnit.facing = dx > 0 ? 'E' : 'W';
+      } else if (dy !== 0) {
+        // Vertical movement
+        gs.selectedUnit.facing = dy > 0 ? 'S' : 'N';
+      }
+      // If dx and dy are both 0, facing doesn't change
+
       gs.selectedUnit.x = gridX;
       gs.selectedUnit.y = gridY;
       gs.selectedUnit.hasMoved = true;
@@ -2996,9 +3134,13 @@ const TacticalRPG = () => {
     
     gs.selectedUnit.x = gs.selectedUnit.previousX;
     gs.selectedUnit.y = gs.selectedUnit.previousY;
+    if (gs.selectedUnit.previousFacing) {
+      gs.selectedUnit.facing = gs.selectedUnit.previousFacing;
+    }
     gs.selectedUnit.hasMoved = false;
     gs.selectedUnit.previousX = null;
     gs.selectedUnit.previousY = null;
+    gs.selectedUnit.previousFacing = null;
     gs.moveRange = calculateMoveRange(gs.selectedUnit);
     addMessage(`Move undone. ${gs.selectedUnit.name} can move again.`);
   };
@@ -3039,11 +3181,44 @@ const TacticalRPG = () => {
         for (let x = 0; x < 15; x++) {
           const px = 50 + x * 50;
           const py = 50 + y * 50;
-          
-          // Base grass color
-          ctx.fillStyle = (x + y) % 2 === 0 ? '#3A5F3A' : '#2F4F2F';
+
+          // Get elevation for this tile
+          const elevation = gs.elevation && gs.elevation[y] ? (gs.elevation[y][x] || 0) : 0;
+
+          // Base grass color - lighter for higher elevations
+          let baseColor1, baseColor2;
+          switch (elevation) {
+            case 0: // Ground level
+              baseColor1 = '#3A5F3A';
+              baseColor2 = '#2F4F2F';
+              break;
+            case 1: // Low platform
+              baseColor1 = '#4A6F4A';
+              baseColor2 = '#3F5F3F';
+              break;
+            case 2: // Medium platform
+              baseColor1 = '#5A7F5A';
+              baseColor2 = '#4F6F4F';
+              break;
+            case 3: // High platform
+              baseColor1 = '#6A8F6A';
+              baseColor2 = '#5F7F5F';
+              break;
+            default:
+              baseColor1 = '#3A5F3A';
+              baseColor2 = '#2F4F2F';
+          }
+          ctx.fillStyle = (x + y) % 2 === 0 ? baseColor1 : baseColor2;
           ctx.fillRect(px, py, 50, 50);
-          
+
+          // Draw elevation indicator in corner if elevated
+          if (elevation > 0) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`+${elevation}`, px + 2, py + 10);
+          }
+
           // Draw terrain overlay
           const tileTerrain = terrain[y] ? terrain[y][x] : 'grass';
           if (tileTerrain !== 'grass') {
@@ -3338,7 +3513,41 @@ const TacticalRPG = () => {
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 2;
         ctx.strokeRect(px - 12, py, 24, 30);
-        
+
+        // Draw facing indicator (small triangle/arrow)
+        if (unit.facing) {
+          ctx.fillStyle = unit.team === 'player' ? '#FFFFFF' : '#FFFF00';
+          ctx.beginPath();
+          const arrowSize = 6;
+          switch (unit.facing) {
+            case 'N': // Pointing up
+              ctx.moveTo(px, py - 2);
+              ctx.lineTo(px - arrowSize, py + arrowSize);
+              ctx.lineTo(px + arrowSize, py + arrowSize);
+              break;
+            case 'S': // Pointing down
+              ctx.moveTo(px, py + 32);
+              ctx.lineTo(px - arrowSize, py + 32 - arrowSize);
+              ctx.lineTo(px + arrowSize, py + 32 - arrowSize);
+              break;
+            case 'E': // Pointing right
+              ctx.moveTo(px + 14, py + 15);
+              ctx.lineTo(px + 14 - arrowSize, py + 15 - arrowSize);
+              ctx.lineTo(px + 14 - arrowSize, py + 15 + arrowSize);
+              break;
+            case 'W': // Pointing left
+              ctx.moveTo(px - 14, py + 15);
+              ctx.lineTo(px - 14 + arrowSize, py + 15 - arrowSize);
+              ctx.lineTo(px - 14 + arrowSize, py + 15 + arrowSize);
+              break;
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
         const hpPercent = unit.hp / unit.maxHp;
         ctx.fillStyle = '#000';
         ctx.fillRect(px - 15, py - 15, 30, 5);
