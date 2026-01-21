@@ -467,10 +467,12 @@ const TacticalRPG = () => {
   const [gameMode, setGameMode] = useState('normal');
   const [waveNumber, setWaveNumber] = useState(1);
   const [gil, setGil] = useState(0);
+  const [recruitCost, setRecruitCost] = useState(300); // Cost for recruiting units, increases by 200 each time
   const [inventory, setInventory] = useState([]); // Equipment owned by player
   const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0 }); // Rewards from last wave
   const [debugMode, setDebugMode] = useState(false); // Debug mode for bug reporting
   const [showDebugPanel, setShowDebugPanel] = useState(false); // Debug panel visibility
+  const [showEquipment, setShowEquipment] = useState(false); // Equipment panel visibility in unit info
 
   const gameState = useRef({
     grid: { cols: 15, rows: 15, tileSize: 50 },
@@ -3208,54 +3210,70 @@ const TacticalRPG = () => {
             <div className="text-center mb-4">
               <div className="text-2xl font-bold text-cyan-300 mb-2">Recruit New Unit</div>
               <div className="text-lg text-yellow-300">Gil: {gil}</div>
-              <div className="text-sm text-cyan-200 mt-2">Cost: 500 Gil per recruit</div>
+              <div className="text-sm text-cyan-200 mt-2">Cost: {recruitCost} Gil</div>
             </div>
 
             {(() => {
               const playerUnits = gameState.current.units.filter(u => u.team === 'player');
               const maxUnits = 6;
-              const canRecruit = playerUnits.length < maxUnits && gil >= 500;
+              const canRecruit = playerUnits.length < maxUnits && gil >= recruitCost;
               const usedNames = playerUnits.map(u => u.name);
               const availableNames = playerNames.filter(n => !usedNames.includes(n));
-              const baseJobs = Object.entries(jobData).filter(([key, job]) => job.tier === 1);
+
+              // Calculate average team level (rounded down)
+              const avgLevel = playerUnits.length > 0
+                ? Math.floor(playerUnits.reduce((sum, u) => sum + u.level, 0) / playerUnits.length)
+                : 1;
+
+              // If avg level > 3, show both base and advanced jobs. Otherwise only base jobs.
+              const availableJobs = avgLevel > 3
+                ? Object.entries(jobData).filter(([key, job]) => job.tier <= 2)
+                : Object.entries(jobData).filter(([key, job]) => job.tier === 1);
 
               return (
                 <div>
                   {playerUnits.length >= maxUnits ? (
                     <div className="text-center text-red-400 mb-4">Maximum units reached (6/6)</div>
-                  ) : gil < 500 ? (
-                    <div className="text-center text-red-400 mb-4">Not enough Gil (need 500)</div>
+                  ) : gil < recruitCost ? (
+                    <div className="text-center text-red-400 mb-4">Not enough Gil (need {recruitCost})</div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      {baseJobs.map(([jobKey, job]) => (
-                        <button
-                          key={jobKey}
-                          onClick={() => {
-                            if (canRecruit) {
-                              setGil(prev => prev - 500);
-                              const newName = availableNames.length > 0 ? availableNames[0] : `Unit ${playerUnits.length + 1}`;
-                              const newUnit = createUnit(
-                                { id: Date.now(), name: newName, job: jobKey, level: 1 },
-                                'player',
-                                playerUnits.length,
-                                playerUnits.length + 1
-                              );
-                              gameState.current.units.push(newUnit);
-                              setMessage(`Recruited ${newName} as ${job.description}!`);
-                              setGamePhase('recruit'); // Force re-render
-                            }
-                          }}
-                          disabled={!canRecruit}
-                          className={`p-4 rounded-lg border-2 font-bold transition-colors ${
-                            canRecruit
-                              ? 'bg-gray-800 hover:bg-gray-700 border-cyan-500 text-white'
-                              : 'bg-gray-900 border-gray-700 text-gray-600 cursor-not-allowed'
-                          }`}
-                          style={{ borderColor: canRecruit ? job.color : '#444' }}>
-                          <div className="text-lg mb-1">{jobKey.charAt(0).toUpperCase() + jobKey.slice(1)}</div>
-                          <div className="text-xs text-gray-400">{job.description}</div>
-                        </button>
-                      ))}
+                    <div>
+                      <div className="text-center text-sm text-cyan-300 mb-3">
+                        New recruit will be Level {avgLevel}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        {availableJobs.map(([jobKey, job]) => (
+                          <button
+                            key={jobKey}
+                            onClick={() => {
+                              if (canRecruit) {
+                                setGil(prev => prev - recruitCost);
+                                setRecruitCost(prev => prev + 200); // Increase cost for next recruit
+                                const newName = availableNames.length > 0 ? availableNames[0] : `Unit ${playerUnits.length + 1}`;
+                                const newUnit = createUnit(
+                                  { id: Date.now(), name: newName, job: jobKey, level: avgLevel },
+                                  'player',
+                                  playerUnits.length,
+                                  playerUnits.length + 1
+                                );
+                                gameState.current.units.push(newUnit);
+                                setMessage(`Recruited ${newName} (Lv${avgLevel} ${jobKey.charAt(0).toUpperCase() + jobKey.slice(1)})!`);
+                                setGamePhase('recruit'); // Force re-render
+                              }
+                            }}
+                            disabled={!canRecruit}
+                            className={`p-4 rounded-lg border-2 font-bold transition-colors ${
+                              canRecruit
+                                ? 'bg-gray-800 hover:bg-gray-700 border-cyan-500 text-white'
+                                : 'bg-gray-900 border-gray-700 text-gray-600 cursor-not-allowed'
+                            }`}
+                            style={{ borderColor: canRecruit ? job.color : '#444' }}>
+                            <div className="text-lg mb-1">{jobKey.charAt(0).toUpperCase() + jobKey.slice(1)}</div>
+                            <div className="text-xs text-gray-400">{job.description}</div>
+                            <div className="text-xs text-cyan-300 mt-1">Tier {job.tier}</div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -3482,13 +3500,42 @@ const TacticalRPG = () => {
               MP Regen: {Math.floor(2 + inspectedUnit.mag / 4)}/turn
             </div>
             
-            {/* Equipment Section */}
+            {/* Skills Section - moved above equipment */}
             <div className="mt-4">
-              <div className="font-bold mb-2 text-yellow-400">Equipment:</div>
-              <div className="text-xs space-y-1">
-                {(() => {
-                  const allEquip = getAllEquipment();
-                  const slots = [
+              <div className="font-bold mb-2">Skills:</div>
+              {getAvailableSkills(inspectedUnit).map(skill => (
+                <div key={skill.name} className="text-sm text-gray-300 mb-2 p-2 bg-gray-700 rounded">
+                  <div className="font-semibold">{skill.name}</div>
+                  <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
+                  <div className="text-xs">Base Accuracy: {skill.accuracy}%</div>
+                  <div className="text-xs text-gray-400">{skill.type}</div>
+                </div>
+              ))}
+              {/* Show locked skills */}
+              {jobData[inspectedUnit.job]?.skills.filter(s => s.level > inspectedUnit.level).length > 0 && (
+                <div className="mt-2 text-xs text-gray-500">
+                  <div className="italic">Locked skills:</div>
+                  {jobData[inspectedUnit.job].skills.filter(s => s.level > inspectedUnit.level).map(skill => (
+                    <div key={skill.name} className="text-gray-600">• {skill.name} (Lv {skill.level})</div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Equipment Section - now collapsible */}
+            <div className="mt-4">
+              <button
+                onClick={() => setShowEquipment(!showEquipment)}
+                className="w-full flex justify-between items-center font-bold mb-2 text-yellow-400 hover:text-yellow-300 bg-gray-700 p-2 rounded"
+              >
+                <span>Equipment</span>
+                <span>{showEquipment ? '▼' : '▶'}</span>
+              </button>
+              {showEquipment && (
+                <div className="text-xs space-y-1">
+                  {(() => {
+                    const allEquip = getAllEquipment();
+                    const slots = [
                     { key: 'mainHand', label: 'ðŸ—¡ï¸ Main Hand' },
                     { key: 'offHand', label: 'ðŸ›¡ï¸ Off Hand' },
                     { key: 'armor', label: 'ðŸ‘• Armor' },
@@ -3510,30 +3557,10 @@ const TacticalRPG = () => {
                     );
                   });
                 })()}
-              </div>
-            </div>
-            
-            <div className="mt-4">
-              <div className="font-bold mb-2">Skills:</div>
-              {getAvailableSkills(inspectedUnit).map(skill => (
-                <div key={skill.name} className="text-sm text-gray-300 mb-2 p-2 bg-gray-700 rounded">
-                  <div className="font-semibold">{skill.name}</div>
-                  <div className="text-xs">MP: {skill.mpCost} | Range: {skill.range}</div>
-                  <div className="text-xs">Base Accuracy: {skill.accuracy}%</div>
-                  <div className="text-xs text-gray-400">{skill.type}</div>
-                </div>
-              ))}
-              {/* Show locked skills */}
-              {jobData[inspectedUnit.job]?.skills.filter(s => s.level > inspectedUnit.level).length > 0 && (
-                <div className="mt-2 text-xs text-gray-500">
-                  <div className="italic">Locked skills:</div>
-                  {jobData[inspectedUnit.job].skills.filter(s => s.level > inspectedUnit.level).map(skill => (
-                    <div key={skill.name} className="text-gray-600">â€¢ {skill.name} (Lv {skill.level})</div>
-                  ))}
                 </div>
               )}
             </div>
-            
+
             {inspectedUnit.effects.length > 0 && (
               <div className="mt-3">
                 <div className="font-bold">Status Effects:</div>
