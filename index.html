@@ -2833,6 +2833,13 @@ const TacticalRPG = () => {
   };
 
   const nextTurn = () => {
+    // Guard: prevent nextTurn from running if AI is currently processing
+    // This prevents race conditions from multiple nextTurn calls
+    if (aiProcessingRef.current) {
+      console.warn('[AI BUG] nextTurn called while AI is processing - ignoring');
+      return;
+    }
+
     const currentUnit = turnOrder[currentTurnIndexRef.current];
     if (currentUnit) {
       processEffects(currentUnit);
@@ -2848,7 +2855,7 @@ const TacticalRPG = () => {
     setInspectedUnit(null);
 
     let nextIndex = currentTurnIndexRef.current + 1;
-    
+
     if (nextIndex >= turnOrder.length) {
       // Reset all units for new round
       gameState.current.units.forEach(u => {
@@ -2875,13 +2882,28 @@ const TacticalRPG = () => {
       setTurnNumber(t => t + 1);
       return;
     }
-    
+
     // Update both ref and state
     currentTurnIndexRef.current = nextIndex;
     setCurrentTurnIndex(nextIndex);
-    
+
     const nextUnit = turnOrder[nextIndex];
+
+    // Skip dead units
+    if (nextUnit && nextUnit.hp <= 0) {
+      console.log(`[Turn] ${nextUnit.name} is dead, skipping to next unit`);
+      setTimeout(nextTurn, 500);
+      return;
+    }
+
     if (nextUnit && nextUnit.team === 'enemy') {
+      // Guard: don't call enemyAI if unit already acted
+      if (nextUnit.hasActed) {
+        console.warn(`[AI BUG] ${nextUnit.name} at index ${nextIndex} already acted - skipping to next`);
+        setTimeout(nextTurn, 500);
+        return;
+      }
+
       // Don't reset aiProcessingRef here - let enemyAI manage it
       setTimeout(() => enemyAI(nextUnit), 500);
     } else if (nextUnit) {
@@ -2978,8 +3000,14 @@ const TacticalRPG = () => {
       return false;
     };
     
-    // Helper to finish turn safely
+    // Helper to finish turn safely (with guard to prevent multiple calls)
+    let turnFinished = false;
     const finishTurn = () => {
+      if (turnFinished) {
+        console.warn(`[AI BUG] finishTurn called multiple times for ${enemy.name} - ignoring`);
+        return;
+      }
+      turnFinished = true;
       enemy.hasActed = true;
       aiProcessingRef.current = false;
       console.log(`[AI] ${enemy.name}'s turn finished`);
