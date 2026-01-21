@@ -2152,6 +2152,22 @@ const TacticalRPG = () => {
     // Skip if no units yet
     if (gameState.current.units.length === 0) return;
 
+    // CRITICAL: Don't rebuild turn order mid-round while AI is processing
+    // This prevents the useEffect from interfering with ongoing turns
+    if (aiProcessingRef.current) {
+      console.warn('[Turn Order] Skipping turn order rebuild - AI is currently processing');
+      return;
+    }
+
+    // CRITICAL: Only rebuild turn order at the start of a new round (when currentTurnIndex is 0)
+    // This prevents mid-round rebuilds that cause duplicate turns
+    if (currentTurnIndexRef.current > 0) {
+      console.warn('[Turn Order] Skipping turn order rebuild - round is in progress (index:', currentTurnIndexRef.current, ')');
+      return;
+    }
+
+    console.log('[Turn Order] Building turn order for turn', turnNumber);
+
     // Process terrain effects at start of round (fire spreading, burning out, etc.)
     if (turnNumber > 1) {
       processTerrainEffects();
@@ -2168,7 +2184,7 @@ const TacticalRPG = () => {
         return true;
       });
     }
-    
+
     const aliveUnits = gameState.current.units.filter(u => u.hp > 0);
     // Roll d20 + speed for initiative
     const withInitiative = aliveUnits.map(u => {
@@ -2183,7 +2199,7 @@ const TacticalRPG = () => {
       };
     });
     const sorted = withInitiative.sort((a, b) => b.initiative - a.initiative).map(i => i.unit);
-    
+
     // Log the initiative rolls
     if (sorted.length > 0) {
       const initMsg = sorted.map(u => {
@@ -2192,11 +2208,11 @@ const TacticalRPG = () => {
       }).join(', ');
       addMessage(`Turn ${turnNumber} initiative: ${initMsg}`);
     }
-    
+
     setTurnOrder(sorted);
     setCurrentTurnIndex(0);
     currentTurnIndexRef.current = 0;
-    
+
     // If first unit is enemy, start their AI after state updates
     if (sorted.length > 0 && sorted[0].team === 'enemy') {
       aiProcessingRef.current = false; // Reset before starting
@@ -2948,11 +2964,13 @@ const TacticalRPG = () => {
       setTimeout(nextTurn, 500);
       return;
     }
-    
+
+    // Log turn start BEFORE modifying flags
+    console.log(`[AI] ${enemy.name}'s turn starting (index: ${currentTurnIndexRef.current}, team: ${enemy.team})`);
+
     // Lock AI processing and mark unit as having acted to prevent double-turns
     aiProcessingRef.current = true;
     enemy.hasActed = true; // Set immediately to prevent race conditions
-    console.log(`[AI] ${enemy.name}'s turn starting (index: ${currentTurnIndexRef.current}, hasActed: ${enemy.hasActed})`);
 
     if (enemy.effects.includes('sleep')) {
       addMessage(`${enemy.name} is asleep and cannot act!`);
