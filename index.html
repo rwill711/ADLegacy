@@ -4788,16 +4788,24 @@ const TacticalRPG = () => {
                     // Get available items for this slot
                     const availableItems = Object.entries(allEquip)
                       .filter(([key, equip]) => {
-                        // Match by slot first (more reliable)
-                        if (equip.slot !== slot.key) {
-                          // For potions and items without slot, check type
-                          if (slot.types.length > 0 && !slot.types.includes(equip.type)) return false;
-                          // If no types specified and slot doesn't match, skip
-                          if (slot.types.length === 0 && equip.slot !== slot.key) return false;
+                        // CRITICAL: Only show items in player's inventory
+                        if (!inventory.includes(key)) return false;
+
+                        // Match by slot - handle special cases for rings and potions
+                        if (slot.key === 'ring1' || slot.key === 'ring2') {
+                          // Ring slots can use any item with slot:'ring'
+                          if (equip.slot !== 'ring') return false;
+                        } else if (slot.key === 'potion1' || slot.key === 'potion2' || slot.key === 'potion3') {
+                          // Potion slots can use any item with slot:'potion'
+                          if (equip.slot !== 'potion') return false;
+                        } else {
+                          // For other slots, exact match required
+                          if (equip.slot !== slot.key) return false;
                         }
+
                         // For two-handed weapons, only show in main hand
                         if (equip.twoHanded && slot.key === 'offHand') return false;
-                        // Check job restrictions (potions have no job restrictions)
+                        // Check job restrictions (potions and rings have no job restrictions)
                         if (equip.jobs && !equip.jobs.includes(selectedUnit.job)) return false;
                         return true;
                       });
