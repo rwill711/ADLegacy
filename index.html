@@ -2146,44 +2146,14 @@ const TacticalRPG = () => {
     }
   }, [messageLog]);
 
+  // Initialize turn order when starting a new battle/wave
   useEffect(() => {
-    // Skip if in setup phase or game ended
-    if (gamePhase === 'setup' || gamePhase === 'victory' || gamePhase === 'defeat') return;
+    // Only run when entering player phase (start of battle)
+    if (gamePhase !== 'player') return;
     // Skip if no units yet
     if (gameState.current.units.length === 0) return;
 
-    // CRITICAL: Don't rebuild turn order mid-round while AI is processing
-    // This prevents the useEffect from interfering with ongoing turns
-    if (aiProcessingRef.current) {
-      console.warn('[Turn Order] Skipping turn order rebuild - AI is currently processing');
-      return;
-    }
-
-    // CRITICAL: Only rebuild turn order at the start of a new round (when currentTurnIndex is 0)
-    // This prevents mid-round rebuilds that cause duplicate turns
-    if (currentTurnIndexRef.current > 0) {
-      console.warn('[Turn Order] Skipping turn order rebuild - round is in progress (index:', currentTurnIndexRef.current, ')');
-      return;
-    }
-
-    console.log('[Turn Order] Building turn order for turn', turnNumber);
-
-    // Process terrain effects at start of round (fire spreading, burning out, etc.)
-    if (turnNumber > 1) {
-      processTerrainEffects();
-    }
-
-    // Decrement body timers and remove expired bodies
-    if (turnNumber > 1) {
-      gameState.current.defeatedUnits = gameState.current.defeatedUnits.filter(body => {
-        body.turnsRemaining--;
-        if (body.turnsRemaining <= 0) {
-          addMessage(`${body.unit.name}'s body fades away...`);
-          return false;
-        }
-        return true;
-      });
-    }
+    console.log('[Turn Order] Initializing turn order for new wave');
 
     const aliveUnits = gameState.current.units.filter(u => u.hp > 0);
     // Roll d20 + speed for initiative
@@ -2206,21 +2176,23 @@ const TacticalRPG = () => {
         const roll = withInitiative.find(w => w.unit === u);
         return `${u.name}: ${roll.initiative}`;
       }).join(', ');
-      addMessage(`Turn ${turnNumber} initiative: ${initMsg}`);
+      addMessage(`Initiative: ${initMsg}`);
     }
 
     setTurnOrder(sorted);
     setCurrentTurnIndex(0);
     currentTurnIndexRef.current = 0;
 
+    // Reset AI lock
+    aiProcessingRef.current = false;
+
     // If first unit is enemy, start their AI after state updates
     if (sorted.length > 0 && sorted[0].team === 'enemy') {
-      aiProcessingRef.current = false; // Reset before starting
       setTimeout(() => enemyAI(sorted[0]), 500);
     } else if (sorted.length > 0) {
       addMessage(`${sorted[0].name}'s turn!`);
     }
-  }, [turnNumber, gamePhase]);
+  }, [gamePhase]); // Only depend on gamePhase, not turnNumber!
 
   // Debug mode keyboard shortcut
   useEffect(() => {
@@ -2873,6 +2845,8 @@ const TacticalRPG = () => {
     let nextIndex = currentTurnIndexRef.current + 1;
 
     if (nextIndex >= turnOrder.length) {
+      console.log('[Turn] End of round - resetting for next round');
+
       // Reset all units for new round
       gameState.current.units.forEach(u => {
         u.hasActed = false;
@@ -2884,6 +2858,9 @@ const TacticalRPG = () => {
         }
       });
 
+      // Process terrain effects at start of round
+      processTerrainEffects();
+
       // Check for volcano eruptions
       const volcanos = gameState.current.objects.filter(obj => obj.type === 'volcano');
       volcanos.forEach(volcano => {
@@ -2894,8 +2871,39 @@ const TacticalRPG = () => {
         }
       });
 
-      // This will trigger the useEffect which handles the new turn
+      // Decrement body timers and remove expired bodies
+      gameState.current.defeatedUnits = gameState.current.defeatedUnits.filter(body => {
+        body.turnsRemaining--;
+        if (body.turnsRemaining <= 0) {
+          addMessage(`${body.unit.name}'s body fades away...`);
+          return false;
+        }
+        return true;
+      });
+
+      // Increment turn counter for tracking
       setTurnNumber(t => t + 1);
+
+      // Rebuild turn order with alive units only (some may have died)
+      const aliveUnits = gameState.current.units.filter(u => u.hp > 0);
+      if (aliveUnits.length !== turnOrder.length) {
+        console.log('[Turn] Rebuilding turn order - unit count changed');
+        // Preserve order but filter out dead units
+        const newTurnOrder = turnOrder.filter(u => u.hp > 0);
+        setTurnOrder(newTurnOrder);
+      }
+
+      // Loop back to start of turn order
+      nextIndex = 0;
+      currentTurnIndexRef.current = 0;
+      setCurrentTurnIndex(0);
+
+      const firstUnit = turnOrder[0];
+      if (firstUnit && firstUnit.team === 'enemy') {
+        setTimeout(() => enemyAI(firstUnit), 500);
+      } else if (firstUnit) {
+        addMessage(`${firstUnit.name}'s turn!`);
+      }
       return;
     }
 
