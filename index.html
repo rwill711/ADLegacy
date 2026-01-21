@@ -633,8 +633,7 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Bow Shot', mpCost: 0, power: 1.0, range: 4, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Standard ranged attack.' },
         { name: 'Aim', mpCost: 4, power: 1.3, range: 5, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Careful aimed shot. Higher accuracy.' },
-        { name: 'Cut Tree', mpCost: 4, power: 0, range: 1, type: 'terrain', targetType: 'tree', accuracy: 100, level: 1, description: 'Cut down adjacent tree to clear the path.' },
-        { name: 'Push Rock', mpCost: 6, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 1, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
+        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 1, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
         { name: 'Leg Shot', mpCost: 6, power: 0.8, range: 4, type: 'physical', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 2, description: 'Shoot the legs. May slow.' },
         { name: 'Rapid Fire', mpCost: 10, power: 0.6, range: 4, type: 'physical', targetType: 'enemy', hits: 2, accuracy: 75, level: 4, description: 'Fire two quick shots.' },
         { name: 'Focus', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'focus', accuracy: 100, level: 5, description: 'Concentrate. Next attack +50% damage.' },
@@ -881,6 +880,12 @@ const TacticalRPG = () => {
   const equipmentData = {
     // Weapons - Main Hand
     weapons: {
+      // Starter weapons - Level 1 flavor only (no stats)
+      dullSword: { name: 'Dull Sword', slot: 'mainHand', type: 'sword', stats: {}, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'], starter: true },
+      dullKnife: { name: 'Dull Knife', slot: 'mainHand', type: 'dagger', stats: {}, jobs: ['rogue', 'assassin', 'ninja', 'thief'], starter: true },
+      oldStaff: { name: 'Old Staff', slot: 'mainHand', type: 'staff', stats: {}, jobs: ['whiteMage', 'darkMage', 'blackMage', 'timeMage'], starter: true },
+      oldBow: { name: 'Old Bow', slot: 'mainHand', type: 'bow', stats: {}, jobs: ['archer', 'sniper', 'ranger'], starter: true },
+      // Regular weapons
       ironSword: { name: 'Iron Sword', slot: 'mainHand', type: 'sword', stats: { atk: 5 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
       steelSword: { name: 'Steel Sword', slot: 'mainHand', type: 'sword', stats: { atk: 10 }, jobs: ['knight', 'paladin', 'warrior', 'darkKnight'] },
       darkBlade: { name: 'Dark Blade', slot: 'mainHand', type: 'sword', stats: { atk: 8, hp: -5 }, jobs: ['darkKnight'] },
@@ -1104,8 +1109,22 @@ const TacticalRPG = () => {
     if (level > 1) {
       equipment = getDefaultEquipment(selectionData.job);
     } else {
+      // Level 1 units get starter weapon for flavor (no stats)
+      const job = selectionData.job;
+      let starterWeapon = null;
+
+      if (['knight', 'paladin', 'warrior', 'darkKnight'].includes(job)) {
+        starterWeapon = 'dullSword';
+      } else if (['rogue', 'assassin', 'ninja', 'thief'].includes(job)) {
+        starterWeapon = 'dullKnife';
+      } else if (['whiteMage', 'darkMage', 'blackMage', 'timeMage'].includes(job)) {
+        starterWeapon = 'oldStaff';
+      } else if (['archer', 'sniper', 'ranger'].includes(job)) {
+        starterWeapon = 'oldBow';
+      }
+
       equipment = {
-        mainHand: null,
+        mainHand: starterWeapon,
         offHand: null,
         armor: null,
         helmet: null,
