@@ -592,11 +592,12 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Sword Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A basic sword attack.' },
         { name: 'Shield Bash', mpCost: 4, power: 0.7, range: 1, type: 'physical', targetType: 'enemy', effect: 'stun', accuracy: 85, level: 1, description: 'Bash with shield. May stun.' },
-        { name: 'Cut Tree', mpCost: 3, power: 0, range: 1, type: 'terrain', targetType: 'tree', accuracy: 100, level: 2, description: 'Cut down adjacent tree. Tree falls and deals damage.' },
-        { name: 'Parry', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'parry', accuracy: 100, level: 3, description: 'Defensive stance. +50% DEF until next turn.' },
-        { name: 'Push Rock', mpCost: 4, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 4, description: 'Push adjacent rock one space.' },
-        { name: 'War Cry', mpCost: 8, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'buff_atk', accuracy: 100, level: 5, description: 'Rally nearby allies. +ATK buff.' },
-        { name: 'Cross Slash', mpCost: 12, power: 1.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 6, description: 'Powerful X-shaped slash.' }
+        { name: 'Cut Tree', mpCost: 4, power: 0, range: 1, type: 'terrain', targetType: 'tree', accuracy: 100, level: 1, description: 'Cut down adjacent tree to clear the path.' },
+        { name: 'Push Rock', mpCost: 6, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 1, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
+        { name: 'Parry', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'parry', accuracy: 100, level: 2, description: 'Defensive stance. +50% DEF until next turn.' },
+        { name: 'War Cry', mpCost: 8, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'buff_atk', accuracy: 100, level: 3, description: 'Rally nearby allies. +ATK buff.' },
+        { name: 'Provoke', mpCost: 6, power: 0, range: 3, type: 'status', targetType: 'enemy', effect: 'provoke', accuracy: 80, level: 4, description: 'Force enemy to target you.' },
+        { name: 'Cross Slash', mpCost: 12, power: 1.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 5, description: 'Powerful X-shaped slash.' }
       ],
       statGrowth: { hp: 8, mp: 2, atk: 3, def: 3, mag: 1, spd: 1 },
       unlocks: { paladin: 4, warrior: 3, dragoon: 5 }
@@ -612,8 +613,8 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Dagger Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A quick dagger strike.' },
         { name: 'Sneak Attack', mpCost: 6, power: 1.6, range: 1, type: 'physical', targetType: 'enemy', accuracy: 85, level: 1, description: 'Strike from behind for bonus damage.' },
+        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 1, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
         { name: 'Poison Strike', mpCost: 8, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'poison', accuracy: 80, level: 2, description: 'Venomous attack. May poison.' },
-        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 2, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
         { name: 'Feint', mpCost: 5, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 3, description: 'Fake attack that lowers enemy DEF.' },
         { name: 'Throw Sand', mpCost: 4, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'blind', accuracy: 75, level: 4, description: 'Blind enemy with dirt.' },
         { name: 'Coup de Grace', mpCost: 15, power: 2.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 75, level: 5, description: 'Deadly finishing blow.' }
@@ -632,8 +633,9 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Bow Shot', mpCost: 0, power: 1.0, range: 4, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Standard ranged attack.' },
         { name: 'Aim', mpCost: 4, power: 1.3, range: 5, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Careful aimed shot. Higher accuracy.' },
-        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 2, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
-        { name: 'Leg Shot', mpCost: 6, power: 0.8, range: 4, type: 'physical', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 3, description: 'Shoot the legs. May slow.' },
+        { name: 'Cut Tree', mpCost: 4, power: 0, range: 1, type: 'terrain', targetType: 'tree', accuracy: 100, level: 1, description: 'Cut down adjacent tree to clear the path.' },
+        { name: 'Push Rock', mpCost: 6, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 1, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
+        { name: 'Leg Shot', mpCost: 6, power: 0.8, range: 4, type: 'physical', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 2, description: 'Shoot the legs. May slow.' },
         { name: 'Rapid Fire', mpCost: 10, power: 0.6, range: 4, type: 'physical', targetType: 'enemy', hits: 2, accuracy: 75, level: 4, description: 'Fire two quick shots.' },
         { name: 'Focus', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'focus', accuracy: 100, level: 5, description: 'Concentrate. Next attack +50% damage.' },
         { name: 'Piercing Shot', mpCost: 14, power: 1.8, range: 5, type: 'physical', targetType: 'enemy', effect: 'armor_pierce', accuracy: 85, level: 6, description: 'Arrow that ignores 50% DEF.' }
@@ -730,10 +732,10 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Cleave', mpCost: 0, power: 1.1, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Heavy overhead swing.' },
         { name: 'Power Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'atk_down', accuracy: 90, level: 1, description: 'Reduce enemy ATK.' },
+        { name: 'Rock Push', mpCost: 8, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 1, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
         { name: 'Armor Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 2, description: 'Reduce enemy DEF.' },
         { name: 'Magic Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'mag_down', accuracy: 90, level: 2, description: 'Reduce enemy MAG.' },
         { name: 'Speed Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'spd_down', accuracy: 90, level: 3, description: 'Reduce enemy SPD.' },
-        { name: 'Rock Push', mpCost: 8, power: 0, range: 1, type: 'support', targetType: 'rock', accuracy: 100, level: 3, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
         { name: 'Full Break', mpCost: 15, power: 1.2, range: 1, type: 'physical', targetType: 'enemy', effect: 'full_break', accuracy: 75, level: 4, description: 'Reduce all enemy stats.' },
         { name: 'Rend Weapon', mpCost: 12, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', effect: 'disarm', accuracy: 70, level: 5, description: 'Destroy enemy weapon.' }
       ],
@@ -1097,22 +1099,41 @@ const TacticalRPG = () => {
     const baseMag = baseStats.mag + (growth.mag * levelBonus);
     const baseSpd = baseStats.spd + (growth.spd * levelBonus);
 
-    // Apply equipment bonuses
-    const equipment = getDefaultEquipment(selectionData.job);
+    // Apply equipment bonuses (only for level 2+)
+    let equipment;
+    if (level > 1) {
+      equipment = getDefaultEquipment(selectionData.job);
+    } else {
+      equipment = {
+        mainHand: null,
+        offHand: null,
+        armor: null,
+        helmet: null,
+        ring1: null,
+        ring2: null,
+        necklace: null,
+        potion1: null,
+        potion2: null,
+        potion3: null
+      };
+    }
+
     const allEquip = getAllEquipment();
     let equipAtk = 0, equipDef = 0, equipMag = 0, equipSpd = 0;
 
-    Object.values(equipment).forEach(equipKey => {
-      if (equipKey && allEquip[equipKey]) {
-        const eq = allEquip[equipKey];
-        // Skip potions (they don't have stats, only effects)
-        if (eq.type === 'potion') return;
-        equipAtk += eq.stats?.atk || 0;
-        equipDef += eq.stats?.def || 0;
-        equipMag += eq.stats?.mag || 0;
-        equipSpd += eq.stats?.spd || 0;
-      }
-    });
+    if (level > 1) {
+      Object.values(equipment).forEach(equipKey => {
+        if (equipKey && allEquip[equipKey]) {
+          const eq = allEquip[equipKey];
+          // Skip potions (they don't have stats, only effects)
+          if (eq.type === 'potion') return;
+          equipAtk += eq.stats?.atk || 0;
+          equipDef += eq.stats?.def || 0;
+          equipMag += eq.stats?.mag || 0;
+          equipSpd += eq.stats?.spd || 0;
+        }
+      });
+    }
 
     // Calculate spawn position
     let x, y;
