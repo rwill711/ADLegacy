@@ -504,12 +504,10 @@ const TacticalRPG = () => {
   const [gameMode, setGameMode] = useState('normal');
   const [waveNumber, setWaveNumber] = useState(1);
   const [gil, setGil] = useState(0);
-  const [recruitCost, setRecruitCost] = useState(300); // Cost for recruiting units, increases by 200 each time
   const [inventory, setInventory] = useState([]); // Equipment owned by player
   const [waveRewards, setWaveRewards] = useState({ gil: 0, exp: 0, potions: [] }); // Rewards from last wave
   const [debugMode, setDebugMode] = useState(false); // Debug mode for bug reporting
   const [showDebugPanel, setShowDebugPanel] = useState(false); // Debug panel visibility
-  const [showEquipment, setShowEquipment] = useState(false); // Equipment panel visibility in unit info
   const [recruitCost, setRecruitCost] = useState(300); // Cost to recruit new unit, increases by 200 each time
 
   const gameState = useRef({
@@ -594,12 +592,11 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Sword Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A basic sword attack.' },
         { name: 'Shield Bash', mpCost: 4, power: 0.7, range: 1, type: 'physical', targetType: 'enemy', effect: 'stun', accuracy: 85, level: 1, description: 'Bash with shield. May stun.' },
-        { name: 'Cut Tree', mpCost: 4, power: 0, range: 1, type: 'terrain', targetType: 'tree', accuracy: 100, level: 1, description: 'Cut down adjacent tree to clear the path.' },
-        { name: 'Push Rock', mpCost: 6, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 1, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
-        { name: 'Parry', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'parry', accuracy: 100, level: 2, description: 'Defensive stance. +50% DEF until next turn.' },
-        { name: 'War Cry', mpCost: 8, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'buff_atk', accuracy: 100, level: 3, description: 'Rally nearby allies. +ATK buff.' },
-        { name: 'Provoke', mpCost: 6, power: 0, range: 3, type: 'status', targetType: 'enemy', effect: 'provoke', accuracy: 80, level: 4, description: 'Force enemy to target you.' },
-        { name: 'Cross Slash', mpCost: 12, power: 1.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 5, description: 'Powerful X-shaped slash.' }
+        { name: 'Cut Tree', mpCost: 3, power: 0, range: 1, type: 'terrain', targetType: 'tree', accuracy: 100, level: 2, description: 'Cut down adjacent tree. Tree falls and deals damage.' },
+        { name: 'Parry', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'parry', accuracy: 100, level: 3, description: 'Defensive stance. +50% DEF until next turn.' },
+        { name: 'Push Rock', mpCost: 4, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 4, description: 'Push adjacent rock one space.' },
+        { name: 'War Cry', mpCost: 8, power: 0, range: 2, type: 'support', targetType: 'ally', effect: 'buff_atk', accuracy: 100, level: 5, description: 'Rally nearby allies. +ATK buff.' },
+        { name: 'Cross Slash', mpCost: 12, power: 1.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 6, description: 'Powerful X-shaped slash.' }
       ],
       statGrowth: { hp: 8, mp: 2, atk: 3, def: 3, mag: 1, spd: 1 },
       unlocks: { paladin: 4, warrior: 3, dragoon: 5 }
@@ -615,8 +612,8 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Dagger Slash', mpCost: 0, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'A quick dagger strike.' },
         { name: 'Sneak Attack', mpCost: 6, power: 1.6, range: 1, type: 'physical', targetType: 'enemy', accuracy: 85, level: 1, description: 'Strike from behind for bonus damage.' },
-        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 1, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
         { name: 'Poison Strike', mpCost: 8, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'poison', accuracy: 80, level: 2, description: 'Venomous attack. May poison.' },
+        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 2, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
         { name: 'Feint', mpCost: 5, power: 0, range: 1, type: 'status', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 3, description: 'Fake attack that lowers enemy DEF.' },
         { name: 'Throw Sand', mpCost: 4, power: 0, range: 2, type: 'status', targetType: 'enemy', effect: 'blind', accuracy: 75, level: 4, description: 'Blind enemy with dirt.' },
         { name: 'Coup de Grace', mpCost: 15, power: 2.5, range: 1, type: 'physical', targetType: 'enemy', accuracy: 75, level: 5, description: 'Deadly finishing blow.' }
@@ -635,9 +632,8 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Bow Shot', mpCost: 0, power: 1.0, range: 4, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Standard ranged attack.' },
         { name: 'Aim', mpCost: 4, power: 1.3, range: 5, type: 'physical', targetType: 'enemy', accuracy: 95, level: 1, description: 'Careful aimed shot. Higher accuracy.' },
-        { name: 'Cut Tree', mpCost: 4, power: 0, range: 1, type: 'terrain', targetType: 'tree', accuracy: 100, level: 1, description: 'Cut down adjacent tree to clear the path.' },
-        { name: 'Push Rock', mpCost: 6, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 1, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
-        { name: 'Leg Shot', mpCost: 6, power: 0.8, range: 4, type: 'physical', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 2, description: 'Shoot the legs. May slow.' },
+        { name: 'Hide', mpCost: 6, power: 0, range: 0, type: 'terrain', targetType: 'tree_hide', accuracy: 100, level: 2, description: 'Hide in nearby tree. Must be adjacent to a tree.' },
+        { name: 'Leg Shot', mpCost: 6, power: 0.8, range: 4, type: 'physical', targetType: 'enemy', effect: 'slow', accuracy: 80, level: 3, description: 'Shoot the legs. May slow.' },
         { name: 'Rapid Fire', mpCost: 10, power: 0.6, range: 4, type: 'physical', targetType: 'enemy', hits: 2, accuracy: 75, level: 4, description: 'Fire two quick shots.' },
         { name: 'Focus', mpCost: 6, power: 0, range: 0, type: 'support', targetType: 'self', effect: 'focus', accuracy: 100, level: 5, description: 'Concentrate. Next attack +50% damage.' },
         { name: 'Piercing Shot', mpCost: 14, power: 1.8, range: 5, type: 'physical', targetType: 'enemy', effect: 'armor_pierce', accuracy: 85, level: 6, description: 'Arrow that ignores 50% DEF.' }
@@ -734,10 +730,10 @@ const TacticalRPG = () => {
       skills: [
         { name: 'Cleave', mpCost: 0, power: 1.1, range: 1, type: 'physical', targetType: 'enemy', accuracy: 90, level: 1, description: 'Heavy overhead swing.' },
         { name: 'Power Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'atk_down', accuracy: 90, level: 1, description: 'Reduce enemy ATK.' },
-        { name: 'Rock Push', mpCost: 8, power: 0, range: 1, type: 'terrain', targetType: 'rock', accuracy: 100, level: 1, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
         { name: 'Armor Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'def_down', accuracy: 90, level: 2, description: 'Reduce enemy DEF.' },
         { name: 'Magic Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'mag_down', accuracy: 90, level: 2, description: 'Reduce enemy MAG.' },
         { name: 'Speed Break', mpCost: 6, power: 1.0, range: 1, type: 'physical', targetType: 'enemy', effect: 'spd_down', accuracy: 90, level: 3, description: 'Reduce enemy SPD.' },
+        { name: 'Rock Push', mpCost: 8, power: 0, range: 1, type: 'support', targetType: 'rock', accuracy: 100, level: 3, description: 'Push an adjacent rock. Crushes enemies (15 dmg).' },
         { name: 'Full Break', mpCost: 15, power: 1.2, range: 1, type: 'physical', targetType: 'enemy', effect: 'full_break', accuracy: 75, level: 4, description: 'Reduce all enemy stats.' },
         { name: 'Rend Weapon', mpCost: 12, power: 0.8, range: 1, type: 'physical', targetType: 'enemy', effect: 'disarm', accuracy: 70, level: 5, description: 'Destroy enemy weapon.' }
       ],
@@ -1101,35 +1097,22 @@ const TacticalRPG = () => {
     const baseMag = baseStats.mag + (growth.mag * levelBonus);
     const baseSpd = baseStats.spd + (growth.spd * levelBonus);
 
-    // Apply equipment bonuses (only for level 2+)
-    const equipment = level > 1 ? getDefaultEquipment(selectionData.job) : {
-      mainHand: null,
-      offHand: null,
-      armor: null,
-      helmet: null,
-      ring1: null,
-      ring2: null,
-      necklace: null,
-      potion1: null,
-      potion2: null,
-      potion3: null
-    };
+    // Apply equipment bonuses
+    const equipment = getDefaultEquipment(selectionData.job);
     const allEquip = getAllEquipment();
     let equipAtk = 0, equipDef = 0, equipMag = 0, equipSpd = 0;
 
-    if (level > 1) {
-      Object.values(equipment).forEach(equipKey => {
-        if (equipKey && allEquip[equipKey]) {
-          const eq = allEquip[equipKey];
-          // Skip potions (they don't have stats, only effects)
-          if (eq.type === 'potion') return;
-          equipAtk += eq.stats?.atk || 0;
-          equipDef += eq.stats?.def || 0;
-          equipMag += eq.stats?.mag || 0;
-          equipSpd += eq.stats?.spd || 0;
-        }
-      });
-    }
+    Object.values(equipment).forEach(equipKey => {
+      if (equipKey && allEquip[equipKey]) {
+        const eq = allEquip[equipKey];
+        // Skip potions (they don't have stats, only effects)
+        if (eq.type === 'potion') return;
+        equipAtk += eq.stats?.atk || 0;
+        equipDef += eq.stats?.def || 0;
+        equipMag += eq.stats?.mag || 0;
+        equipSpd += eq.stats?.spd || 0;
+      }
+    });
 
     // Calculate spawn position
     let x, y;
@@ -2962,23 +2945,7 @@ const TacticalRPG = () => {
       }
     });
 
-    // Find a usable skill (enemy has enough MP)
-    const availableSkills = jobData[enemy.job].skills.filter(s =>
-      s.level <= enemy.level &&
-      s.mpCost <= enemy.mp &&
-      s.targetType === 'enemy'
-    );
-
-    // If no usable skills, just end turn
-    if (availableSkills.length === 0) {
-      console.log(`[AI] ${enemy.name} has no MP for any skills, ending turn`);
-      enemy.hasActed = true;
-      aiProcessingRef.current = false;
-      setTimeout(nextTurn, 1000);
-      return;
-    }
-
-    const skill = availableSkills[0];
+    const skill = jobData[enemy.job].skills[0];
     
     // Helper to check win/loss after attack
     const checkGameEnd = () => {
@@ -3011,17 +2978,9 @@ const TacticalRPG = () => {
 
     // Otherwise, move toward nearest player
     const moveRange = calculateMoveRange(enemy);
-
-    // If no movement possible and can't attack, end turn
-    if (moveRange.length === 0 && minDist > skill.range) {
-      console.log(`[AI] ${enemy.name} cannot move or attack, ending turn`);
-      finishTurn();
-      return;
-    }
-
     let bestMove = null;
     let bestDist = minDist;
-
+    
     moveRange.forEach(tile => {
       const dist = Math.abs(tile.x - nearestPlayer.x) + Math.abs(tile.y - nearestPlayer.y);
       if (dist < bestDist) {
@@ -4131,11 +4090,6 @@ const TacticalRPG = () => {
                 Level Up Units
               </button>
               <button
-                onClick={() => setGamePhase('recruit')}
-                className="w-full px-6 py-3 bg-cyan-600 text-white rounded-lg font-bold hover:bg-cyan-700 transition-colors">
-                Recruit Unit
-              </button>
-              <button
                 onClick={() => setGamePhase('shop')}
                 className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">
                 Visit Shop (Gil: {gil})
@@ -4275,80 +4229,6 @@ const TacticalRPG = () => {
               className="w-full mt-4 px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
               Back to Rewards
             </button>
-          </div>
-        )}
-        {gamePhase === 'recruit' && (
-          <div className="mt-4 p-6 bg-cyan-900 border-2 border-cyan-500 rounded-lg max-h-96 overflow-y-auto">
-            <div className="text-center mb-4">
-              <div className="text-2xl font-bold text-cyan-300 mb-2">Recruit New Unit</div>
-              <div className="text-lg text-yellow-300">Gil: {gil}</div>
-              <div className="text-sm text-cyan-200 mt-2">Cost: {recruitCost} Gil</div>
-            </div>
-
-            {(() => {
-              const playerUnits = gameState.current.units.filter(u => u.team === 'player');
-              const maxUnits = 6;
-              const canRecruit = playerUnits.length < maxUnits && gil >= recruitCost;
-
-              // Calculate average team level (rounded down)
-              const avgLevel = playerUnits.length > 0
-                ? Math.floor(playerUnits.reduce((sum, u) => sum + u.level, 0) / playerUnits.length)
-                : 1;
-
-              // If avg level > 3, show both base and advanced jobs. Otherwise only base jobs.
-              const availableJobs = avgLevel > 3
-                ? Object.entries(jobData).filter(([key, job]) => job.tier <= 2)
-                : Object.entries(jobData).filter(([key, job]) => job.tier === 1);
-
-              return (
-                <div>
-                  {playerUnits.length >= maxUnits ? (
-                    <div className="text-center text-red-400 mb-4">Maximum units reached (6/6)</div>
-                  ) : gil < recruitCost ? (
-                    <div className="text-center text-red-400 mb-4">Not enough Gil (need {recruitCost})</div>
-                  ) : (
-                    <div>
-                      <div className="text-center text-sm text-cyan-300 mb-3">
-                        New recruit will be Level {avgLevel}
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        {availableJobs.map(([jobKey, job]) => (
-                          <button
-                            key={jobKey}
-                            onClick={() => {
-                              if (canRecruit) {
-                                recruitNewUnit();
-                                setGamePhase('recruit'); // Stay on recruit page
-                              }
-                            }}
-                            disabled={!canRecruit}
-                            className={`p-4 rounded-lg border-2 font-bold transition-colors ${
-                              canRecruit
-                                ? 'bg-gray-800 hover:bg-gray-700 border-cyan-500 text-white'
-                                : 'bg-gray-900 border-gray-700 text-gray-600 cursor-not-allowed'
-                            }`}
-                            style={{ borderColor: canRecruit ? job.color : '#444' }}>
-                            <div className="text-lg mb-1">{jobKey.charAt(0).toUpperCase() + jobKey.slice(1)}</div>
-                            <div className="text-xs text-gray-400">{job.description}</div>
-                            <div className="text-xs text-cyan-300 mt-1">Tier {job.tier}</div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="text-center text-sm text-cyan-200 mb-3">
-                    Current Units: {playerUnits.length}/{maxUnits}
-                  </div>
-
-                  <button
-                    onClick={() => setGamePhase('rewards')}
-                    className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-colors">
-                    Back to Rewards
-                  </button>
-                </div>
-              );
-            })()}
           </div>
         )}
         {gamePhase === 'shop' && (
@@ -4584,8 +4464,41 @@ const TacticalRPG = () => {
             <div className="text-xs text-gray-400">
               MP Regen: {Math.floor(2 + inspectedUnit.mag / 4)}/turn
             </div>
-
-            {/* Skills Section - moved above equipment */}
+            
+            {/* Equipment Section */}
+            <div className="mt-4">
+              <div className="font-bold mb-2 text-yellow-400">Equipment:</div>
+              <div className="text-xs space-y-1">
+                {(() => {
+                  const allEquip = getAllEquipment();
+                  const slots = [
+                    { key: 'mainHand', label: 'Main Hand' },
+                    { key: 'offHand', label: 'Off Hand' },
+                    { key: 'armor', label: 'Armor' },
+                    { key: 'helmet', label: 'Helmet' },
+                    { key: 'ring1', label: 'Ring 1' },
+                    { key: 'ring2', label: 'Ring 2' },
+                    { key: 'necklace', label: 'Necklace' },
+                    { key: 'potion1', label: 'Potion 1' },
+                    { key: 'potion2', label: 'Potion 2' },
+                    { key: 'potion3', label: 'Potion 3' }
+                  ];
+                  return slots.map(slot => {
+                    const equipKey = inspectedUnit.equipment?.[slot.key];
+                    const item = equipKey ? allEquip[equipKey] : null;
+                    return (
+                      <div key={slot.key} className="flex justify-between bg-gray-700 p-1 rounded">
+                        <span className="text-gray-400">{slot.label}:</span>
+                        <span className={item ? 'text-white' : 'text-gray-500'}>
+                          {item ? item.name : '(empty)'}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+            
             <div className="mt-4">
               <div className="font-bold mb-2">Skills:</div>
               {getAvailableSkills(inspectedUnit).map(skill => (
@@ -4606,49 +4519,7 @@ const TacticalRPG = () => {
                 </div>
               )}
             </div>
-
-            {/* Equipment Section - now collapsible */}
-            <div className="mt-4">
-              <button
-                onClick={() => setShowEquipment(!showEquipment)}
-                className="w-full flex justify-between items-center font-bold mb-2 text-yellow-400 hover:text-yellow-300 bg-gray-700 p-2 rounded"
-              >
-                <span>Equipment</span>
-                <span>{showEquipment ? '▼' : '▶'}</span>
-              </button>
-              {showEquipment && (
-                <div className="text-xs space-y-1">
-                  {(() => {
-                    const allEquip = getAllEquipment();
-                    const slots = [
-                      { key: 'mainHand', label: 'Main Hand' },
-                      { key: 'offHand', label: 'Off Hand' },
-                      { key: 'armor', label: 'Armor' },
-                      { key: 'helmet', label: 'Helmet' },
-                      { key: 'ring1', label: 'Ring 1' },
-                      { key: 'ring2', label: 'Ring 2' },
-                      { key: 'necklace', label: 'Necklace' },
-                      { key: 'potion1', label: 'Potion 1' },
-                      { key: 'potion2', label: 'Potion 2' },
-                      { key: 'potion3', label: 'Potion 3' }
-                    ];
-                    return slots.map(slot => {
-                      const equipKey = inspectedUnit.equipment?.[slot.key];
-                      const item = equipKey ? allEquip[equipKey] : null;
-                      return (
-                        <div key={slot.key} className="flex justify-between bg-gray-700 p-1 rounded">
-                          <span className="text-gray-400">{slot.label}:</span>
-                          <span className={item ? 'text-white' : 'text-gray-500'}>
-                            {item ? item.name : '(empty)'}
-                          </span>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
-            </div>
-
+            
             {inspectedUnit.effects.length > 0 && (
               <div className="mt-3">
                 <div className="font-bold">Status Effects:</div>
