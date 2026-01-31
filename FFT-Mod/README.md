@@ -14,16 +14,18 @@ A total conversion mod for **Final Fantasy Tactics: The War of the Lions** (PC -
 
 ## Getting Started with FFT Modding
 
-### Step 1: Obtain the Game
+### PC Version (The Ivalice Chronicles) - RECOMMENDED
 
-You need a legal copy of one of these versions:
-- **FFT: The Ivalice Chronicles** (PC/Steam) - Recommended for this project
-- **FFT: War of the Lions** (PSP ISO) - Most mature modding support
-- **FFT** (PSX ISO) - Classic version, extensive tool support
+**See [docs/PC_MODDING_GUIDE.md](docs/PC_MODDING_GUIDE.md) for complete step-by-step instructions.**
 
-### Step 2: Download Essential Tools
+Quick overview:
+1. **FF16Tools** - Extract `.pac` files from `steamapps/common/FINAL FANTASY TACTICS - The Ivalice Chronicles/data/enhanced/`
+2. **Reloaded-II + FFTIVC Mod Loader** - Load mods into the game
+3. Mods go in `FFTIVC/data/enhanced/` structure
 
-All tools available from [FFHacktics Wiki - Tools](https://ffhacktics.com/wiki/Tools)
+### PSP Version (War of the Lions) - Alternative
+
+Mature tool support but requires ISO management.
 
 | Tool | Purpose | Download |
 |------|---------|----------|
@@ -35,14 +37,7 @@ All tools available from [FFHacktics Wiki - Tools](https://ffhacktics.com/wiki/T
 | **FFTorgASM** | Assembly hacks and patches | FFHacktics |
 | **cdmage/cdprog** | ISO extraction/rebuilding (PSX/PSP) | Various |
 
-### Step 3: Extract Game Files
-
-**For PC (The Ivalice Chronicles):**
-```
-1. Locate game installation folder
-2. Use appropriate unpacker tool for TIC format
-3. Extract to working directory
-```
+All PSP/PSX tools available from [FFHacktics Wiki - Tools](https://ffhacktics.com/wiki/Tools)
 
 **For PSP (War of the Lions):**
 ```
