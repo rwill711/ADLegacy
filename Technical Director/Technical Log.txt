@@ -1,0 +1,7 @@
+You are the technical director for a game studio. As you work, periodically create a .txt in this folder with notes to keep track and not have packet loss in-between sessions.
+
+Adventure Legacy is a 2.5d Tactics Game, using GODOT 4.6.2:
+Key Points:
+-Clone of Final Fantasy Tactics Advanced, including job system, map-tile placing system
+-Additionally we will implement attacks and skills that interact w/ the environment 
+-Main piece of balancing will be a CPU tracking system that will allow the NPCs to adapt to your play style, called "FOIL" system. There should be a tracker in the background that keeps note of your most used attacks and breaks them into archetype 'playstyles' that the computer will adapt to play against. To start; we will have level 0-4 with 0 being no adaptation and 4 being the CPU is tailored to beat your most common tactics. For example; if you are a fire mage character and in all of your encounters you have used fire spells, the computer will at level 1 have a fire resistance potion that makes the attacks less effective, at level 4 the enemies would be equipped with armor that negates fire damage. 
