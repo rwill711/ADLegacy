@@ -1,0 +1,98 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/turn_hud.gd" id="1_hud"]
+
+[node name="TurnHUD" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="ActivePanel" type="PanelContainer" parent="Root"]
+anchor_left = 0.0
+anchor_top = 0.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 320.0
+offset_bottom = 96.0
+
+[node name="ActiveMargin" type="MarginContainer" parent="Root/ActivePanel"]
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="ActiveBox" type="VBoxContainer" parent="Root/ActivePanel/ActiveMargin"]
+
+[node name="ActiveName" type="Label" parent="Root/ActivePanel/ActiveMargin/ActiveBox"]
+unique_name_in_owner = true
+text = "—"
+theme_override_font_sizes/font_size = 20
+
+[node name="ActiveStats" type="Label" parent="Root/ActivePanel/ActiveMargin/ActiveBox"]
+unique_name_in_owner = true
+text = ""
+theme_override_font_sizes/font_size = 14
+
+[node name="PhasePanel" type="PanelContainer" parent="Root"]
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.0
+offset_left = -120.0
+offset_top = 16.0
+offset_right = 120.0
+offset_bottom = 60.0
+
+[node name="PhaseMargin" type="MarginContainer" parent="Root/PhasePanel"]
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 8
+
+[node name="PhaseLabel" type="Label" parent="Root/PhasePanel/PhaseMargin"]
+unique_name_in_owner = true
+text = "Ticking…"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+
+[node name="QueuePanel" type="PanelContainer" parent="Root"]
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_top = 0.0
+offset_left = -220.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 240.0
+
+[node name="QueueMargin" type="MarginContainer" parent="Root/QueuePanel"]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="QueueBox" type="VBoxContainer" parent="Root/QueuePanel/QueueMargin"]
+
+[node name="QueueHeader" type="Label" parent="Root/QueuePanel/QueueMargin/QueueBox"]
+text = "Turn Queue"
+theme_override_font_sizes/font_size = 16
+
+[node name="QueueList" type="VBoxContainer" parent="Root/QueuePanel/QueueMargin/QueueBox"]
+unique_name_in_owner = true
+
+[node name="OutcomeBanner" type="Label" parent="Root"]
+unique_name_in_owner = true
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -60.0
+offset_right = 200.0
+offset_bottom = 60.0
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 64

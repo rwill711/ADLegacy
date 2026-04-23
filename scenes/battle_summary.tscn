@@ -1,0 +1,90 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/battle_summary.gd" id="1_bs"]
+
+[node name="BattleSummary" type="CanvasLayer"]
+layer = 3
+script = ExtResource("1_bs")
+
+[node name="Root" type="Control" parent="."]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Dim" type="ColorRect" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="Panel" type="PanelContainer" parent="Root"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -360.0
+offset_top = -260.0
+offset_right = 360.0
+offset_bottom = 260.0
+
+[node name="Margin" type="MarginContainer" parent="Root/Panel"]
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="Box" type="VBoxContainer" parent="Root/Panel/Margin"]
+theme_override_constants/separation = 12
+
+[node name="OutcomeLabel" type="Label" parent="Root/Panel/Margin/Box"]
+unique_name_in_owner = true
+text = "VICTORY"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 48
+
+[node name="TurnsLabel" type="Label" parent="Root/Panel/Margin/Box"]
+unique_name_in_owner = true
+text = "Battle length: 0 turns"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 14
+modulate = Color(1, 1, 1, 0.75)
+
+[node name="TeamsRow" type="HBoxContainer" parent="Root/Panel/Margin/Box"]
+theme_override_constants/separation = 18
+
+[node name="PlayerColumn" type="VBoxContainer" parent="Root/Panel/Margin/Box/TeamsRow"]
+size_flags_horizontal = 3
+
+[node name="PlayerHeader" type="Label" parent="Root/Panel/Margin/Box/TeamsRow/PlayerColumn"]
+text = "Player Party"
+theme_override_font_sizes/font_size = 18
+
+[node name="PlayerStatsBox" type="VBoxContainer" parent="Root/Panel/Margin/Box/TeamsRow/PlayerColumn"]
+unique_name_in_owner = true
+theme_override_constants/separation = 6
+
+[node name="EnemyColumn" type="VBoxContainer" parent="Root/Panel/Margin/Box/TeamsRow"]
+size_flags_horizontal = 3
+
+[node name="EnemyHeader" type="Label" parent="Root/Panel/Margin/Box/TeamsRow/EnemyColumn"]
+text = "Enemy Party"
+theme_override_font_sizes/font_size = 18
+
+[node name="EnemyStatsBox" type="VBoxContainer" parent="Root/Panel/Margin/Box/TeamsRow/EnemyColumn"]
+unique_name_in_owner = true
+theme_override_constants/separation = 6
+
+[node name="ButtonsRow" type="HBoxContainer" parent="Root/Panel/Margin/Box"]
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="RetryButton" type="Button" parent="Root/Panel/Margin/Box/ButtonsRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 44)
+text = "Retry"
+theme_override_font_sizes/font_size = 18
+
+[node name="QuitButton" type="Button" parent="Root/Panel/Margin/Box/ButtonsRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 44)
+text = "Quit"
+theme_override_font_sizes/font_size = 18

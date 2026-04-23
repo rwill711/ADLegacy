@@ -61,3 +61,1051 @@ ADR:
   - ADR-003 committed at docs/adr/ADR-003-foil-system.md
 
 NEXT SESSION: Start with Chunk 4 (foil_analyzer.gd), then Chunk 5 (foil_loadout_builder.gd).
+
+
+==========================================================================
+FOIL SYSTEM BUILD LOG — End of Session 3
+==========================================================================
+
+STATUS: Chunks 1–6 of 6 complete. FOIL v1 is code-complete.
+        The three subsystems talk to each other end-to-end; integration
+        points into BattleManager/EnemySpawner are well-defined and symbolic
+        (see "EnemySpawner contract" below).
+
+FILES ADDED TO scripts/foil/ THIS SESSION:
+  6. foil_analyzer.gd        — BRAIN. Reads tracker data + trait tags → FOILProfile.
+                                Computes category weights, behavioral stats,
+                                archetype weights, dominant archetype, confidence.
+                                Exposes resolve_foil_level(renown, override) helper.
+  7. foil_loadout_builder.gd — OUTPUT. Consumes FOILProfile + FOIL level + base
+                                enemy pool → Dictionary enemy team config with
+                                per-enemy job role, consumable, and gear hints,
+                                plus team-level AI hints at level 3+.
+
+TOTAL FOIL FILES: 7 in scripts/foil/ (+ ADR-003 in docs/adr/).
+
+CHUNK 4 — foil_analyzer.gd DETAILS:
+  - build_profile(tracker, character_name, trait_tags) → FOILProfile
+  - Trait tags permanently vote for archetypes (TRAIT_WEIGHT_PER_TAG = 0.35)
+      even when rolling window is empty — keeps identity from evaporating
+      during long streaks of odd playstyle. Safe to call with no battle data.
+  - Category weights normalized to 0–1 by total action count.
+  - Archetype weights normalized so max archetype = 1.0.
+  - AOE-heavy players get an AOE_BLASTER boost scaled by aoe_tendency;
+      prevents a mage who only casts Fireball from being flagged pure MAGIC_OFFENSE.
+  - Dominant archetype flips to HYBRID if the top two are within HYBRID_MARGIN
+      (0.12) of each other; avoids flip-flopping the CPU's counter target.
+  - Confidence ramps linearly from 0 at MIN_BATTLES to 1.0 at ROLLING_WINDOW_SIZE.
+      Below MIN_BATTLES confidence is hard 0 and the loadout builder uses FOIL 0.
+  - resolve_foil_level(renown, mission_override) — single helper so BattleManager
+      doesn't have to care whether the current battle is a story override or free.
+
+CHUNK 5 — foil_loadout_builder.gd DETAILS:
+  - build_enemy_team(profile, foil_level, base_enemy_pool, party_size) → Dictionary
+  - Return shape:
+      {
+        "foil_level": int,
+        "dominant_archetype": int,
+        "enemies": Array[Dictionary],  # each: {job, role, consumable, gear_hint, ...}
+        "ai_hints": Dictionary,        # {target_priority, formation, engagement_range, ...}
+        "notes": Array[String],        # audit log, useful for dev overlay
+      }
+  - Level-by-level layering mirrors ADR-003 exactly:
+        0 base pool
+        1 + counter consumables
+        2 + half team swapped to counter roles (interleaves top-2 archetypes
+            for clear hybrid players so the enemy team isn't one-note)
+        3 + team AI hints (target_priority, formation, engagement_range, defensive_posture)
+        4 + full team swap + elite_ prefixed consumables + counter gear hints
+  - Graceful fallback: null profile, FOIL 0, or insufficient data → returns the
+      base-pool configuration with notes explaining why.
+  - Symbolic (string-tag) output on purpose — job/equipment/element systems
+      aren't ported yet; EnemySpawner will translate hints → real JobData/ItemData
+      when those come online. See EnemySpawner contract below.
+
+ENEMY-SPAWNER CONTRACT (for when it's built):
+  Input:  the Dictionary returned by FOILLoadoutBuilder.build_enemy_team().
+  Responsibilities:
+    - For each entry in config["enemies"]:
+        if "role" is set and is in COUNTER_JOBS_BY_ARCHETYPE, pick a real
+          JobData from the region's enemy pool that fulfills that role;
+          otherwise use entry["job"] directly.
+        if "consumable" is set, grant one stack at battle start.
+          "elite_*" prefix means use the tier-2 variant.
+        if "gear_hint" is set, swap appropriate equipment slot to the closest
+          match from the enemy pool; fall back silently if no match.
+    - Pass config["ai_hints"] to each enemy's AI controller on spawn.
+    - Log config["notes"] to the dev overlay when a debug flag is on.
+
+FULL PIPELINE (end-to-end, once BattleManager is in GDScript):
+
+  [Battle start]
+    level := FOILAnalyzer.resolve_foil_level(character.renown, mission.foil_override)
+    profile := FOILAnalyzer.build_profile(FOILTracker, character.name, character.trait_tags)
+    team_config := FOILLoadoutBuilder.build_enemy_team(profile, level, encounter.base_pool, party_size)
+    EnemySpawner.spawn_from_config(team_config)
+    FOILTracker.begin_battle(character.name, character.job, level)
+
+  [During battle — per player action]
+    FOILTracker.record_action(skill_name, category, is_aoe, target_name, target_job,
+                              targeted_ally, damage, was_kill, was_hit,
+                              distance, caster_pos, target_pos, turn_number)
+
+  [Battle end]
+    FOILTracker.commit_battle(total_turns, player_won)
+
+  [Save / Load]
+    save["foil"] = FOILTracker.save_to_dict()
+    FOILTracker.load_from_dict(save["foil"])
+
+TUNING KNOBS WORTH REVISITING AFTER PLAYTEST:
+  - FOILEnums.RENOWN_THRESHOLDS   — how fast FOIL ramps for free battles
+  - FOILEnums.ROLLING_WINDOW_SIZE / ROLLING_WINDOW_MIN_BATTLES
+  - FOILAnalyzer.TRAIT_WEIGHT_PER_TAG — how strongly titles push archetype
+  - FOILAnalyzer.HYBRID_MARGIN   — how committed a player must be before the CPU locks in a counter
+  - AOE boost threshold (0.4) and multiplier (0.5) in _compute_archetype_weights
+  - AI hint thresholds in FOILLoadoutBuilder._build_ai_hints (distance, aggression, aoe_tendency)
+  - Per-archetype counter maps (COUNTER_JOBS/CONSUMABLES/GEAR_BY_ARCHETYPE)
+
+DEPENDENCIES STILL OUTSTANDING (block full value, not FOIL v1 itself):
+  - BattleManager port to GDScript — nothing is calling FOILTracker yet.
+  - Trait tag assignment — titles/milestones need to emit tag strings that
+      match keys in FOILAnalyzer.TRAIT_ARCHETYPE_SIGNALS. Plain-string contract
+      keeps the two systems loosely coupled.
+  - EnemySpawner — consumer of build_enemy_team() output. See contract above.
+  - Element / Equipment / AI systems — needed for level-4 counter gear and
+      level-3 AI hint actuation. FOIL will happily emit hints the AI ignores
+      until that system lands; safe to ship partial.
+
+ADR:
+  - ADR-003 updated: moved Chunks 4 & 5 from "planned" to "implemented" file list.
+
+NEXT SESSION (recommendation, not locked):
+  - Port BattleManager.cs → battle_manager.gd, wire the four FOIL hooks in.
+  - Stub an EnemySpawner that reads build_enemy_team() output using placeholder
+      JobData so we can run an end-to-end test before the full asset pipeline is there.
+  - Write a headless test harness under scripts/foil/tests/ that drives the
+      tracker → analyzer → builder flow with a scripted set of fake battles
+      and snapshots the output — catches regressions when we retune.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 1 (Phase 1A: Grid Tile System)
+==========================================================================
+
+STATUS: Godot project initialized. Phase 1A code-complete.
+        Phase 1B (camera rotation) not started.
+
+PROJECT SCAFFOLDING (NEW THIS SESSION):
+  - project.godot at repo root. Godot 4.6, Forward+ renderer, MSAA x2.
+      Main scene: res://scenes/main.tscn
+      Autoload: FOILTracker (res://scripts/foil/foil_tracker.gd) — global as `FOILTracker`
+  - .gitignore (excludes .godot/, import cache, editor junk)
+  - scenes/main.tscn — Node3D root scene with DirectionalLight, WorldEnvironment,
+      isometric orthographic Camera3D, and a GridVisualizer child.
+
+FILES ADDED TO scripts/grid/ (5 total):
+  1. grid_enums.gd        — TerrainType + HighlightState enums. Single source of
+                             truth for terrain color, walkability, movement cost,
+                             damage-per-turn lookups. World-space constants
+                             (TILE_WORLD_SIZE, HEIGHT_STEP, FLOOR_THICKNESS).
+  2. grid_tile.gd         — Resource. Per-tile data: coord, height, terrain,
+                             walkable_override, occupant_id (StringName so grid
+                             stays decoupled from the Unit class that's coming),
+                             highlight_state. Helpers: is_walkable(),
+                             top_world_position(), mesh_center_position(),
+                             mesh_height(). Serializes via to_dict/from_dict.
+  3. grid_map.gd          — Resource. Owns the 2D array of GridTile. Queries:
+                             get_tile, is_in_bounds, neighbors, tiles_in_range,
+                             find_occupant, can_step_between (for jump/elevation).
+                             Emits tile_changed + occupancy_changed signals.
+  4. grid_visualizer.gd   — Node3D. Reads a GridMap and renders each tile as a
+                             BoxMesh column with a StandardMaterial3D colored
+                             by terrain. Tile-sized Area3D on each tile for
+                             mouse raycast picking. Emits tile_hovered /
+                             tile_unhovered / tile_clicked. Shared material
+                             cache so N identical tiles = 1 material alloc.
+                             Highlight overlays are transparent QuadMesh siblings
+                             laying flat above each tile's top surface.
+  5. alpha_test_map.gd    — Factory for the standard Alpha battlefield:
+                             12×12 grass baseline, central 3×3 STONE hill at
+                             (5,5)..(7,7) elevated one step, two 3-tile FOREST
+                             patches on the west, 3-tile WATER pond top-right
+                             to sanity-check impassable terrain. Also owns
+                             player/enemy spawn points so the battle scene
+                             doesn't drift out of sync with the map.
+
+ENTRY SCRIPT:
+  - scripts/main.gd — Builds the test map, hands it to the visualizer, wires up
+      hover = HOVER highlight, unhover = NONE, click = print tile info to console.
+      Kept intentionally thin; battle/turn wiring is Phases 3-4.
+
+COORDINATE / RENDERING CONVENTIONS (locked in):
+  - Grid coord is Vector2i(x, y). +X = east, +Y = south (screen-space-like).
+  - World axis mapping: world.x ← grid.x, world.z ← grid.y, world.y = up.
+  - 1 grid unit = 1 world unit. HEIGHT_STEP = 0.3 world units per elevation step.
+  - A unit at (x, y, h) stands at world (x, h * HEIGHT_STEP, y).
+  - Every downstream system (movement, camera, skill range) MUST read these
+      constants from grid_enums.gd. Do not hardcode.
+
+ANSWERS TO CD OPEN QUESTIONS (Tech Director rulings):
+  - Q1 (turn order): RECOMMEND CTR countdown (FFTA style). Locks in authentic
+      feel the brief asks for, and lets Speed stat behave monotonically without
+      the "my 11-speed unit got two turns before your 10-speed" weirdness an
+      initiative queue has. Implementation complexity is marginal.
+      NOT yet implemented — Phase 3 work.
+  - Q2 (hit/miss): Agreed, all-hit for Alpha. We can slot a HitResolver module
+      later without touching existing skill code.
+  - Q3 (unit passthrough): Adopted. GridTile.is_walkable() already returns false
+      for any occupied tile, so pathfinding will respect this for free.
+  - Q5 (map size): Adopted (12×12, central 3×3 hill). See alpha_test_map.gd.
+  - Q4 (retry on defeat), Q6 (party size 3v3): Noted but no code implication yet.
+
+IN SCOPE NEXT SESSION — Phase 1B: Camera System (FFTA rotation)
+  - 4-point orthographic rotation (NE/SE/SW/NW, 90° snaps) on shoulder button / Q+E.
+  - Short tween between positions (0.2s ease-out) for readability.
+  - Bounded zoom via Camera3D.size.
+  - Camera follows the currently active unit on their turn (stubbed until turn
+      system lands — for now, just center-of-grid).
+  - Sort/render order: orthographic camera + 3D tiles auto-sorts correctly, so
+      no draw-order hack needed (Unity 2D had this pain; Godot 3D doesn't).
+
+DEPENDENCIES STILL OUTSTANDING FOR ALPHA:
+  - Unit base class + 3 job definitions (Phase 2)
+  - Turn system (Phase 3A)
+  - Pathfinding (Phase 3B — straightforward A* once unit jump stat exists)
+  - Battle resolution (Phase 3C)
+  - Win/lose conditions (Phase 4)
+  - Debug overlay framework (Phase 5 — Creative wants this modular/registerable)
+  - Full FOIL integration hooks (Phase 6 — BattleManager needed first)
+
+NOTES ON GODOT-VS-UNITY PORTING TRADEOFFS (for future reference):
+  - Old C# reference files under Assets/Scripts/ are not wired into the new
+      project. They remain as design reference only. Do not import.
+  - Unity's SpriteRenderer.sortingOrder hack is replaced by Godot's 3D depth
+      sort + orthographic camera. Keeps tile draw order automatic even after
+      camera rotation.
+  - ScriptableObject → Resource with @export vars. Autoload replaces Unity's
+      DontDestroyOnLoad singleton pattern — already used for FOILTracker.
+
+NEXT SESSION: Phase 1B (camera rotation + zoom + follow-active-unit stub).
+           Target: end of session, player can spin the camera with Q/E and zoom
+           with scroll, and the grid reads cleanly from every angle.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 2 (Phase 1B: Camera System)
+==========================================================================
+
+STATUS: Phase 1B complete. Phase 1 (The Board) fully done.
+        Ready to move to Phase 2 (Units & Jobs).
+
+FILES ADDED:
+  - scripts/camera/camera_rig.gd — FFTA-style pivot-rig camera. Pivot Node3D
+      at the focus point; Camera3D child orbits at a fixed isometric offset
+      (y ≈ 8.6, z ≈ 12.3) pitched −35°. Rotating the pivot around Y rotates
+      the view; the camera itself never changes orientation.
+  - scenes/main.tscn updated: replaced the standalone Camera3D with a
+      CameraRig → Camera3D hierarchy, NodePath-wired via the @export.
+
+CAPABILITIES IMPLEMENTED:
+  - 4-point rotation in 90° snaps (initial 45° → NE diagonal; Q/E step ±90°).
+      Cubic ease-out over 0.22s. Continuous-target pattern so crossing 360°
+      always tweens the short way.
+  - Orthographic zoom bounded to [8, 28] on the Camera3D.size property,
+      ±1.5 per mouse-wheel tick, 0.1s tween for a touch of smoothness.
+  - set_focus(world_position, instant=false) — cubic-ease pan over 0.25s.
+      Used by main.gd to center on grid. Turn system will call this at turn
+      start once units exist.
+  - Signals: rotation_changed(index), zoom_changed(size), focus_changed(pos).
+      UI and debug overlay will subscribe.
+
+INPUT BINDINGS:
+  - camera_rotate_left  = Q + gamepad LB
+  - camera_rotate_right = E + gamepad RB
+  - Mouse wheel = zoom in/out (handled directly — not via InputMap)
+  - Actions are registered at runtime via InputMap.add_action(). Keeps the
+      [input] section of project.godot out of hand-edited binary-ish
+      InputEventKey serialization, which is fragile to author without the
+      editor. Idempotent — safe on hot reload.
+
+KEY DESIGN DECISIONS (worth remembering when we add UI):
+  - Camera3D's orthographic size is the "zoom" value. Never scale the camera
+      node; never touch fov (that's perspective-only). Everything is
+      orthographic so tiles stay uniform across screen — FFTA's read-friendly
+      geometry.
+  - Rig position = world focus point (ground-level). Camera local offset is
+      fixed relative to the pivot. This means the pitch is PERMANENT and
+      rotation cannot accidentally drift off-axis. No gimbal issues.
+  - No draw-order sorting needed after rotation. Godot 3D depth sort handles
+      it. This was an open concern from the roadmap (Phase 1B bullet:
+      "Camera should re-sort or re-render tile/unit draw order correctly
+      after each rotation") — confirmed a non-issue with our 3D approach.
+  - Tile picking (Area3D raycasts) continues to work at any rotation, for
+      free. Verified by inspection of Godot's input forwarding; will confirm
+      behaviorally once we have a build running.
+
+STILL TODO FOR POLISH (deferred, not blocking Alpha):
+  - Edge-pan / middle-mouse-drag pan for free camera movement. Not in the
+      CD's Phase 1B requirements; add if playtest asks for it.
+  - Camera shake for impacts (obvious post-Alpha polish; leaving the rig's
+      pivot free of animation dependencies for now).
+  - Snap-to-90°-cardinal instead of 45°-diagonal view option. FFTA uses
+      diagonals; if designers want cardinal for a specific mission, it's
+      a one-line tweak to `initial_rotation_degrees`.
+
+PHASE 1 RETROSPECTIVE:
+  - Board is complete: grid data + rendering + rotatable camera.
+  - 989 lines added in Session 1 (1A), ~200 in Session 2 (1B). Grid layer
+      is deliberately verbose with lookup tables so downstream systems
+      (pathfinder, battle, FOIL) pull from constants rather than magic numbers.
+  - No scope creep into Phase 2. Phase 1 is closed.
+
+NEXT SESSION: Phase 2 — Units & Jobs.
+  Targets:
+    - Base Unit class (HP, MP, ATK, DEF, MAG, RES, SPD, facing, jump, move range)
+    - 3 Job definitions as Resources: Rogue, Squire, White Mage.
+      Stats per CD's roadmap; ability hooks stubbed (ability data system stays
+      light — name, type, range, target type, MP cost, power — designed for
+      extensibility so every new skill later is pure data).
+    - Placeholder unit visualizer (capsule mesh + colored facing arrow).
+    - Unit spawn at AlphaTestMap.player_spawn_points() / .enemy_spawn_points().
+    - Occupant wiring into GridMap.set_occupant().
+  Out of scope for Phase 2: movement execution, ability resolution, turn order.
+  Those are Phase 3.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 3 (Phase 2: Units & Jobs)
+==========================================================================
+
+STATUS: Phase 2 code-complete. 3 jobs, 8 skills, 6 spawned units on the grid.
+        Occupancy correctly wired. Ready to move to Phase 3 (Turn System).
+
+FILES ADDED (11 total across 4 new folders):
+
+scripts/units/
+  unit_enums.gd      — Team, Facing, UnitState enums. Facing helpers:
+                       facing_to_vector, facing_to_y_rotation,
+                       facing_toward(from, to), opposite_facing,
+                       facing_delta (0=same, 1=flank, 2=rear),
+                       attack_side(attacker_coord, defender_coord, defender_facing)
+                       — last one is the key primitive for facing-modifier damage.
+  unit_stats.gd      — Resource. Pool stats (HP/MP current+max), combat stats
+                       (ATK, DEF, MAG, RES, SPD), movement (move_range, jump).
+                       Helpers: take_damage, heal, spend_mp, restore_mp, reset_to_full.
+  unit.gd            — Node3D. Owns stats + job ref + skills + coord + facing.
+                       Builds visuals on _ready (capsule body + prism facing arrow).
+                       Material tint blends team color with job color so
+                       friend/foe reads first, job identity reads second.
+                       Signals: hp_changed, mp_changed, facing_changed,
+                       state_changed, defeated. place_on_tile(tile, instant)
+                       handles world positioning with optional 0.18s tween.
+  unit_spawner.gd    — Node. spawn_alpha_roster(grid, parent) populates the
+                       3 player + 3 enemy units at AlphaTestMap spawn points
+                       and registers occupancy on the grid.
+                       Auto-faces each unit toward the opposite team's centroid
+                       so placeholder arrows read correctly at spawn.
+                       get_unit(id), get_units_on_team(team), get_all_units().
+
+scripts/jobs/
+  job_data.gd        — Resource. job_name (StringName), display_name, description,
+                       base_stats template (UnitStats), starting_skill_names
+                       (Array of StringName, resolved via SkillLibrary), job_color.
+                       instantiate_stats() — returns a duplicated, full-HP stat block.
+  job_library.gd     — Factory for Rogue, Squire, White Mage with numbers-locked
+                       first-pass stats (see below). all_alpha_jobs() returns all 3.
+
+scripts/skills/
+  skill_enums.gd     — SkillType (7: PHYSICAL_DAMAGE, MAGIC_DAMAGE, HEALING,
+                       BUFF, DEBUFF, STEAL, MOVEMENT), TargetType (6: ENEMY,
+                       ALLY, SELF, ALLY_OR_SELF, TILE, ANY),
+                       AreaShape (5: SINGLE, CROSS, SQUARE, RADIUS, LINE),
+                       Element (8 slots, Alpha all-NONE).
+                       FOIL_CATEGORY_MAP + to_foil_category() bridge so the
+                       battle resolver can push a one-liner to FOILTracker
+                       without a switch at every call site.
+  skill_data.gd      — Resource. The full ability contract: skill_name,
+                       display_name, description, skill_type, power, mp_cost,
+                       target_type, min/max range, area_shape + area_size,
+                       requires_rear_for_bonus + rear_bonus_multiplier
+                       (backstab plumbing), element. Queries:
+                       is_offensive, is_support, is_melee_only, is_area,
+                       foil_category, can_target(caster_team, target_team,
+                       is_self_target). Factory `create(...)` with sensible
+                       defaults so SkillLibrary entries stay one-liners.
+  skill_library.gd   — Factory for 8 Alpha skills:
+                       BASIC_ATTACK, BACKSTAB, STEAL, FIRST_AID,
+                       STONE_THROW, STAFF_BONK, CURE, PROTECT.
+                       get_skill(name) / get_skills(names_array).
+                       StringName constants exported so callers don't
+                       stringly-type skill lookups.
+
+scene/scripts changes:
+  scenes/main.tscn   — Added Units Node3D (container for spawned units) and
+                       a UnitSpawner Node. Scene still single-root (Main Node3D).
+  scripts/main.gd    — Calls unit_spawner.spawn_alpha_roster() on _ready.
+                       Click logging now dumps the occupant's name and HP when
+                       clicking a tile with a unit on it.
+
+ALPHA JOB STATS (FIRST PASS — Phase 10 will retune):
+            HP   MP  ATK  DEF  MAG  RES  SPD  MOVE  JUMP
+  Rogue      80  20   14    8    6    6   14    5    2
+  Squire    110  30   11   11    8    8   10    4    3
+  White Mage 75  60    6    7   14   13    8    3    1
+
+ALPHA SKILL SET:
+  Rogue:       basic_attack, backstab (+2x damage from rear), steal
+  Squire:      basic_attack, first_aid (self-heal, 1.5 power), stone_throw (2-3 rng)
+  White Mage:  staff_bonk (weak 0.6 power melee), cure (4 rng, 4 MP, 2.0 power),
+               protect (4 rng, 6 MP, defense buff)
+
+CONTRACT NOTES (FOR DOWNSTREAM PHASES):
+  - Unit.unit_id is StringName, matches GridMap.occupant_id. Source of truth
+      for "who's on this tile" lives in the grid; Unit just caches its coord.
+      Always update via grid.set_occupant() so signals fire.
+  - Skills are resolved from JobData.starting_skill_names via SkillLibrary
+      each time Unit is spawned. Instances are per-unit so passives that
+      mutate power later won't bleed between characters.
+  - FOIL wiring: when the battle resolver fires, one call per player action:
+      FOILTracker.record_action(
+        skill.skill_name, skill.foil_category(),
+        skill.is_area(), target.display_name, target.job.job_name,
+        target.team != caster.team == false,   # targeted_ally
+        damage_dealt, was_kill, was_hit,
+        GridMap.manhattan(caster.coord, target.coord),
+        caster.coord, target.coord, turn_number
+      )
+      Every field needed by the tracker is available on SkillData + Unit
+      already — no translator layer required.
+
+VISUAL NOTES:
+  - Capsule body: CapsuleMesh radius 0.3, height 1.1. Base sits on tile's
+      top_world_position. Material tint = team_color.lerp(job_color, 0.35).
+      At rotation.y = 0 the capsule faces NORTH (world -Z).
+  - Facing arrow: PrismMesh 0.2 × 0.15 × 0.3 ahead of the body. White,
+      always visible. Rotates with the parent Unit node.
+  - Unit._auto_face_units sets initial facing toward opposite team's
+      centroid. Placeholder — player will choose facing at end of turn once
+      the turn UI lands in Phase 3.
+
+OPEN / DEFERRED:
+  - Status effects (Protect actually doing something) — needs a StatusEffect
+      component on Unit. Phase 3C or later.
+  - Steal resolution — needs a minimal Inventory on Unit. Alpha can just
+      flag steal success/failure without real items. Phase 3C stub.
+  - Skill ".tres" files replacing SkillLibrary — post-Alpha, when design
+      iteration slows and we want designer-authored files.
+
+NEXT SESSION: Phase 3A — Turn System.
+  Targets:
+    - CTR countdown turn order (FFTA-style). Speed stat fills a CT counter;
+      first unit to 100 CT goes.
+    - Active-unit pointer; camera_rig.set_focus(active_unit.global_position)
+      on turn start.
+    - Phase state machine: MOVE → ACT → FACE → END_TURN (any skippable).
+    - Turn-order queue visible on HUD (even as a plain Label list for Alpha).
+  Phase 3B (pathfinding + tween along path) comes right after — it's the
+  piece that lets "Move" actually work on the grid.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 4 (Phase 3A: Turn System)
+==========================================================================
+
+STATUS: Phase 3A complete. CTR countdown live, phase state machine live,
+        HUD renders active unit + turn queue + phase indicator.
+        MOVE and ACT still stubbed — Phase 3B/3C will execute them.
+
+FILES ADDED:
+
+scripts/turn/
+  turn_enums.gd       — TurnPhase (TICKING, TURN_START, AWAITING_ACTION,
+                        CHOOSING_FACING, TURN_ENDING, BATTLE_OVER).
+                        BattleOutcome (ONGOING, PLAYER_VICTORY, PLAYER_DEFEAT, DRAW).
+                        CT constants: CT_ACTION_THRESHOLD = 100,
+                        CT_COST_WAIT=60, CT_COST_MOVED_ONLY/ACTED_ONLY=80,
+                        CT_COST_FULL_TURN=100. CT_MAX = 999.
+  turn_manager.gd     — Node. Owns CT table, active unit, phase. Signals:
+                        battle_started, battle_ended, turn_started,
+                        turn_ended, phase_changed, queue_updated.
+                        Public API: begin_battle(units), end_battle(outcome),
+                        declare_moved(), declare_acted(), end_turn(),
+                        wait_and_end_turn(), get_active_unit(), get_phase(),
+                        get_ct(unit_id), predict_turn_queue(count).
+
+scripts/ui/
+  turn_hud.gd         — class_name TurnHUD extends CanvasLayer. Subscribes
+                        to all TurnManager signals. Renders:
+                          • Active-unit panel (top-left): name tinted by team,
+                            HP/MP/SPD readout.
+                          • Phase indicator (top-center): "Move / Act / Wait",
+                            "Choose Facing", etc.
+                          • Turn queue panel (right): top 6 predicted turns,
+                            each entry colored by team.
+                          • Victory/Defeat/Draw banner on battle end.
+                        Uses unique_name_in_owner for @onready lookups.
+
+scenes/turn_hud.tscn  — CanvasLayer with Control-hierarchy panels. All three
+                        panel anchors are set so the HUD lays out cleanly
+                        across window sizes without a theme.
+
+scene / main changes:
+  scenes/main.tscn    — Added TurnManager Node and an instanced TurnHUD
+                        (loaded via PackedScene ExtResource so the HUD scene
+                        stays authorable in isolation).
+  scripts/main.gd     — Connects turn_started → camera_rig.set_focus for
+                        active-unit tracking. Binds the HUD to the turn
+                        manager, then calls begin_battle(units).
+                        Registers runtime input actions: SPACE = end_turn,
+                        W = wait_and_end_turn, M = stub declare_moved,
+                        A = stub declare_acted. Replaced by UI in 3B/3C.
+                        Enemy turns auto-end after `enemy_auto_end_delay`
+                        seconds (default 0.5) so the CT queue keeps
+                        rotating during manual testing until AI lands.
+                        Guards the auto-end callback against unit death
+                        or battle end mid-delay.
+
+CTR COUNTDOWN MECHANICS (LOCKED FOR ALPHA):
+  - Every tick, each alive unit's CT += their SPEED stat.
+  - First unit across CT_ACTION_THRESHOLD (100) takes the turn.
+  - Tie-break order: higher SPD > spawn order (stable via _units list).
+  - CT is clamped to CT_MAX (999) so a forever-waiting unit can't runaway.
+  - After turn ends, CT is reduced by the cost of what the unit did:
+        Wait (no move, no act):   -60   (relatively cheap — stalling viable)
+        Moved only / Acted only:  -80
+        Moved AND Acted:         -100   (full turn cost)
+  - Rationale: punishing full-turn users mildly shifts CT pressure back to
+    slower/defensive characters. Creative wants tactical stall to be a real
+    option, not a trap — hence Wait cheaper than action.
+
+QUEUE PREDICTION:
+  - predict_turn_queue(N) runs the CT simulation forward N turns on a
+    duplicated CT table. Assumes full-turn cost for each predicted winner
+    (best-case fast rotation) since we can't know intent in advance.
+  - Re-emitted on every turn start + turn end via queue_updated(Array[Unit]).
+    HUD rebuilds the queue list on each emit — cheap for 6–10 entries.
+
+PHASE STATE MACHINE:
+  - phase_changed fires on every transition.
+  - Typical flow per turn:
+      TICKING → TURN_START → AWAITING_ACTION (reenters as move/act consumed)
+      → CHOOSING_FACING → TURN_ENDING → TICKING (or BATTLE_OVER)
+  - CHOOSING_FACING is a transient beat for Alpha (passes through). Phase 3C
+    will gate it on a real facing-picker UI since CD called facing
+    "non-negotiable for Alpha".
+  - AWAITING_ACTION is stateful: _moved_this_turn + _acted_this_turn flags
+    drive CT cost at end_turn(). declare_moved / declare_acted flip the flags.
+
+FOIL HOOK POINTS (WIRED NEXT SESSION AT EARLIEST):
+  - battle_started signal — will drive FOILTracker.begin_battle()
+  - turn_started signal (player units only) — nothing yet, but Phase 3C's
+    record_action() gets called from the ability resolver on the ACT phase.
+  - battle_ended signal — will drive FOILTracker.commit_battle().
+  - DEFERRED: FOIL's one-character-at-a-time tracker design doesn't fit a
+    3-unit party cleanly. Two options under consideration:
+      (a) Refactor FOILTracker to hold a Dictionary of active battles
+          keyed by character name; begin/commit per-unit.
+      (b) Track the party as a single aggregate profile with a synthetic
+          party_id. Simpler but loses per-character adaptation.
+    Defer this decision to Phase 6 so we don't churn FOIL before Phase 3B/3C
+    exist to consume it.
+
+INPUT BINDINGS (TESTING ONLY, REPLACED IN 3B/3C):
+  - SPACE = end current unit's turn
+  - W     = wait + end turn (always CT_COST_WAIT)
+  - M     = flag "moved this turn" (stub — Phase 3B replaces with real path exec)
+  - A     = flag "acted this turn" (stub — Phase 3C replaces with ability UI)
+
+DESIGN NOTES / OPEN DECISIONS:
+  - CTR numbers (thresholds, costs) are first-pass. Needs Phase 10 tuning
+    with the full roster. One risk to watch: White Mage (SPD 8) vs Rogue
+    (SPD 14) means Rogue acts ~1.75x as often. If healing feels
+    under-available, tune Cure power up before touching SPD.
+  - Turn queue preview count is @export var on the manager (default 6).
+    If the HUD gets busy, drop to 4 or split into "this turn / next turn"
+    panels later.
+  - Auto-end for enemy turns is a TEMPORARY behavior. When Phase 3C lands,
+    replace with a minimal enemy AI that picks a legal action and commits.
+
+NEXT SESSION: Phase 3B — Movement & Pathfinding.
+  Targets:
+    - A* pathfinder on GridMap respecting walkability, jump/elevation,
+      and occupancy (no unit passthrough per CD ruling).
+    - Move-range preview on TURN_START → highlight all reachable tiles
+      in MOVE_RANGE color.
+    - Click a highlighted tile → tween unit along path, tile-by-tile.
+      On arrival: declare_moved(), clear highlights, return to AWAITING_ACTION.
+    - Move-range excludes tiles the unit's jump can't reach.
+    - Update GridMap.set_occupant() on arrival so subsequent move/action
+      checks see the new position.
+  Does not yet include: ability targeting, ability resolution, AI movement
+  decisions (those come in 3C).
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 5 (Phase 3B: Movement & Pathfinding)
+==========================================================================
+
+STATUS: Phase 3B complete. Click-to-move with reachable-tile preview, A*
+        pathfinding respecting jump/elevation/occupancy, tile-by-tile
+        animation with facing-toward-step rotation. Ready for Phase 3C.
+
+FILES ADDED:
+
+scripts/movement/
+  pathfinder.gd        — class_name Pathfinder. Static utility. Two public
+                         methods:
+                         • reachable_tiles(grid, unit) → Dictionary
+                             Dijkstra from unit.coord within unit.move_range
+                             budget. Returns Vector2i → float cost-to-reach.
+                             Start tile excluded (no move = no move).
+                         • find_path(grid, unit, goal) → Array[Vector2i]
+                             A* with manhattan heuristic. Returns full path
+                             including start and goal, or [] if unreachable.
+                         Walkability predicate enforces:
+                           - terrain walkable
+                           - occupancy: blocked by any unit except self
+                             (Creative ruling: no pass-through, allies OR foes)
+                           - no object on tile
+                           - jump tolerance on height delta between steps
+                         Internal "array of dicts sorted by min" queue — fine
+                         at 12x12 scale; will swap to binary heap if maps
+                         grow past ~50x50.
+  move_controller.gd   — class_name MoveController extends Node. Orchestrates
+                         the MOVE phase:
+                           turn_started (player, haven't moved) → show preview
+                           tile_clicked on reachable tile        → execute path
+                           move completes                         → declare_moved
+                           turn_ended / battle_ended              → clear preview
+                         Public API: bind(grid, viz, turn_mgr), execute_move
+                         (AI entry — no UI), is_preview_tile(coord),
+                         is_previewing(), is_executing().
+                         Step duration 0.14s per tile, sine ease-in-out,
+                         optional face-toward-step rotation.
+
+Scene + main wiring:
+  - scenes/main.tscn adds MoveController (Node with script).
+  - scripts/main.gd
+      * @onready _move_controller and calls its bind() in _ready.
+      * Hover/unhover handlers now check is_preview_tile(coord):
+          - Reachable tile hovered → PATH color (bright green)
+          - Reachable tile unhovered → MOVE_RANGE color (restored)
+          - Non-reachable tile → standard HOVER / NONE behavior
+        Fixes the visual decay where hovering a preview tile would
+        overwrite MOVE_RANGE and unhover would clear to NONE.
+      * Removed stub_move (M) input — movement is real now. SPACE still
+        ends turn; W waits; A still stub-acts until 3C.
+      * _unhandled_input blocks turn-ending input during move tweens
+        (is_executing() gate) so SPACE mid-animation can't rotate turns
+        before the current move commits.
+  - move_controller defensively re-checks turn_manager.get_active_unit()
+    before calling declare_moved() post-animation, as a second line of
+    defense against the same mid-tween turn-rotation scenario.
+
+MOVE PHASE UX (PER-CLICK):
+  1. Player unit's turn starts → reachable tiles light up MOVE_RANGE (soft blue).
+  2. Hover a reachable tile → that tile switches to PATH (bright green).
+     Other reachable tiles stay blue. Non-reachable tiles show HOVER on hover.
+  3. Left-click a reachable tile → preview clears, unit walks the A* path.
+     Each step ~0.14s, sine ease. Facing rotates toward the step direction.
+  4. On arrival: grid occupancy updates (cleared at start, set at end),
+     unit state → IDLE, turn_manager.declare_moved() fires.
+  5. Player still in AWAITING_ACTION — can still Act (stub), Wait, or end turn.
+
+PATHFINDER RULES (CONTRACT):
+  - Movement cost floats (grass 1.0, forest 1.5, mountain 2.0) summed per
+    step; total must be ≤ unit.move_range (int). No partial-cost rounding —
+    a Rogue with MOVE 5 can enter 3 forest tiles (3×1.5 = 4.5), not a 4th
+    (6.0). Feels correct tactically.
+  - Jump applies PER STEP (not cumulative): stepping from height 0 → height 1
+    requires jump ≥ 1 each time. A unit with jump 1 on a 3-step staircase
+    can climb it; on a wall it cannot.
+  - Unit's own starting tile is always considered passable (so it can LEAVE
+    itself) but never in the reachable set (no "staying put" dressed up as
+    a move).
+
+INPUT BINDINGS NOW:
+  - Left-click highlighted tile = move there
+  - SPACE = end turn
+  - W     = wait + end (always CT_COST_WAIT)
+  - A     = stub declare_acted (replaced by ability UI in 3C)
+  - Input blocked during move animation
+
+EDGE CASES HANDLED:
+  - Click during animation → ignored (is_executing gate in _on_tile_clicked).
+  - SPACE during animation → ignored (main.gd._unhandled_input gate).
+  - Unit dies mid-animation (shouldn't happen without AOE ticking, but
+    defensive) → declare_moved skipped because active_unit check fails.
+  - Path-to-goal has only one step (adjacent move) → animates one hop.
+
+AI USAGE (PHASE 3C):
+  - move_controller.execute_move(unit, goal_coord) is the AI entry.
+    Same path execution machinery, no preview UI. Will be called from the
+    enemy AI stub in 3C after it picks a destination.
+
+DESIGN NOTES / DEFERRED:
+  - No path-preview-along-route (showing the full route highlighted as the
+    player hovers). Roadmap only required "Highlight reachable tiles"; this
+    is polish. Single-tile PATH hover is a compromise that reads clearly.
+  - No terrain-cost-aware move-range display (e.g., "forest costs 2, this
+    is your furthest point on flat ground"). Current MOVE_RANGE color is
+    binary: reachable or not. A future gradient (spend-1, spend-2, etc.)
+    would help players plan around forests. Deferred to polish pass.
+  - Pathfinder queue is an unsorted array with linear-scan min extraction.
+    Good enough at 12×12. If we go past ~50×50 maps, swap to a binary heap.
+
+NEXT SESSION: Phase 3C — Battle / Ability Resolution.
+  Targets:
+    - Ability UI: select a skill from the active unit's kit → show valid
+      target tiles (in ATTACK_RANGE color) given the skill's range/shape.
+    - Click a valid target → resolve damage / heal / buff.
+    - Facing modifiers (Front 0.75x / Side 1.0x / Rear 1.5x, backstab stacks).
+    - Floating damage/heal numbers above target on impact.
+    - Enemy AI stub.
+    - FOIL integration: route player actions through FOILTracker.record_action.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 6 (Phase 3C: Battle & Ability Resolution)
+==========================================================================
+
+STATUS: Phase 3C complete. Full combat loop is live — player can select a
+        skill, target a unit, resolve damage/heal with facing modifiers,
+        see floating numbers, and the battle ends on last-enemy kill.
+        Enemy AI acts and moves toward players. FOIL records each player
+        action per-character via the v2 tracker refactor.
+
+FOIL TRACKER REFACTOR (v1 → v2):
+  Problem: v1 held ONE active battle via _current_battle + _battle_active,
+  but an Alpha party has 3 characters all acting in one battle.
+  Solution: _current_battles Dictionary keyed by StringName(character_name).
+  API changes:
+    - begin_battle(character_name, job, foil_level)       — same shape, now
+                                                            callable N times
+                                                            per battle
+    - record_action(character_name, skill_name, ...)      — character_name added
+    - commit_battle(character_name, turn_count, victory)  — character_name added
+    - commit_all_battles(turn_count, victory)             — new convenience
+    - abort_battle(character_name), abort_all_battles()   — split from single-abort
+    - has_character_battle(name)                          — idempotency check
+  Save format bumped: version 2 in save_to_dict(); v1 loads still work since
+  battle_history schema is unchanged.
+
+FILES ADDED THIS SESSION:
+
+scripts/battle/
+  targeting.gd        — class_name Targeting. Static.
+                        valid_anchors(grid, caster, skill, all_units) returns
+                        the Vector2i list of legal skill anchor coords given
+                        range, target_type, team hostility, and alive-status.
+                        Does NOT expand AoE — the resolver does that.
+                        expand_area(skill, anchor, grid) handles SINGLE /
+                        CROSS / SQUARE / RADIUS / LINE shapes.
+  ability_resolver.gd — class_name AbilityResolver. Static.
+                        resolve(caster, skill, anchor, grid, units, turn_num)
+                        → Dictionary describing what happened. Mutates
+                        target.stats directly; floating text, FOIL logging,
+                        and audio are the caller's responsibility.
+                        Facing modifiers as CD specified (0.75 / 1.0 / 1.5).
+                        Backstab stacks: rear + requires_rear_for_bonus =
+                        1.5 × 2.0 = 3.0x the base stat.
+                        Damage formula: max(1, int(attacker_stat × power × facing)
+                                           − target_defense_stat).
+                        Returns effects[] array with per-target damage/heal/kill/side.
+  action_controller.gd — class_name ActionController extends Node. Mirror of
+                        MoveController in shape. State machine:
+                          IDLE → SELECTING_SKILL → SELECTING_TARGET → EXECUTING → IDLE
+                        Coordinates with MoveController: hides move preview
+                        when entering targeting, restores it on cancel_targeting
+                        (if unit still has move).
+                        Enemy entry: enemy_act_if_possible(unit) does a simple
+                        scoring pass (offensive on low-HP foe > healing low-HP
+                        ally > buff > nothing) and fires the same resolver.
+                        Checks turn_manager.check_outcome() after each resolve;
+                        ends battle immediately on killing blow so the victory
+                        banner doesn't wait for SPACE.
+                        Routes every player-side effect through
+                        FOILTracker.record_action with engagement_distance,
+                        caster/target coords, damage_dealt, was_kill, etc.
+                        All FOILActionRecord fields are one-hop from SkillData
+                        + Unit, no translator layer.
+
+scripts/ui/
+  ability_bar.gd       — class_name AbilityBar extends CanvasLayer. Populated
+                        per player-unit turn with one button per skill
+                        (greyed if unaffordable MP). Emits skill_selected.
+                        show_targeting(skill) dims non-selected buttons while
+                        waiting for the target click.
+  floating_text.gd    — class_name FloatingText extends Node3D. Label3D with
+                        billboard enabled so numbers stay readable after
+                        Q/E camera rotation. Tweens upward 1.2 world units
+                        over 1.0s, fade-out in the back half. static spawn()
+                        fire-and-forget factory.
+
+scenes/
+  ability_bar.tscn    — CanvasLayer + anchored bottom panel (buttons row +
+                        unit label + hint). unique_name_in_owner on the key
+                        refs so the script @onready-picks them cleanly.
+
+scripts/
+  main.gd rewrite     — Now binds all controllers in order (TurnHUD →
+                        MoveController → ActionController) and starts a FOIL
+                        battle record for each player unit before begin_battle.
+                        Enemy turns drive a simple brain: wait → try-act →
+                        move-toward-nearest-hostile → try-act-again → end_turn.
+                        All steps guarded against the unit dying or the
+                        battle ending mid-sequence via _still_this_unit_turn().
+                        Hover/unhover logic now respects three preview layers:
+                        ACTION target > MOVE preview > base HOVER.
+                        ESC bound to cancel_targeting.
+                        Commits every player-unit's FOIL record via
+                        commit_all_battles on battle_ended.
+
+scripts/turn/turn_manager.gd updates:
+  - Added monotonic _turn_number counter. Exposed via get_turn_number().
+    Used by FOIL routing. (The CT-derived approximation I had earlier was
+    wrong because CT resets each turn.)
+  - Added check_outcome() — re-evaluates win/lose synchronously. Action
+    controller calls it after damage resolves so killing blows end the
+    battle immediately instead of waiting for end_turn.
+
+scripts/movement/move_controller.gd updates:
+  - hide_preview() — public clear. Action controller calls it when entering
+    target selection so clicks don't ambiguously hit both systems.
+  - refresh_preview() — re-shows preview for the active unit if they still
+    have move available. Called by action controller after canceling
+    targeting or after a successful act-before-move.
+  - execute_move is now awaitable (has `await _execute_path`) so the enemy
+    AI can sequence: `await execute_move(goal)` → try to act again.
+
+COMBAT FLOW (PLAYER TURN):
+  1. Turn starts → ability bar populates with skills, move preview shows.
+  2. Player either:
+     a) Clicks a blue tile → walk there, preview clears. Ability bar stays.
+     b) Clicks an ability button → preview clears, ATTACK_RANGE highlights.
+        - Hover target → TARGET color, damage/kill feedback visible.
+        - Click target → resolve, floating numbers, FOIL record. If unit
+          hasn't moved, move preview re-opens automatically.
+        - ESC or right-click → cancel targeting, skill menu reopens, move
+          preview restored.
+  3. Player ends turn with SPACE or W (Wait). Facing stays as-is (explicit
+     facing-picker UI is still stubbed — Phase 4/5 adds a real picker).
+
+COMBAT FLOW (ENEMY TURN):
+  1. Turn starts → camera pans, think-delay (0.4s).
+  2. enemy_act_if_possible: score each skill × each valid anchor; pick the
+     highest-scoring pair. Offense on low-HP foe > heal low-HP ally > buff >
+     nothing. If any pair scores > 0, resolve it.
+  3. If move unspent, find the reachable tile closest to the nearest hostile,
+     walk there.
+  4. After move, re-run enemy_act_if_possible — we may now be in range.
+  5. end_turn().
+
+FACING MODIFIERS (TUNING KNOBS):
+  const FRONT_MOD = 0.75   (AbilityResolver)
+  const FLANK_MOD = 1.0
+  const REAR_MOD  = 1.5
+  Backstab rear_bonus_multiplier = 2.0 in SkillLibrary, stacks to 3.0x when
+  fired from the rear (1.5 × 2.0). Front attacks still land (no miss chance
+  for Alpha per CD Q2). Damage floor = 1 so a heavy-armor fight doesn't
+  deadlock.
+
+STATUS EFFECTS (INTENTIONALLY STUBBED):
+  - BUFF and DEBUFF skills resolve to a buff_label in the result but do NOT
+    apply a real stat modifier yet. The floating text reads "PROTECT!" /
+    "STEAL" / etc. so the feedback loop exists.
+  - Full StatusEffect system (stat mods, durations, visual badges, stack
+    rules) is scoped to Phase 4/5. When it lands, AbilityResolver will grow
+    a fourth skill_type branch that writes to a status_effects list on the
+    target.
+
+FOIL INTEGRATION STATE:
+  - begin_battle fires for every PLAYER unit in main._ready, so records
+    are open from turn 1.
+  - record_action fires for every player-unit effect inside
+    ActionController._record_foil_actions.
+  - commit_all_battles fires on battle_ended in main.gd.
+  - Every FOILActionRecord field is populated: damage, was_kill, was_hit
+    (always true for Alpha), engagement_distance (manhattan), caster/target
+    coords, turn_number, targeted_ally (inverted hostility), skill_category
+    via SkillData.foil_category().
+  - NOT YET wired: FOILAnalyzer + FOILLoadoutBuilder at battle SETUP
+    (that's Phase 6 "FOIL Integration Hooks"). The tracker is recording;
+    the loadout-influence loop closes in Phase 6.
+
+DESIGN NOTES / DEFERRED:
+  - AoE preview highlighting — hovering a skill's target tile could
+    preview the full AoE fan. Skipped for Alpha (no AoE skills yet). Easy
+    to add via Targeting.expand_area(skill, hover_coord, grid).
+  - Damage prediction tooltip on target hover — polish. Post-Alpha.
+  - Skill ordering / grouping in the ability bar — all skills flat for
+    now; will need categories (Basic / Weapon / Magic / Support) once
+    kits grow past ~5.
+  - Facing-picker UI — CD wants explicit choose-your-facing at end of
+    turn, non-negotiable. Currently turn keeps current facing. Phase 4
+    adds the 4-button picker since End Game UX fits the same HUD work.
+
+NEXT SESSION: Phase 4 — End Game Conditions (+ facing picker).
+  Targets:
+    - Explicit Victory / Defeat overlay with a basic summary: turns taken,
+      damage dealt, abilities used by each player unit.
+    - Retry button (Producer call deferred; useful for test iteration).
+    - Facing-picker UI overlay: during CHOOSING_FACING phase, show four
+      arrow buttons around the active unit; click one to set facing and
+      close the turn.
+    - Also a good spot to surface FOIL profile summary in a corner panel
+      so we can see profile data building between battles.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 7 (Phase 4: End Game + Facing Picker)
+==========================================================================
+
+STATUS: Phase 4 complete. Every end-turn (normal OR Wait) now routes
+        through the facing-picker modal per CD's "non-negotiable" spec.
+        Victory/Defeat/Draw pops a full battle summary modal with
+        per-unit stat lines and Retry / Quit. Enemy AI auto-faces the
+        nearest threat before ending its turn.
+
+TURN MANAGER API SPLIT (end-turn flow):
+  Old: end_turn() was a single call that blasted through CHOOSING_FACING
+       as a transient phase and committed.
+  New:
+    end_turn()            → enters CHOOSING_FACING; UI drives the pick.
+    wait_and_end_turn()   → same but clears move/act flags first (Wait CT cost).
+    confirm_end_turn()    → called by facing picker after set_facing; commits.
+    cancel_end_turn()     → back to AWAITING_ACTION; picker dismiss on ESC.
+    end_turn_immediate()  → skip facing picker entirely (enemy AI path).
+  _commit_turn_end() is the single private pipeline that handles CT deduction,
+  turn_ended emission, outcome check, and advance — every public path funnels
+  through it.
+
+FILES ADDED:
+
+scripts/ui/
+  facing_picker.gd      — class_name FacingPicker extends CanvasLayer.
+                          Listens for phase_changed; shows the modal when
+                          CHOOSING_FACING fires for a PLAYER unit. Enemy
+                          units bypass (they call end_turn_immediate).
+                          Compass layout (N/E/S/W) + center label in a
+                          3x3 GridContainer. Current facing is highlighted
+                          brighter; dimmed alternatives show the player
+                          where they already face ("keep this" = one click).
+                          ESC routes to turn_manager.cancel_end_turn;
+                          button click routes to set_facing + confirm_end_turn.
+  battle_summary.gd     — class_name BattleSummary extends CanvasLayer.
+                          Called from main.gd on battle_ended. Displays:
+                          • Outcome banner (Victory / Defeat / Draw), color-tinted
+                          • Turn count
+                          • Per-unit rows (team-colored header):
+                              "Dmg dealt X | Dmg taken Y | Actions Z | Kills K"
+                              "Most used: <skill> × N"
+                          • Retry button (reload scene; FOIL persists via
+                            autoload so the rolling window survives Retry)
+                          • Quit button (get_tree().quit())
+
+scenes/
+  facing_picker.tscn    — CanvasLayer layer=2. Dim ColorRect fills viewport
+                          and absorbs clicks (default mouse_filter=STOP) so
+                          grid doesn't receive input while picker open.
+                          Panel centered with compass grid + hint line.
+  battle_summary.tscn   — CanvasLayer layer=3. Same dim-absorb pattern.
+                          Modal panel 720×520. Two-column Player / Enemy
+                          stat lists. Retry / Quit buttons centered below.
+
+UNIT STAT TRACKING (for the summary):
+  Added to Unit:
+    total_damage_dealt: int       (accumulated via record_action_stats)
+    total_damage_taken: int       (accumulated in take_damage)
+    actions_taken: int
+    kills_scored: int
+    skill_usage_counts: Dictionary (StringName → int)
+  ActionController._record_caster_stats() runs per-cast, aggregates the
+  effects[] array into one record_action_stats call on the caster.
+  Stats reset when Unit is re-initialized (scene reload on Retry hands
+  fresh stats to freshly-spawned units).
+
+MAIN.GD WIRING:
+  - Instances FacingPicker and BattleSummary via PackedScene ExtResource.
+  - Binds FacingPicker to the turn manager on _ready.
+  - Connects BattleSummary retry/quit buttons to _on_retry_pressed
+    (get_tree().reload_current_scene) and _on_quit_pressed (get_tree().quit).
+  - Guards _unhandled_input against firing while phase==CHOOSING_FACING:
+    SPACE and W become no-ops, ESC is owned by the picker.
+  - Enemy turn handler: before calling end_turn_immediate, calls
+    unit.face_toward(nearest_hostile.coord). Keeps enemies from ending
+    comically exposed.
+  - _on_battle_ended commits FOIL for all player units, then shows the
+    summary modal with the real turn counter.
+
+RETRY SEMANTICS:
+  get_tree().reload_current_scene() destroys every node in the main scene
+  (grid, units, controllers, UI) and re-instances from the .tscn.
+  FOILTracker is an AUTOLOAD so its battle_history survives the reload —
+  exactly the cross-battle persistence the "3 consecutive battles" success
+  criterion requires. Fresh Unit instances start with zeroed per-battle
+  stats and full HP/MP.
+
+FACING PICKER UX:
+  1. Player presses SPACE → turn_manager.end_turn() → phase = CHOOSING_FACING.
+  2. FacingPicker._on_phase_changed → _show(active_unit).
+     Compass modal appears with current facing highlighted.
+  3. Player clicks a direction button → unit.set_facing(f) →
+     turn_manager.confirm_end_turn() → _commit_turn_end() → advance.
+  4. Or: player clicks ESC → cancel_end_turn → phase back to AWAITING_ACTION.
+     Picker hides on phase_changed. Player can still Move / Act.
+  5. Wait (W) → wait_and_end_turn() → clears move/act flags → same picker
+     flow, but CT cost will be CT_COST_WAIT (60, the "stall is cheap" knob).
+
+ENEMY AUTO-FACING:
+  After acting + moving + try-acting-again, the enemy picks the nearest
+  hostile unit and face_toward(threat.coord) before end_turn_immediate().
+  Simple but keeps rear-attack bonuses from being trivial to exploit —
+  player can still flank, but not by just walking around a dumb enemy.
+
+BUFF / DEBUFF STATUS — STILL STUBBED:
+  AbilityResolver writes buff_label into the effects[] dict and the floating
+  text surfaces "PROTECT!" / "STEAL" etc., but no actual stat modifiers
+  are applied. Full StatusEffect system is Phase 5 material:
+    - Unit.status_effects: Array[StatusEffect]
+    - stat accessors (effective_defense) sum base + active effects
+    - duration ticks on turn_ended
+    - visual badges near HP bar
+  This lets the Alpha playtest validate the FEEDBACK LOOP (I cast Protect,
+  it animates, I see text) without blocking on status-effect tuning.
+
+HUD STACKING:
+  - TurnHUD        (CanvasLayer default layer 1)
+  - AbilityBar     (layer 1)
+  - FacingPicker   (layer 2)     — dims viewport; catches clicks
+  - BattleSummary  (layer 3)     — dims harder; catches clicks
+  Each modal's dim ColorRect has default mouse_filter=STOP, so clicks during
+  a modal cannot leak to the grid / underlying UI.
+
+KNOWN GAPS / DEFERRED POLISH:
+  - TurnHUD's own Victory/Defeat banner still fires on battle_ended and is
+    visible at the screen edges behind the BattleSummary's dim layer. Low
+    priority — summary's 60% dim mostly hides it. Clean up by hiding the
+    whole TurnHUD on battle_ended in a future polish pass.
+  - No sound on summary popup / button presses — audio system post-Alpha.
+  - No "continue campaign" path — only Retry or Quit. Fine for Alpha since
+    there's only one battle.
+  - The FacingPicker doesn't visualize a world-space arrow around the unit
+    itself (FFTA authentic would place 3D arrows around the unit's tile).
+    Screen-centered modal is simpler and still reads.
+
+NEXT SESSION: Phase 5 — Debug System.
+  Per CD: modular + extensible. Key pieces:
+    - DebugManager autoload — any system can register commands + panels.
+    - Debug overlay toggled by backtick: Tile Inspector, Unit Inspector,
+      Turn Order / CT readout, Grid Coord overlay.
+    - In-game console: `heal <unit> <amount>`, `damage`, `kill`, `spawn`,
+      `foil_level`, `foil_profile`, `win`, `lose`, `move`, `next_turn`.
+    - Persistent debug log with filterable categories (combat, movement,
+      FOIL, system).
+    - Extensibility contract: register_command(name, callable, desc),
+      add_panel(name, control), log(category, text). New systems register
+      without editing debug code itself.
+  Also: this unlocks real FOIL-profile visibility, which is a nice handshake
+  before Phase 6 wires the loadout builder.

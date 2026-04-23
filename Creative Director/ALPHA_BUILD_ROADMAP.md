@@ -9,11 +9,11 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 
 ## Prerequisites (Complete Before Alpha Work Begins)
 - [x] FOIL System — Chunks 1–3 (enums, action record, battle record, profile, tracker)
-- [ ] FOIL System — Chunk 4: `foil_analyzer.gd` *(scheduled: tomorrow)*
-- [ ] FOIL System — Chunk 5: `foil_loadout_builder.gd` *(scheduled: tomorrow)*
-- [ ] FOIL System — Chunk 6: Integration notes & log update *(scheduled: tomorrow)*
+- [x] FOIL System — Chunk 4: `foil_analyzer.gd`
+- [x] FOIL System — Chunk 5: `foil_loadout_builder.gd`
+- [x] FOIL System — Chunk 6: Integration notes & log update
 
-> **Once FOIL is wrapped, Alpha begins.**
+> **Once FOIL is wrapped, Alpha begins.** ✅ Alpha work has begun.
 
 ---
 
@@ -31,10 +31,10 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 
 ---
 
-## Phase 1 — The Board (Grid & Camera)
+## Phase 1 — The Board (Grid & Camera) ✅ COMPLETE
 *If the stage isn't built, nobody can perform.*
 
-### 1A: Isometric Grid Tile System
+### 1A: Isometric Grid Tile System ✅ DONE (Alpha Session 1)
 - Tile-based grid map — isometric 2.5D presentation
 - Tiles should be data-driven: each tile holds properties (type, elevation, walkable, occupant)
 - Support for **elevation differences** (even if just 2–3 height levels for Alpha)
@@ -43,7 +43,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 - Grid coordinate system that all other systems reference (movement, targeting, pathfinding)
 - **Stretch:** Basic terrain cost differences (normal, rough/slow, impassable)
 
-### 1B: Camera System (FFTA-Style)
+### 1B: Camera System (FFTA-Style) ✅ DONE (Alpha Session 2)
 - Isometric camera with **4-point rotation** (90° snaps: NE, SE, SW, NW) — exactly like FFTA
 - Rotation input: shoulder buttons / Q+E / designated keys
 - Camera should re-sort or re-render tile/unit draw order correctly after each rotation
@@ -53,7 +53,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 
 ---
 
-## Phase 2 — The Pieces (Units & Jobs)
+## Phase 2 — The Pieces (Units & Jobs) ✅ DONE (Alpha Session 3)
 *Three jobs. Three distinct play-feels. That's enough to prove the system.*
 
 ### General Unit Framework
@@ -102,7 +102,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 ## Phase 3 — The Rules (Turn System, Movement, & Battle)
 *This is the heartbeat. If the turn loop doesn't feel right, nothing else matters.*
 
-### 3A: Turn System
+### 3A: Turn System ✅ DONE (Alpha Session 4)
 - **Turn order** based on Speed stat (CTR countdown or initiative queue)
 - Each unit's turn consists of: **Move → Act → Face → End Turn** (in that order, any can be skipped)
   - Move: Select a tile within movement range. Pathfinding respects elevation/jump and terrain.
@@ -113,7 +113,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 - **Wait** option: Skip remaining actions and end turn immediately (still must choose facing)
 - Display turn order queue on screen (even just a text list for Alpha — who's next matters to the player)
 
-### 3B: Movement & Pathfinding
+### 3B: Movement & Pathfinding ✅ DONE (Alpha Session 5)
 - A* pathfinding on the grid, accounting for:
   - Tile walkability
   - Elevation and unit's Jump stat
@@ -121,7 +121,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 - Highlight reachable tiles when unit is selected to move
 - Movement animates unit across path tile-by-tile (even at placeholder level — don't teleport, it kills readability)
 
-### 3C: Battle / Action Resolution
+### 3C: Battle / Action Resolution ✅ DONE (Alpha Session 6)
 - Ability use: select ability → show valid targets/range → select target → resolve
 - Damage formula (starting point, subject to tuning):
   - `Physical Damage = Attack × Ability Power − Target Defense` (with facing modifier)
@@ -134,7 +134,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 
 ---
 
-## Phase 4 — End Game Conditions
+## Phase 4 — End Game Conditions ✅ DONE (Alpha Session 7)
 *A battle without stakes is just moving pieces around a board.*
 
 ### Win Conditions (Alpha)
@@ -233,18 +233,18 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 
 ## Suggested Build Order
 
-| Priority | System | Depends On | Owner |
-|----------|--------|-----------|-------|
-| 🔴 1 | Grid Tile System (data + rendering) | Nothing | Programming Lead |
-| 🔴 2 | Camera System (FFTA rotation) | Grid | Programming Lead |
-| 🔴 3 | Unit Base Class + 3 Jobs | Grid (for placement) | Programming Lead + Creative Director (stat review) |
-| 🔴 4 | Turn System (turn order, move/act/face/end loop) | Grid + Units | Programming Lead |
-| 🔴 5 | Movement + Pathfinding | Grid + Turn System | Programming Lead |
-| 🔴 6 | Battle / Ability Resolution | Units + Turn System | Programming Lead |
-| 🔴 7 | End Game Conditions | Battle System | Programming Lead |
-| 🟡 8 | Debug System (overlay, console, log) | All above (to inspect them) | Programming Lead |
-| 🟡 9 | FOIL Integration Hooks | FOIL System + Battle System | Programming Lead |
-| 🟢 10 | Tuning Pass (damage values, move ranges, speed, facing modifiers) | Everything functional | Creative Director + QA Lead |
+| Priority | System | Status | Depends On | Owner |
+|----------|--------|--------|-----------|-------|
+| 🔴 1 | Grid Tile System (data + rendering) | ✅ Done (S1) | Nothing | Programming Lead |
+| 🔴 2 | Camera System (FFTA rotation) | ✅ Done (S2) | Grid | Programming Lead |
+| 🔴 3 | Unit Base Class + 3 Jobs | ✅ Done (S3) | Grid (for placement) | Programming Lead + Creative Director (stat review) |
+| 🔴 4 | Turn System (turn order, move/act/face/end loop) | ✅ Done (S4) | Grid + Units | Programming Lead |
+| 🔴 5 | Movement + Pathfinding | ✅ Done (S5) | Grid + Turn System | Programming Lead |
+| 🔴 6 | Battle / Ability Resolution | ✅ Done (S6) | Units + Turn System | Programming Lead |
+| 🔴 7 | End Game Conditions | ✅ Done (S7) | Battle System | Programming Lead |
+| 🟡 8 | Debug System (overlay, console, log) | ⏭️ Next | All above (to inspect them) | Programming Lead |
+| 🟡 9 | FOIL Integration Hooks | ⏭️ | FOIL System + Battle System | Programming Lead |
+| 🟢 10 | Tuning Pass (damage values, move ranges, speed, facing modifiers) | ⏭️ | Everything functional | Creative Director + QA Lead |
 
 > 🔴 = Critical Path | 🟡 = High Priority | 🟢 = Polish / Balance
 
@@ -263,16 +263,16 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 
 ## Success Criteria
 Alpha is **done** when:
-- [ ] A player can start a battle on a grid map
-- [ ] Camera rotates in 4 directions, FFTA-style
-- [ ] 3 units per side, each with distinct jobs (Rogue, Squire, White Mage)
-- [ ] Units take turns based on speed
-- [ ] Units can move, use an ability, choose facing, and end their turn
-- [ ] Damage, healing, and buffs resolve correctly with facing modifiers
-- [ ] A battle can be won or lost
-- [ ] FOIL system records player actions and influences enemy setup
+- [~] A player can start a battle on a grid map *(grid + camera done; spawn & battle loop pending)*
+- [x] Camera rotates in 4 directions, FFTA-style
+- [x] 3 units per side, each with distinct jobs (Rogue, Squire, White Mage)
+- [x] Units take turns based on speed
+- [x] Units can move, use an ability, choose facing, and end their turn *(facing picker modal enforces a pick on every end-turn and Wait)*
+- [x] Damage, healing, and buffs resolve correctly with facing modifiers *(buffs currently log-only; full StatusEffect system is Phase 5+)*
+- [x] A battle can be won or lost *(end-of-battle summary screen with Retry / Quit)*
+- [~] FOIL system records player actions and influences enemy setup *(record_action live per-unit; loadout influence is Phase 6)*
 - [ ] Debug tools allow inspection of all systems
-- [ ] A tester can play 3 consecutive battles and see FOIL adaptation shift enemy loadouts
+- [~] A tester can play 3 consecutive battles and see FOIL adaptation shift enemy loadouts *(Retry loop in place; loadout influence hookup is Phase 6)*
 
 ---
 

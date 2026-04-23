@@ -1,0 +1,225 @@
+class_name CameraRig extends Node3D
+## FFTA-style isometric camera rig.
+##
+## Structure: this node is the PIVOT. A Camera3D child is positioned at a
+## local offset (height + distance) and pitched downward. Rotating THIS node
+## around Y orbits the camera around the focus point, keeping the same
+## isometric angle. The camera itself is never rotated directly.
+##
+## Features:
+##   - 4-point rotation in 90° snaps (NE, SE, SW, NW), eased over ~0.2s.
+##   - Bounded orthographic zoom on mouse wheel / page keys.
+##   - set_focus(world_pos) with optional tween — used later by the turn
+##     system to follow the active unit.
+##   - Action bindings are registered at runtime, so the project file doesn't
+##     need hand-edited InputMap serialization (fragile to author by hand).
+
+
+## --- Signals -----------------------------------------------------------------
+signal rotation_changed(index: int)        # 0..3
+signal zoom_changed(ortho_size: float)
+signal focus_changed(world_position: Vector3)
+
+
+## --- Config ------------------------------------------------------------------
+@export var camera: Camera3D
+@export var focus_height_offset: float = 0.0
+
+@export_group("Rotation")
+## Y-rotation at index 0. 45° puts corner 0 at NE (FFTA-style diagonal),
+## each Q/E step adds/subtracts 90°.
+@export var initial_rotation_degrees: float = 45.0
+@export var rotation_tween_duration: float = 0.22
+
+@export_group("Zoom")
+@export var zoom_min: float = 8.0
+@export var zoom_max: float = 28.0
+@export var zoom_step: float = 1.5
+@export var default_zoom: float = 16.0
+@export var zoom_tween_duration: float = 0.1
+
+@export_group("Focus")
+@export var focus_tween_duration: float = 0.25
+
+
+## --- State (runtime) ---------------------------------------------------------
+var _rotation_index: int = 0
+## Continuous target so crossing 360° tweens the short way (+90 keeps going).
+var _target_y_degrees: float = 0.0
+
+var _rotation_tween: Tween = null
+var _focus_tween: Tween = null
+var _zoom_tween: Tween = null
+
+
+# =============================================================================
+# LIFECYCLE
+# =============================================================================
+
+func _ready() -> void:
+	_register_input_actions()
+
+	_target_y_degrees = initial_rotation_degrees
+	rotation_degrees = Vector3(0, _target_y_degrees, 0)
+
+	if camera != null:
+		camera.size = default_zoom
+		camera.current = true
+
+
+# =============================================================================
+# ROTATION
+# =============================================================================
+
+func rotate_left() -> void:
+	_rotate_by_step(-1)
+
+
+func rotate_right() -> void:
+	_rotate_by_step(1)
+
+
+func _rotate_by_step(delta: int) -> void:
+	_rotation_index = posmod(_rotation_index + delta, 4)
+	_target_y_degrees += float(delta) * 90.0
+
+	if _rotation_tween != null and _rotation_tween.is_running():
+		_rotation_tween.kill()
+	_rotation_tween = create_tween()
+	_rotation_tween.set_ease(Tween.EASE_OUT)
+	_rotation_tween.set_trans(Tween.TRANS_CUBIC)
+	_rotation_tween.tween_property(
+		self, "rotation_degrees:y",
+		_target_y_degrees,
+		rotation_tween_duration,
+	)
+
+	rotation_changed.emit(_rotation_index)
+
+
+func get_rotation_index() -> int:
+	return _rotation_index
+
+
+# =============================================================================
+# FOCUS / FOLLOW
+# =============================================================================
+
+## Move the pivot to a new world position. When the turn system lands, call
+## this with the active unit's world position at turn start.
+func set_focus(world_position: Vector3, instant: bool = false) -> void:
+	var target: Vector3 = world_position + Vector3(0, focus_height_offset, 0)
+
+	if instant:
+		global_position = target
+		focus_changed.emit(target)
+		return
+
+	if _focus_tween != null and _focus_tween.is_running():
+		_focus_tween.kill()
+	_focus_tween = create_tween()
+	_focus_tween.set_ease(Tween.EASE_OUT)
+	_focus_tween.set_trans(Tween.TRANS_CUBIC)
+	_focus_tween.tween_property(self, "global_position", target, focus_tween_duration)
+	_focus_tween.finished.connect(func(): focus_changed.emit(target))
+
+
+# =============================================================================
+# ZOOM
+# =============================================================================
+
+func zoom_in() -> void:
+	_change_zoom(-zoom_step)
+
+
+func zoom_out() -> void:
+	_change_zoom(zoom_step)
+
+
+func _change_zoom(delta: float) -> void:
+	if camera == null:
+		return
+	var new_size: float = clampf(camera.size + delta, zoom_min, zoom_max)
+	if is_equal_approx(new_size, camera.size):
+		return
+
+	if _zoom_tween != null and _zoom_tween.is_running():
+		_zoom_tween.kill()
+	_zoom_tween = create_tween()
+	_zoom_tween.set_ease(Tween.EASE_OUT)
+	_zoom_tween.tween_property(camera, "size", new_size, zoom_tween_duration)
+
+	zoom_changed.emit(new_size)
+
+
+# =============================================================================
+# INPUT
+# =============================================================================
+
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("camera_rotate_left"):
+		rotate_left()
+		return
+	if event.is_action_pressed("camera_rotate_right"):
+		rotate_right()
+		return
+
+	# Mouse wheel handled directly — not worth spinning up an InputMap entry.
+	if event is InputEventMouseButton and event.pressed:
+		match event.button_index:
+			MOUSE_BUTTON_WHEEL_UP:
+				zoom_in()
+			MOUSE_BUTTON_WHEEL_DOWN:
+				zoom_out()
+
+
+# =============================================================================
+# INPUT ACTION REGISTRATION
+# =============================================================================
+
+## Register default bindings for camera rotation. Running at runtime (not
+## editor-time) keeps project.godot's [input] section tidy — and the actions
+## are idempotent if they already exist.
+func _register_input_actions() -> void:
+	_ensure_action("camera_rotate_left", [
+		_key_event(KEY_Q),
+		_joy_button_event(JOY_BUTTON_LEFT_SHOULDER),
+	])
+	_ensure_action("camera_rotate_right", [
+		_key_event(KEY_E),
+		_joy_button_event(JOY_BUTTON_RIGHT_SHOULDER),
+	])
+
+
+static func _ensure_action(action: StringName, events: Array) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	for e in events:
+		# Avoid duplicating bindings on hot reload.
+		var already := false
+		for existing in InputMap.action_get_events(action):
+			if existing.get_class() == e.get_class() and _event_keys_match(existing, e):
+				already = true
+				break
+		if not already:
+			InputMap.action_add_event(action, e)
+
+
+static func _key_event(keycode: int) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.keycode = keycode
+	return ev
+
+
+static func _joy_button_event(button: int) -> InputEventJoypadButton:
+	var ev := InputEventJoypadButton.new()
+	ev.button_index = button
+	return ev
+
+
+static func _event_keys_match(a: InputEvent, b: InputEvent) -> bool:
+	if a is InputEventKey and b is InputEventKey:
+		return (a as InputEventKey).keycode == (b as InputEventKey).keycode
+	if a is InputEventJoypadButton and b is InputEventJoypadButton:
+		return (a as InputEventJoypadButton).button_index == (b as InputEventJoypadButton).button_index
+	return false
