@@ -187,3 +187,107 @@ NEXT SESSION (recommendation, not locked):
   - Write a headless test harness under scripts/foil/tests/ that drives the
       tracker → analyzer → builder flow with a scripted set of fake battles
       and snapshots the output — catches regressions when we retune.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 1 (Phase 1A: Grid Tile System)
+==========================================================================
+
+STATUS: Godot project initialized. Phase 1A code-complete.
+        Phase 1B (camera rotation) not started.
+
+PROJECT SCAFFOLDING (NEW THIS SESSION):
+  - project.godot at repo root. Godot 4.6, Forward+ renderer, MSAA x2.
+      Main scene: res://scenes/main.tscn
+      Autoload: FOILTracker (res://scripts/foil/foil_tracker.gd) — global as `FOILTracker`
+  - .gitignore (excludes .godot/, import cache, editor junk)
+  - scenes/main.tscn — Node3D root scene with DirectionalLight, WorldEnvironment,
+      isometric orthographic Camera3D, and a GridVisualizer child.
+
+FILES ADDED TO scripts/grid/ (5 total):
+  1. grid_enums.gd        — TerrainType + HighlightState enums. Single source of
+                             truth for terrain color, walkability, movement cost,
+                             damage-per-turn lookups. World-space constants
+                             (TILE_WORLD_SIZE, HEIGHT_STEP, FLOOR_THICKNESS).
+  2. grid_tile.gd         — Resource. Per-tile data: coord, height, terrain,
+                             walkable_override, occupant_id (StringName so grid
+                             stays decoupled from the Unit class that's coming),
+                             highlight_state. Helpers: is_walkable(),
+                             top_world_position(), mesh_center_position(),
+                             mesh_height(). Serializes via to_dict/from_dict.
+  3. grid_map.gd          — Resource. Owns the 2D array of GridTile. Queries:
+                             get_tile, is_in_bounds, neighbors, tiles_in_range,
+                             find_occupant, can_step_between (for jump/elevation).
+                             Emits tile_changed + occupancy_changed signals.
+  4. grid_visualizer.gd   — Node3D. Reads a GridMap and renders each tile as a
+                             BoxMesh column with a StandardMaterial3D colored
+                             by terrain. Tile-sized Area3D on each tile for
+                             mouse raycast picking. Emits tile_hovered /
+                             tile_unhovered / tile_clicked. Shared material
+                             cache so N identical tiles = 1 material alloc.
+                             Highlight overlays are transparent QuadMesh siblings
+                             laying flat above each tile's top surface.
+  5. alpha_test_map.gd    — Factory for the standard Alpha battlefield:
+                             12×12 grass baseline, central 3×3 STONE hill at
+                             (5,5)..(7,7) elevated one step, two 3-tile FOREST
+                             patches on the west, 3-tile WATER pond top-right
+                             to sanity-check impassable terrain. Also owns
+                             player/enemy spawn points so the battle scene
+                             doesn't drift out of sync with the map.
+
+ENTRY SCRIPT:
+  - scripts/main.gd — Builds the test map, hands it to the visualizer, wires up
+      hover = HOVER highlight, unhover = NONE, click = print tile info to console.
+      Kept intentionally thin; battle/turn wiring is Phases 3-4.
+
+COORDINATE / RENDERING CONVENTIONS (locked in):
+  - Grid coord is Vector2i(x, y). +X = east, +Y = south (screen-space-like).
+  - World axis mapping: world.x ← grid.x, world.z ← grid.y, world.y = up.
+  - 1 grid unit = 1 world unit. HEIGHT_STEP = 0.3 world units per elevation step.
+  - A unit at (x, y, h) stands at world (x, h * HEIGHT_STEP, y).
+  - Every downstream system (movement, camera, skill range) MUST read these
+      constants from grid_enums.gd. Do not hardcode.
+
+ANSWERS TO CD OPEN QUESTIONS (Tech Director rulings):
+  - Q1 (turn order): RECOMMEND CTR countdown (FFTA style). Locks in authentic
+      feel the brief asks for, and lets Speed stat behave monotonically without
+      the "my 11-speed unit got two turns before your 10-speed" weirdness an
+      initiative queue has. Implementation complexity is marginal.
+      NOT yet implemented — Phase 3 work.
+  - Q2 (hit/miss): Agreed, all-hit for Alpha. We can slot a HitResolver module
+      later without touching existing skill code.
+  - Q3 (unit passthrough): Adopted. GridTile.is_walkable() already returns false
+      for any occupied tile, so pathfinding will respect this for free.
+  - Q5 (map size): Adopted (12×12, central 3×3 hill). See alpha_test_map.gd.
+  - Q4 (retry on defeat), Q6 (party size 3v3): Noted but no code implication yet.
+
+IN SCOPE NEXT SESSION — Phase 1B: Camera System (FFTA rotation)
+  - 4-point orthographic rotation (NE/SE/SW/NW, 90° snaps) on shoulder button / Q+E.
+  - Short tween between positions (0.2s ease-out) for readability.
+  - Bounded zoom via Camera3D.size.
+  - Camera follows the currently active unit on their turn (stubbed until turn
+      system lands — for now, just center-of-grid).
+  - Sort/render order: orthographic camera + 3D tiles auto-sorts correctly, so
+      no draw-order hack needed (Unity 2D had this pain; Godot 3D doesn't).
+
+DEPENDENCIES STILL OUTSTANDING FOR ALPHA:
+  - Unit base class + 3 job definitions (Phase 2)
+  - Turn system (Phase 3A)
+  - Pathfinding (Phase 3B — straightforward A* once unit jump stat exists)
+  - Battle resolution (Phase 3C)
+  - Win/lose conditions (Phase 4)
+  - Debug overlay framework (Phase 5 — Creative wants this modular/registerable)
+  - Full FOIL integration hooks (Phase 6 — BattleManager needed first)
+
+NOTES ON GODOT-VS-UNITY PORTING TRADEOFFS (for future reference):
+  - Old C# reference files under Assets/Scripts/ are not wired into the new
+      project. They remain as design reference only. Do not import.
+  - Unity's SpriteRenderer.sortingOrder hack is replaced by Godot's 3D depth
+      sort + orthographic camera. Keeps tile draw order automatic even after
+      camera rotation.
+  - ScriptableObject → Resource with @export vars. Autoload replaces Unity's
+      DontDestroyOnLoad singleton pattern — already used for FOILTracker.
+
+NEXT SESSION: Phase 1B (camera rotation + zoom + follow-active-unit stub).
+           Target: end of session, player can spin the camera with Q/E and zoom
+           with scroll, and the grid reads cleanly from every angle.
