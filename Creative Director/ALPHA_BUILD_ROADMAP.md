@@ -53,7 +53,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 
 ---
 
-## Phase 2 — The Pieces (Units & Jobs) 🚧 IN PROGRESS (Alpha Session 3)
+## Phase 2 — The Pieces (Units & Jobs) ✅ DONE (Alpha Session 3)
 *Three jobs. Three distinct play-feels. That's enough to prove the system.*
 
 ### General Unit Framework
@@ -102,7 +102,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 ## Phase 3 — The Rules (Turn System, Movement, & Battle)
 *This is the heartbeat. If the turn loop doesn't feel right, nothing else matters.*
 
-### 3A: Turn System
+### 3A: Turn System ✅ DONE (Alpha Session 4)
 - **Turn order** based on Speed stat (CTR countdown or initiative queue)
 - Each unit's turn consists of: **Move → Act → Face → End Turn** (in that order, any can be skipped)
   - Move: Select a tile within movement range. Pathfinding respects elevation/jump and terrain.
@@ -113,7 +113,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 - **Wait** option: Skip remaining actions and end turn immediately (still must choose facing)
 - Display turn order queue on screen (even just a text list for Alpha — who's next matters to the player)
 
-### 3B: Movement & Pathfinding
+### 3B: Movement & Pathfinding ⏭️ NEXT
 - A* pathfinding on the grid, accounting for:
   - Tile walkability
   - Elevation and unit's Jump stat
@@ -237,9 +237,9 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 |----------|--------|--------|-----------|-------|
 | 🔴 1 | Grid Tile System (data + rendering) | ✅ Done (S1) | Nothing | Programming Lead |
 | 🔴 2 | Camera System (FFTA rotation) | ✅ Done (S2) | Grid | Programming Lead |
-| 🔴 3 | Unit Base Class + 3 Jobs | 🚧 In Progress (S3) | Grid (for placement) | Programming Lead + Creative Director (stat review) |
-| 🔴 4 | Turn System (turn order, move/act/face/end loop) | ⏭️ Next | Grid + Units | Programming Lead |
-| 🔴 5 | Movement + Pathfinding | ⏭️ | Grid + Turn System | Programming Lead |
+| 🔴 3 | Unit Base Class + 3 Jobs | ✅ Done (S3) | Grid (for placement) | Programming Lead + Creative Director (stat review) |
+| 🔴 4 | Turn System (turn order, move/act/face/end loop) | ✅ Done (S4) | Grid + Units | Programming Lead |
+| 🔴 5 | Movement + Pathfinding | ⏭️ Next | Grid + Turn System | Programming Lead |
 | 🔴 6 | Battle / Ability Resolution | ⏭️ | Units + Turn System | Programming Lead |
 | 🔴 7 | End Game Conditions | ⏭️ | Battle System | Programming Lead |
 | 🟡 8 | Debug System (overlay, console, log) | ⏭️ | All above (to inspect them) | Programming Lead |
@@ -265,9 +265,9 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 Alpha is **done** when:
 - [~] A player can start a battle on a grid map *(grid + camera done; spawn & battle loop pending)*
 - [x] Camera rotates in 4 directions, FFTA-style
-- [ ] 3 units per side, each with distinct jobs (Rogue, Squire, White Mage)
-- [ ] Units take turns based on speed
-- [ ] Units can move, use an ability, choose facing, and end their turn
+- [x] 3 units per side, each with distinct jobs (Rogue, Squire, White Mage)
+- [x] Units take turns based on speed
+- [~] Units can move, use an ability, choose facing, and end their turn *(phase flow + end-turn live; MOVE/ACT execution pending Phase 3B/3C)*
 - [ ] Damage, healing, and buffs resolve correctly with facing modifiers
 - [ ] A battle can be won or lost
 - [ ] FOIL system records player actions and influences enemy setup

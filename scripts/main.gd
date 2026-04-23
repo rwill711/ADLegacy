@@ -1,19 +1,28 @@
 extends Node3D
-## Alpha entry scene. Builds the grid, spawns the roster, and wires basic
-## hover/click feedback. Battle loop wiring belongs to Phase 3+.
+## Alpha entry scene. Builds the grid, spawns the roster, starts the battle,
+## wires hover/click feedback, and drives the camera from the active unit.
+##
+## Phase 3A scope: turn system is live but MOVE/ACT are stubs. SPACE ends
+## the current unit's turn. Enemy turns auto-end after a short delay so
+## the CT queue keeps rotating during manual testing.
 
 
 @export var log_tile_events: bool = true
+@export var enemy_auto_end_delay: float = 0.5  # seconds before enemies auto-end-turn
 
 @onready var _visualizer: GridVisualizer = $GridVisualizer
 @onready var _camera_rig: CameraRig = $CameraRig
 @onready var _unit_spawner: UnitSpawner = $UnitSpawner
 @onready var _units_root: Node3D = $Units
+@onready var _turn_manager: TurnManager = $TurnManager
+@onready var _turn_hud: TurnHUD = $TurnHUD
 
 var _grid: GridMap = null
 
 
 func _ready() -> void:
+	_register_battle_input_actions()
+
 	_grid = AlphaTestMap.build()
 	_visualizer.set_grid(_grid)
 
@@ -21,13 +30,86 @@ func _ready() -> void:
 	_visualizer.tile_unhovered.connect(_on_tile_unhovered)
 	_visualizer.tile_clicked.connect(_on_tile_clicked)
 
-	# Spawn the Alpha roster onto the grid.
-	_unit_spawner.spawn_alpha_roster(_grid, _units_root)
+	var units: Array = _unit_spawner.spawn_alpha_roster(_grid, _units_root)
 
-	# Center the camera on the grid. Later, the turn system replaces this with
-	# camera_rig.set_focus(active_unit.world_position) at each turn start.
 	_camera_rig.set_focus(_grid_center_world(_grid), true)
 
+	_turn_manager.turn_started.connect(_on_turn_started)
+	_turn_manager.battle_ended.connect(_on_battle_ended)
+
+	_turn_hud.bind_turn_manager(_turn_manager)
+
+	_turn_manager.begin_battle(units)
+
+
+# =============================================================================
+# INPUT
+# =============================================================================
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("end_turn"):
+		_turn_manager.end_turn()
+	elif event.is_action_pressed("wait_turn"):
+		_turn_manager.wait_and_end_turn()
+	elif event.is_action_pressed("stub_move"):
+		_turn_manager.declare_moved()
+	elif event.is_action_pressed("stub_act"):
+		_turn_manager.declare_acted()
+
+
+## Register testing-only input actions at runtime so project.godot stays
+## clean. Replaced by proper UI buttons when Phase 3B/3C add real MOVE/ACT.
+func _register_battle_input_actions() -> void:
+	_ensure_action("end_turn", KEY_SPACE)
+	_ensure_action("wait_turn", KEY_W)
+	_ensure_action("stub_move", KEY_M)
+	_ensure_action("stub_act", KEY_A)
+
+
+static func _ensure_action(action: StringName, keycode: int) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	# De-dupe binding on hot reload.
+	for existing in InputMap.action_get_events(action):
+		if existing is InputEventKey and (existing as InputEventKey).keycode == keycode:
+			return
+	var ev := InputEventKey.new()
+	ev.keycode = keycode
+	InputMap.action_add_event(action, ev)
+
+
+# =============================================================================
+# TURN-DRIVEN CAMERA + AI STUB
+# =============================================================================
+
+func _on_turn_started(unit: Unit) -> void:
+	_camera_rig.set_focus(unit.global_position)
+
+	# Phase 3A placeholder: enemies don't have AI yet, so we auto-end their
+	# turn so the CT queue keeps rotating during testing. Replace in Phase 3C
+	# when we wire up actual enemy decision-making.
+	if unit.team != UnitEnums.Team.PLAYER:
+		_auto_end_enemy_turn(unit)
+
+
+func _auto_end_enemy_turn(unit: Unit) -> void:
+	var tween := get_tree().create_tween()
+	tween.tween_interval(enemy_auto_end_delay)
+	tween.tween_callback(func():
+		# Guard against the unit dying or the battle ending mid-delay.
+		if _turn_manager.get_active_unit() == unit \
+		and _turn_manager.get_phase() == TurnEnums.TurnPhase.AWAITING_ACTION:
+			_turn_manager.wait_and_end_turn()
+	)
+
+
+func _on_battle_ended(outcome: int) -> void:
+	print("[battle] ended with outcome=%d" % outcome)
+
+
+# =============================================================================
+# TILE INPUT FEEDBACK (from Phase 1A, unchanged)
+# =============================================================================
 
 func _grid_center_world(map: GridMap) -> Vector3:
 	return Vector3(
@@ -57,8 +139,10 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 	if tile.occupant_id != &"":
 		var u := _unit_spawner.get_unit(tile.occupant_id)
 		if u != null:
-			occupant_info = " occupant=%s(%s hp=%d/%d)" % [
-				u.unit_id, u.display_name, u.stats.hp, u.stats.max_hp
+			occupant_info = " occupant=%s(%s hp=%d/%d ct=%d)" % [
+				u.unit_id, u.display_name,
+				u.stats.hp, u.stats.max_hp,
+				_turn_manager.get_ct(u.unit_id),
 			]
 	print("[tile %s] terrain=%d height=%d walkable=%s button=%d%s" % [
 		coord, int(tile.terrain), tile.height, tile.is_walkable(),

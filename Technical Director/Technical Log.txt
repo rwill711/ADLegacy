@@ -507,3 +507,137 @@ NEXT SESSION: Phase 3A — Turn System.
     - Turn-order queue visible on HUD (even as a plain Label list for Alpha).
   Phase 3B (pathfinding + tween along path) comes right after — it's the
   piece that lets "Move" actually work on the grid.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 4 (Phase 3A: Turn System)
+==========================================================================
+
+STATUS: Phase 3A complete. CTR countdown live, phase state machine live,
+        HUD renders active unit + turn queue + phase indicator.
+        MOVE and ACT still stubbed — Phase 3B/3C will execute them.
+
+FILES ADDED:
+
+scripts/turn/
+  turn_enums.gd       — TurnPhase (TICKING, TURN_START, AWAITING_ACTION,
+                        CHOOSING_FACING, TURN_ENDING, BATTLE_OVER).
+                        BattleOutcome (ONGOING, PLAYER_VICTORY, PLAYER_DEFEAT, DRAW).
+                        CT constants: CT_ACTION_THRESHOLD = 100,
+                        CT_COST_WAIT=60, CT_COST_MOVED_ONLY/ACTED_ONLY=80,
+                        CT_COST_FULL_TURN=100. CT_MAX = 999.
+  turn_manager.gd     — Node. Owns CT table, active unit, phase. Signals:
+                        battle_started, battle_ended, turn_started,
+                        turn_ended, phase_changed, queue_updated.
+                        Public API: begin_battle(units), end_battle(outcome),
+                        declare_moved(), declare_acted(), end_turn(),
+                        wait_and_end_turn(), get_active_unit(), get_phase(),
+                        get_ct(unit_id), predict_turn_queue(count).
+
+scripts/ui/
+  turn_hud.gd         — class_name TurnHUD extends CanvasLayer. Subscribes
+                        to all TurnManager signals. Renders:
+                          • Active-unit panel (top-left): name tinted by team,
+                            HP/MP/SPD readout.
+                          • Phase indicator (top-center): "Move / Act / Wait",
+                            "Choose Facing", etc.
+                          • Turn queue panel (right): top 6 predicted turns,
+                            each entry colored by team.
+                          • Victory/Defeat/Draw banner on battle end.
+                        Uses unique_name_in_owner for @onready lookups.
+
+scenes/turn_hud.tscn  — CanvasLayer with Control-hierarchy panels. All three
+                        panel anchors are set so the HUD lays out cleanly
+                        across window sizes without a theme.
+
+scene / main changes:
+  scenes/main.tscn    — Added TurnManager Node and an instanced TurnHUD
+                        (loaded via PackedScene ExtResource so the HUD scene
+                        stays authorable in isolation).
+  scripts/main.gd     — Connects turn_started → camera_rig.set_focus for
+                        active-unit tracking. Binds the HUD to the turn
+                        manager, then calls begin_battle(units).
+                        Registers runtime input actions: SPACE = end_turn,
+                        W = wait_and_end_turn, M = stub declare_moved,
+                        A = stub declare_acted. Replaced by UI in 3B/3C.
+                        Enemy turns auto-end after `enemy_auto_end_delay`
+                        seconds (default 0.5) so the CT queue keeps
+                        rotating during manual testing until AI lands.
+                        Guards the auto-end callback against unit death
+                        or battle end mid-delay.
+
+CTR COUNTDOWN MECHANICS (LOCKED FOR ALPHA):
+  - Every tick, each alive unit's CT += their SPEED stat.
+  - First unit across CT_ACTION_THRESHOLD (100) takes the turn.
+  - Tie-break order: higher SPD > spawn order (stable via _units list).
+  - CT is clamped to CT_MAX (999) so a forever-waiting unit can't runaway.
+  - After turn ends, CT is reduced by the cost of what the unit did:
+        Wait (no move, no act):   -60   (relatively cheap — stalling viable)
+        Moved only / Acted only:  -80
+        Moved AND Acted:         -100   (full turn cost)
+  - Rationale: punishing full-turn users mildly shifts CT pressure back to
+    slower/defensive characters. Creative wants tactical stall to be a real
+    option, not a trap — hence Wait cheaper than action.
+
+QUEUE PREDICTION:
+  - predict_turn_queue(N) runs the CT simulation forward N turns on a
+    duplicated CT table. Assumes full-turn cost for each predicted winner
+    (best-case fast rotation) since we can't know intent in advance.
+  - Re-emitted on every turn start + turn end via queue_updated(Array[Unit]).
+    HUD rebuilds the queue list on each emit — cheap for 6–10 entries.
+
+PHASE STATE MACHINE:
+  - phase_changed fires on every transition.
+  - Typical flow per turn:
+      TICKING → TURN_START → AWAITING_ACTION (reenters as move/act consumed)
+      → CHOOSING_FACING → TURN_ENDING → TICKING (or BATTLE_OVER)
+  - CHOOSING_FACING is a transient beat for Alpha (passes through). Phase 3C
+    will gate it on a real facing-picker UI since CD called facing
+    "non-negotiable for Alpha".
+  - AWAITING_ACTION is stateful: _moved_this_turn + _acted_this_turn flags
+    drive CT cost at end_turn(). declare_moved / declare_acted flip the flags.
+
+FOIL HOOK POINTS (WIRED NEXT SESSION AT EARLIEST):
+  - battle_started signal — will drive FOILTracker.begin_battle()
+  - turn_started signal (player units only) — nothing yet, but Phase 3C's
+    record_action() gets called from the ability resolver on the ACT phase.
+  - battle_ended signal — will drive FOILTracker.commit_battle().
+  - DEFERRED: FOIL's one-character-at-a-time tracker design doesn't fit a
+    3-unit party cleanly. Two options under consideration:
+      (a) Refactor FOILTracker to hold a Dictionary of active battles
+          keyed by character name; begin/commit per-unit.
+      (b) Track the party as a single aggregate profile with a synthetic
+          party_id. Simpler but loses per-character adaptation.
+    Defer this decision to Phase 6 so we don't churn FOIL before Phase 3B/3C
+    exist to consume it.
+
+INPUT BINDINGS (TESTING ONLY, REPLACED IN 3B/3C):
+  - SPACE = end current unit's turn
+  - W     = wait + end turn (always CT_COST_WAIT)
+  - M     = flag "moved this turn" (stub — Phase 3B replaces with real path exec)
+  - A     = flag "acted this turn" (stub — Phase 3C replaces with ability UI)
+
+DESIGN NOTES / OPEN DECISIONS:
+  - CTR numbers (thresholds, costs) are first-pass. Needs Phase 10 tuning
+    with the full roster. One risk to watch: White Mage (SPD 8) vs Rogue
+    (SPD 14) means Rogue acts ~1.75x as often. If healing feels
+    under-available, tune Cure power up before touching SPD.
+  - Turn queue preview count is @export var on the manager (default 6).
+    If the HUD gets busy, drop to 4 or split into "this turn / next turn"
+    panels later.
+  - Auto-end for enemy turns is a TEMPORARY behavior. When Phase 3C lands,
+    replace with a minimal enemy AI that picks a legal action and commits.
+
+NEXT SESSION: Phase 3B — Movement & Pathfinding.
+  Targets:
+    - A* pathfinder on GridMap respecting walkability, jump/elevation,
+      and occupancy (no unit passthrough per CD ruling).
+    - Move-range preview on TURN_START → highlight all reachable tiles
+      in MOVE_RANGE color.
+    - Click a highlighted tile → tween unit along path, tile-by-tile.
+      On arrival: declare_moved(), clear highlights, return to AWAITING_ACTION.
+    - Move-range excludes tiles the unit's jump can't reach.
+    - Update GridMap.set_occupant() on arrival so subsequent move/action
+      checks see the new position.
+  Does not yet include: ability targeting, ability resolution, AI movement
+  decisions (those come in 3C).
