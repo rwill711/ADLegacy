@@ -209,6 +209,9 @@ func _execute_skill(anchor: Vector2i) -> void:
 
 	_spawn_effect_visuals(caster, skill, result)
 
+	# Aggregate per-caster battle stats for the end-of-battle summary.
+	_record_caster_stats(caster, skill, result)
+
 	# Route each effect through FOIL for player-side casters.
 	if caster.team == UnitEnums.Team.PLAYER:
 		_record_foil_actions(caster, skill, result, turn_number)
@@ -352,6 +355,22 @@ func _spawn_effect_visuals(_caster: Unit, skill: SkillData, result: Dictionary) 
 		# landed. Not strictly necessary with the skill's own label, but a
 		# future polish pass can add a small caster-side toast.
 		var _ = skill  # reserved for future caster-side feedback
+
+
+# =============================================================================
+# BATTLE STATS AGGREGATION
+# =============================================================================
+
+static func _record_caster_stats(caster: Unit, skill: SkillData, result: Dictionary) -> void:
+	if caster == null or skill == null:
+		return
+	var total_damage: int = 0
+	var any_kill: bool = false
+	for effect in result["effects"]:
+		total_damage += int(effect["damage"])
+		if effect["was_kill"]:
+			any_kill = true
+	caster.record_action_stats(skill.skill_name, total_damage, any_kill)
 
 
 # =============================================================================

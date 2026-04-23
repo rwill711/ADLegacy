@@ -18,6 +18,8 @@ extends Node3D
 @onready var _move_controller: MoveController = $MoveController
 @onready var _action_controller: ActionController = $ActionController
 @onready var _ability_bar: AbilityBar = $AbilityBar
+@onready var _facing_picker: FacingPicker = $FacingPicker
+@onready var _battle_summary: BattleSummary = $BattleSummary
 
 
 var _grid: GridMap = null
@@ -46,6 +48,10 @@ func _ready() -> void:
 		_grid, _visualizer, _turn_manager, _unit_spawner,
 		_move_controller, _ability_bar, self
 	)
+	_facing_picker.bind_turn_manager(_turn_manager)
+
+	_battle_summary.retry_pressed.connect(_on_retry_pressed)
+	_battle_summary.quit_pressed.connect(_on_quit_pressed)
 
 	# Kick off FOIL battle records for every player unit up front, so even
 	# actions on the first turn land in the rolling window.
@@ -66,6 +72,11 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# Block turn input while any controller is mid-animation.
 	if _move_controller.is_executing() or _action_controller.is_executing():
+		return
+	# While the facing picker is driving CHOOSING_FACING, it owns ESC and
+	# the board — everything else is a no-op until the player confirms or
+	# cancels the end-turn.
+	if _turn_manager.get_phase() == TurnEnums.TurnPhase.CHOOSING_FACING:
 		return
 	if event.is_action_pressed("cancel_action"):
 		_action_controller.cancel_targeting()
@@ -133,7 +144,12 @@ func _run_enemy_turn(unit: Unit) -> void:
 					await get_tree().create_timer(enemy_think_delay).timeout
 
 	if _still_this_unit_turn(unit):
-		_turn_manager.end_turn()
+		# Auto-face toward the nearest remaining hostile so the enemy's back
+		# isn't comically exposed. Then end immediately — no picker for AI.
+		var threat: Unit = _nearest_hostile(unit)
+		if threat != null:
+			unit.face_toward(threat.coord)
+		_turn_manager.end_turn_immediate()
 
 
 ## Pick the reachable tile closest (manhattan) to the nearest hostile unit.
@@ -179,14 +195,37 @@ func _still_this_unit_turn(unit: Unit) -> bool:
 
 func _on_battle_ended(outcome: int) -> void:
 	print("[battle] ended with outcome=%d" % outcome)
-	# Commit every player-unit FOIL record at once. Retains whoever's data
-	# was in-flight into the rolling window for next session's analyzer.
-	var foil: Node = get_tree().root.get_node_or_null("FOILTracker")
-	if foil == null:
-		return
-	var was_victory: bool = outcome == TurnEnums.BattleOutcome.PLAYER_VICTORY
+
 	var turn_count: int = _turn_manager.get_turn_number()
-	foil.commit_all_battles(turn_count, was_victory)
+
+	# Commit every player-unit FOIL record. Dead units commit too — their
+	# action trail still informs the rolling-window profile even if the
+	# character perished. Full "death resets window" handling is a legacy
+	# system concern for later.
+	var foil: Node = get_tree().root.get_node_or_null("FOILTracker")
+	if foil != null:
+		var was_victory: bool = outcome == TurnEnums.BattleOutcome.PLAYER_VICTORY
+		foil.commit_all_battles(turn_count, was_victory)
+
+	# Surface the end-of-battle summary modal.
+	_battle_summary.show_summary(
+		outcome as TurnEnums.BattleOutcome,
+		turn_count,
+		_unit_spawner.get_all_units(),
+	)
+
+
+func _on_retry_pressed() -> void:
+	# Reload the whole battle scene. Units, stats, turn order — all rebuilt.
+	# The FOIL rolling window persists across reloads because FOILTracker is
+	# an autoload; that's exactly the "3 consecutive battles show FOIL
+	# adaptation" success criterion from the roadmap.
+	_battle_summary.hide_summary()
+	get_tree().reload_current_scene()
+
+
+func _on_quit_pressed() -> void:
+	get_tree().quit()
 
 
 # =============================================================================

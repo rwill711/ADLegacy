@@ -134,7 +134,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 
 ---
 
-## Phase 4 — End Game Conditions
+## Phase 4 — End Game Conditions ✅ DONE (Alpha Session 7)
 *A battle without stakes is just moving pieces around a board.*
 
 ### Win Conditions (Alpha)
@@ -241,8 +241,8 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 | 🔴 4 | Turn System (turn order, move/act/face/end loop) | ✅ Done (S4) | Grid + Units | Programming Lead |
 | 🔴 5 | Movement + Pathfinding | ✅ Done (S5) | Grid + Turn System | Programming Lead |
 | 🔴 6 | Battle / Ability Resolution | ✅ Done (S6) | Units + Turn System | Programming Lead |
-| 🔴 7 | End Game Conditions | ⏭️ Next | Battle System | Programming Lead |
-| 🟡 8 | Debug System (overlay, console, log) | ⏭️ | All above (to inspect them) | Programming Lead |
+| 🔴 7 | End Game Conditions | ✅ Done (S7) | Battle System | Programming Lead |
+| 🟡 8 | Debug System (overlay, console, log) | ⏭️ Next | All above (to inspect them) | Programming Lead |
 | 🟡 9 | FOIL Integration Hooks | ⏭️ | FOIL System + Battle System | Programming Lead |
 | 🟢 10 | Tuning Pass (damage values, move ranges, speed, facing modifiers) | ⏭️ | Everything functional | Creative Director + QA Lead |
 
@@ -267,12 +267,12 @@ Alpha is **done** when:
 - [x] Camera rotates in 4 directions, FFTA-style
 - [x] 3 units per side, each with distinct jobs (Rogue, Squire, White Mage)
 - [x] Units take turns based on speed
-- [~] Units can move, use an ability, choose facing, and end their turn *(move+act+end live; explicit facing-picker UI still stubbed — turn keeps current facing on end)*
-- [x] Damage, healing, and buffs resolve correctly with facing modifiers *(buffs currently log-only; full StatusEffect system is Phase 4/5)*
-- [x] A battle can be won or lost *(TurnManager.check_outcome fires win/lose banner)*
+- [x] Units can move, use an ability, choose facing, and end their turn *(facing picker modal enforces a pick on every end-turn and Wait)*
+- [x] Damage, healing, and buffs resolve correctly with facing modifiers *(buffs currently log-only; full StatusEffect system is Phase 5+)*
+- [x] A battle can be won or lost *(end-of-battle summary screen with Retry / Quit)*
 - [~] FOIL system records player actions and influences enemy setup *(record_action live per-unit; loadout influence is Phase 6)*
 - [ ] Debug tools allow inspection of all systems
-- [ ] A tester can play 3 consecutive battles and see FOIL adaptation shift enemy loadouts
+- [~] A tester can play 3 consecutive battles and see FOIL adaptation shift enemy loadouts *(Retry loop in place; loadout influence hookup is Phase 6)*
 
 ---
 

@@ -1,0 +1,146 @@
+class_name BattleSummary extends CanvasLayer
+## End-of-battle modal. Shows Victory / Defeat / Draw, a per-unit stat
+## breakdown (damage dealt, damage taken, actions, kills, top skill),
+## and Retry / Quit buttons.
+##
+## Pulls data from Unit instances directly — the ActionController already
+## aggregates stats there via record_action_stats().
+
+
+signal retry_pressed()
+signal quit_pressed()
+
+
+@onready var _root: Control = %Root
+@onready var _outcome_label: Label = %OutcomeLabel
+@onready var _turns_label: Label = %TurnsLabel
+@onready var _player_stats_box: VBoxContainer = %PlayerStatsBox
+@onready var _enemy_stats_box: VBoxContainer = %EnemyStatsBox
+@onready var _retry_button: Button = %RetryButton
+@onready var _quit_button: Button = %QuitButton
+
+
+func _ready() -> void:
+	_root.visible = false
+	_retry_button.pressed.connect(func(): retry_pressed.emit())
+	_quit_button.pressed.connect(func(): quit_pressed.emit())
+
+
+## Populate and show the summary for a finished battle.
+## `units` is every unit that participated (alive or dead).
+func show_summary(
+	outcome: TurnEnums.BattleOutcome,
+	turn_count: int,
+	units: Array
+) -> void:
+	_outcome_label.text = _outcome_text(outcome)
+	_outcome_label.modulate = _outcome_color(outcome)
+	_turns_label.text = "Battle length: %d turns" % turn_count
+
+	_clear_box(_player_stats_box)
+	_clear_box(_enemy_stats_box)
+
+	for unit in units:
+		if unit == null:
+			continue
+		var row := _build_unit_row(unit)
+		if unit.team == UnitEnums.Team.PLAYER:
+			_player_stats_box.add_child(row)
+		elif unit.team == UnitEnums.Team.ENEMY:
+			_enemy_stats_box.add_child(row)
+
+	_root.visible = true
+
+
+func hide_summary() -> void:
+	_root.visible = false
+
+
+# =============================================================================
+# ROW BUILDING
+# =============================================================================
+
+func _build_unit_row(unit: Unit) -> Control:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(0, 72)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	margin.add_child(vbox)
+
+	var header := Label.new()
+	var alive_tag: String = "" if unit.is_alive() else "  †"
+	header.text = "%s — %s%s  |  HP %d/%d" % [
+		unit.display_name,
+		unit.job.display_name if unit.job != null else "?",
+		alive_tag,
+		unit.stats.hp, unit.stats.max_hp,
+	]
+	header.modulate = UnitEnums.team_color(unit.team)
+	header.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(header)
+
+	var stats_line := Label.new()
+	stats_line.text = "Dmg dealt %d  |  Dmg taken %d  |  Actions %d  |  Kills %d" % [
+		unit.total_damage_dealt,
+		unit.total_damage_taken,
+		unit.actions_taken,
+		unit.kills_scored,
+	]
+	stats_line.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(stats_line)
+
+	var top_skill_name: String = _top_skill_label(unit.skill_usage_counts)
+	if top_skill_name != "":
+		var skill_line := Label.new()
+		skill_line.text = "Most used: " + top_skill_name
+		skill_line.add_theme_font_size_override("font_size", 11)
+		skill_line.modulate = Color(1, 1, 1, 0.7)
+		vbox.add_child(skill_line)
+
+	return panel
+
+
+static func _top_skill_label(usage: Dictionary) -> String:
+	var best_name: String = ""
+	var best_count: int = 0
+	for name in usage:
+		var count: int = usage[name]
+		if count > best_count:
+			best_count = count
+			best_name = String(name)
+	if best_count == 0:
+		return ""
+	return "%s × %d" % [best_name, best_count]
+
+
+# =============================================================================
+# HELPERS
+# =============================================================================
+
+static func _outcome_text(outcome: TurnEnums.BattleOutcome) -> String:
+	match outcome:
+		TurnEnums.BattleOutcome.PLAYER_VICTORY: return "VICTORY"
+		TurnEnums.BattleOutcome.PLAYER_DEFEAT:  return "DEFEAT"
+		TurnEnums.BattleOutcome.DRAW:           return "DRAW"
+	return "BATTLE OVER"
+
+
+static func _outcome_color(outcome: TurnEnums.BattleOutcome) -> Color:
+	match outcome:
+		TurnEnums.BattleOutcome.PLAYER_VICTORY: return Color(0.7, 1.0, 0.7)
+		TurnEnums.BattleOutcome.PLAYER_DEFEAT:  return Color(1.0, 0.55, 0.55)
+		TurnEnums.BattleOutcome.DRAW:           return Color(1.0, 1.0, 0.75)
+	return Color.WHITE
+
+
+func _clear_box(box: VBoxContainer) -> void:
+	for child in box.get_children():
+		child.queue_free()

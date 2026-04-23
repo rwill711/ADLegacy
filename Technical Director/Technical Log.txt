@@ -956,3 +956,156 @@ NEXT SESSION: Phase 4 — End Game Conditions (+ facing picker).
       close the turn.
     - Also a good spot to surface FOIL profile summary in a corner panel
       so we can see profile data building between battles.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 7 (Phase 4: End Game + Facing Picker)
+==========================================================================
+
+STATUS: Phase 4 complete. Every end-turn (normal OR Wait) now routes
+        through the facing-picker modal per CD's "non-negotiable" spec.
+        Victory/Defeat/Draw pops a full battle summary modal with
+        per-unit stat lines and Retry / Quit. Enemy AI auto-faces the
+        nearest threat before ending its turn.
+
+TURN MANAGER API SPLIT (end-turn flow):
+  Old: end_turn() was a single call that blasted through CHOOSING_FACING
+       as a transient phase and committed.
+  New:
+    end_turn()            → enters CHOOSING_FACING; UI drives the pick.
+    wait_and_end_turn()   → same but clears move/act flags first (Wait CT cost).
+    confirm_end_turn()    → called by facing picker after set_facing; commits.
+    cancel_end_turn()     → back to AWAITING_ACTION; picker dismiss on ESC.
+    end_turn_immediate()  → skip facing picker entirely (enemy AI path).
+  _commit_turn_end() is the single private pipeline that handles CT deduction,
+  turn_ended emission, outcome check, and advance — every public path funnels
+  through it.
+
+FILES ADDED:
+
+scripts/ui/
+  facing_picker.gd      — class_name FacingPicker extends CanvasLayer.
+                          Listens for phase_changed; shows the modal when
+                          CHOOSING_FACING fires for a PLAYER unit. Enemy
+                          units bypass (they call end_turn_immediate).
+                          Compass layout (N/E/S/W) + center label in a
+                          3x3 GridContainer. Current facing is highlighted
+                          brighter; dimmed alternatives show the player
+                          where they already face ("keep this" = one click).
+                          ESC routes to turn_manager.cancel_end_turn;
+                          button click routes to set_facing + confirm_end_turn.
+  battle_summary.gd     — class_name BattleSummary extends CanvasLayer.
+                          Called from main.gd on battle_ended. Displays:
+                          • Outcome banner (Victory / Defeat / Draw), color-tinted
+                          • Turn count
+                          • Per-unit rows (team-colored header):
+                              "Dmg dealt X | Dmg taken Y | Actions Z | Kills K"
+                              "Most used: <skill> × N"
+                          • Retry button (reload scene; FOIL persists via
+                            autoload so the rolling window survives Retry)
+                          • Quit button (get_tree().quit())
+
+scenes/
+  facing_picker.tscn    — CanvasLayer layer=2. Dim ColorRect fills viewport
+                          and absorbs clicks (default mouse_filter=STOP) so
+                          grid doesn't receive input while picker open.
+                          Panel centered with compass grid + hint line.
+  battle_summary.tscn   — CanvasLayer layer=3. Same dim-absorb pattern.
+                          Modal panel 720×520. Two-column Player / Enemy
+                          stat lists. Retry / Quit buttons centered below.
+
+UNIT STAT TRACKING (for the summary):
+  Added to Unit:
+    total_damage_dealt: int       (accumulated via record_action_stats)
+    total_damage_taken: int       (accumulated in take_damage)
+    actions_taken: int
+    kills_scored: int
+    skill_usage_counts: Dictionary (StringName → int)
+  ActionController._record_caster_stats() runs per-cast, aggregates the
+  effects[] array into one record_action_stats call on the caster.
+  Stats reset when Unit is re-initialized (scene reload on Retry hands
+  fresh stats to freshly-spawned units).
+
+MAIN.GD WIRING:
+  - Instances FacingPicker and BattleSummary via PackedScene ExtResource.
+  - Binds FacingPicker to the turn manager on _ready.
+  - Connects BattleSummary retry/quit buttons to _on_retry_pressed
+    (get_tree().reload_current_scene) and _on_quit_pressed (get_tree().quit).
+  - Guards _unhandled_input against firing while phase==CHOOSING_FACING:
+    SPACE and W become no-ops, ESC is owned by the picker.
+  - Enemy turn handler: before calling end_turn_immediate, calls
+    unit.face_toward(nearest_hostile.coord). Keeps enemies from ending
+    comically exposed.
+  - _on_battle_ended commits FOIL for all player units, then shows the
+    summary modal with the real turn counter.
+
+RETRY SEMANTICS:
+  get_tree().reload_current_scene() destroys every node in the main scene
+  (grid, units, controllers, UI) and re-instances from the .tscn.
+  FOILTracker is an AUTOLOAD so its battle_history survives the reload —
+  exactly the cross-battle persistence the "3 consecutive battles" success
+  criterion requires. Fresh Unit instances start with zeroed per-battle
+  stats and full HP/MP.
+
+FACING PICKER UX:
+  1. Player presses SPACE → turn_manager.end_turn() → phase = CHOOSING_FACING.
+  2. FacingPicker._on_phase_changed → _show(active_unit).
+     Compass modal appears with current facing highlighted.
+  3. Player clicks a direction button → unit.set_facing(f) →
+     turn_manager.confirm_end_turn() → _commit_turn_end() → advance.
+  4. Or: player clicks ESC → cancel_end_turn → phase back to AWAITING_ACTION.
+     Picker hides on phase_changed. Player can still Move / Act.
+  5. Wait (W) → wait_and_end_turn() → clears move/act flags → same picker
+     flow, but CT cost will be CT_COST_WAIT (60, the "stall is cheap" knob).
+
+ENEMY AUTO-FACING:
+  After acting + moving + try-acting-again, the enemy picks the nearest
+  hostile unit and face_toward(threat.coord) before end_turn_immediate().
+  Simple but keeps rear-attack bonuses from being trivial to exploit —
+  player can still flank, but not by just walking around a dumb enemy.
+
+BUFF / DEBUFF STATUS — STILL STUBBED:
+  AbilityResolver writes buff_label into the effects[] dict and the floating
+  text surfaces "PROTECT!" / "STEAL" etc., but no actual stat modifiers
+  are applied. Full StatusEffect system is Phase 5 material:
+    - Unit.status_effects: Array[StatusEffect]
+    - stat accessors (effective_defense) sum base + active effects
+    - duration ticks on turn_ended
+    - visual badges near HP bar
+  This lets the Alpha playtest validate the FEEDBACK LOOP (I cast Protect,
+  it animates, I see text) without blocking on status-effect tuning.
+
+HUD STACKING:
+  - TurnHUD        (CanvasLayer default layer 1)
+  - AbilityBar     (layer 1)
+  - FacingPicker   (layer 2)     — dims viewport; catches clicks
+  - BattleSummary  (layer 3)     — dims harder; catches clicks
+  Each modal's dim ColorRect has default mouse_filter=STOP, so clicks during
+  a modal cannot leak to the grid / underlying UI.
+
+KNOWN GAPS / DEFERRED POLISH:
+  - TurnHUD's own Victory/Defeat banner still fires on battle_ended and is
+    visible at the screen edges behind the BattleSummary's dim layer. Low
+    priority — summary's 60% dim mostly hides it. Clean up by hiding the
+    whole TurnHUD on battle_ended in a future polish pass.
+  - No sound on summary popup / button presses — audio system post-Alpha.
+  - No "continue campaign" path — only Retry or Quit. Fine for Alpha since
+    there's only one battle.
+  - The FacingPicker doesn't visualize a world-space arrow around the unit
+    itself (FFTA authentic would place 3D arrows around the unit's tile).
+    Screen-centered modal is simpler and still reads.
+
+NEXT SESSION: Phase 5 — Debug System.
+  Per CD: modular + extensible. Key pieces:
+    - DebugManager autoload — any system can register commands + panels.
+    - Debug overlay toggled by backtick: Tile Inspector, Unit Inspector,
+      Turn Order / CT readout, Grid Coord overlay.
+    - In-game console: `heal <unit> <amount>`, `damage`, `kill`, `spawn`,
+      `foil_level`, `foil_profile`, `win`, `lose`, `move`, `next_turn`.
+    - Persistent debug log with filterable categories (combat, movement,
+      FOIL, system).
+    - Extensibility contract: register_command(name, callable, desc),
+      add_panel(name, control), log(category, text). New systems register
+      without editing debug code itself.
+  Also: this unlocks real FOIL-profile visibility, which is a nice handshake
+  before Phase 6 wires the loadout builder.

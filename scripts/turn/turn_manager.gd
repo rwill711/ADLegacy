@@ -96,46 +96,79 @@ func declare_acted() -> void:
 	_acted_this_turn = true
 
 
-## End the current unit's turn. If facing wasn't explicitly chosen, keeps
-## the existing facing. Handles CT cost + outcome check + next-turn advance.
+## End the current unit's turn. Transitions to CHOOSING_FACING and waits
+## for confirm_end_turn() — the facing-picker UI drives that call. If the
+## caller wants to bypass the picker (enemy AI, debug cheats, or test code),
+## they can call end_turn_immediate() instead.
+##
+## Per Creative Director: facing-at-end-of-turn is non-negotiable for Alpha,
+## so the default path is the picker flow.
 func end_turn() -> void:
 	if _phase == TurnEnums.TurnPhase.BATTLE_OVER:
 		return
 	if _active_unit == null:
 		return
-
-	# Facing phase is a transient beat for Alpha — the turn UI will later
-	# gate this on an actual facing pick. For now, just pass through.
 	_set_phase(TurnEnums.TurnPhase.CHOOSING_FACING)
+
+
+## Skip remaining actions and transition to CHOOSING_FACING with Wait CT cost.
+## Clears move/act flags so _ct_cost_for_turn returns CT_COST_WAIT.
+func wait_and_end_turn() -> void:
+	if _phase != TurnEnums.TurnPhase.AWAITING_ACTION:
+		return
+	_moved_this_turn = false
+	_acted_this_turn = false
+	_set_phase(TurnEnums.TurnPhase.CHOOSING_FACING)
+
+
+## Confirm the facing pick and commit the turn end. Called by the facing
+## picker UI after the player chooses a direction. Caller is responsible
+## for calling active_unit.set_facing(f) before this.
+func confirm_end_turn() -> void:
+	if _phase != TurnEnums.TurnPhase.CHOOSING_FACING:
+		return
+	if _active_unit == null:
+		return
+	_commit_turn_end()
+
+
+## Cancel a pending end-turn. Returns the unit to AWAITING_ACTION so they
+## can still move/act. Useful for ESC on the facing picker — player changed
+## their mind.
+func cancel_end_turn() -> void:
+	if _phase != TurnEnums.TurnPhase.CHOOSING_FACING:
+		return
+	_set_phase(TurnEnums.TurnPhase.AWAITING_ACTION)
+
+
+## Immediately end the turn without a facing pick — facing stays wherever
+## the caller set it. Used by enemy AI (which auto-faces before ending) and
+## by debug / end-of-battle cleanup paths.
+func end_turn_immediate() -> void:
+	if _phase == TurnEnums.TurnPhase.BATTLE_OVER:
+		return
+	if _active_unit == null:
+		return
+	_commit_turn_end()
+
+
+# Private: the actual CT-deduction + outcome-check + advance pipeline.
+# All public end-turn paths funnel here.
+func _commit_turn_end() -> void:
 	_set_phase(TurnEnums.TurnPhase.TURN_ENDING)
 
-	# Deduct CT based on what was done.
 	var cost: int = _ct_cost_for_turn()
 	var new_ct: int = maxi(0, _ct_table.get(_active_unit.unit_id, 0) - cost)
 	_ct_table[_active_unit.unit_id] = new_ct
 
 	turn_ended.emit(_active_unit)
 
-	# Check win/lose before advancing to avoid giving a turn to a dead unit.
 	var outcome := _evaluate_outcome()
 	if outcome != TurnEnums.BattleOutcome.ONGOING:
 		end_battle(outcome)
 		return
 
 	_advance_to_next_turn()
-
-
-## Skip remaining actions and end the turn immediately. Costs less CT so
-## "passing" isn't always worse than acting — tactical stall becomes viable.
-## (Creative-approved: Wait is a first-class option on the roadmap.)
-func wait_and_end_turn() -> void:
-	if _phase != TurnEnums.TurnPhase.AWAITING_ACTION:
-		return
-	# Clear action flags so the CT cost is CT_COST_WAIT regardless of what
-	# would have been selected mid-phase.
-	_moved_this_turn = false
-	_acted_this_turn = false
-	end_turn()
 
 
 # =============================================================================

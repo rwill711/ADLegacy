@@ -35,6 +35,16 @@ var facing: UnitEnums.Facing = UnitEnums.Facing.SOUTH
 var state: UnitEnums.UnitState = UnitEnums.UnitState.IDLE
 
 
+## --- Battle stats (for end-of-battle summary) -------------------------------
+## Accumulated over the course of a single battle. Reset when the unit is
+## re-initialized (which happens when the scene reloads on Retry).
+var total_damage_dealt: int = 0
+var total_damage_taken: int = 0
+var actions_taken: int = 0
+var kills_scored: int = 0
+var skill_usage_counts: Dictionary = {}  # StringName → int
+
+
 ## --- Visuals (built in _ready) ----------------------------------------------
 var _body_mesh: MeshInstance3D = null
 var _facing_arrow: MeshInstance3D = null
@@ -190,11 +200,27 @@ func take_damage(amount: int) -> int:
 	if stats == null:
 		return 0
 	var lost := stats.take_damage(amount)
+	total_damage_taken += lost
 	hp_changed.emit(stats.hp, stats.max_hp)
 	if not stats.is_alive():
 		set_state(UnitEnums.UnitState.DEFEATED)
 		defeated.emit()
 	return lost
+
+
+## Call when this unit is the caster of a successful action. Updates the
+## summary-screen counters. ActionController aggregates damage per effect
+## and passes the totals here.
+func record_action_stats(
+	skill_name: StringName,
+	damage_dealt: int,
+	kill_scored: bool
+) -> void:
+	actions_taken += 1
+	total_damage_dealt += damage_dealt
+	if kill_scored:
+		kills_scored += 1
+	skill_usage_counts[skill_name] = skill_usage_counts.get(skill_name, 0) + 1
 
 
 func heal(amount: int) -> int:

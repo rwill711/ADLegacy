@@ -1,0 +1,98 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/facing_picker.gd" id="1_fp"]
+
+[node name="FacingPicker" type="CanvasLayer"]
+layer = 2
+script = ExtResource("1_fp")
+
+[node name="Root" type="Control" parent="."]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Dim" type="ColorRect" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.45)
+
+[node name="Panel" type="PanelContainer" parent="Root"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -140.0
+offset_right = 180.0
+offset_bottom = 140.0
+
+[node name="Margin" type="MarginContainer" parent="Root/Panel"]
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 14
+
+[node name="Box" type="VBoxContainer" parent="Root/Panel/Margin"]
+theme_override_constants/separation = 10
+
+[node name="UnitLabel" type="Label" parent="Root/Panel/Margin/Box"]
+unique_name_in_owner = true
+horizontal_alignment = 1
+text = ""
+theme_override_font_sizes/font_size = 18
+
+[node name="Grid" type="GridContainer" parent="Root/Panel/Margin/Box"]
+columns = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="Spacer1" type="Control" parent="Root/Panel/Margin/Box/Grid"]
+custom_minimum_size = Vector2(80, 48)
+
+[node name="ButtonN" type="Button" parent="Root/Panel/Margin/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 48)
+text = "▲ N"
+theme_override_font_sizes/font_size = 20
+
+[node name="Spacer2" type="Control" parent="Root/Panel/Margin/Box/Grid"]
+custom_minimum_size = Vector2(80, 48)
+
+[node name="ButtonW" type="Button" parent="Root/Panel/Margin/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 48)
+text = "◀ W"
+theme_override_font_sizes/font_size = 20
+
+[node name="CenterLabel" type="Label" parent="Root/Panel/Margin/Box/Grid"]
+custom_minimum_size = Vector2(80, 48)
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "Face"
+theme_override_font_sizes/font_size = 14
+modulate = Color(1, 1, 1, 0.55)
+
+[node name="ButtonE" type="Button" parent="Root/Panel/Margin/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 48)
+text = "E ▶"
+theme_override_font_sizes/font_size = 20
+
+[node name="Spacer3" type="Control" parent="Root/Panel/Margin/Box/Grid"]
+custom_minimum_size = Vector2(80, 48)
+
+[node name="ButtonS" type="Button" parent="Root/Panel/Margin/Box/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 48)
+text = "▼ S"
+theme_override_font_sizes/font_size = 20
+
+[node name="Spacer4" type="Control" parent="Root/Panel/Margin/Box/Grid"]
+custom_minimum_size = Vector2(80, 48)
+
+[node name="HintLabel" type="Label" parent="Root/Panel/Margin/Box"]
+unique_name_in_owner = true
+horizontal_alignment = 1
+text = ""
+theme_override_font_sizes/font_size = 12
+modulate = Color(1, 1, 1, 0.75)
