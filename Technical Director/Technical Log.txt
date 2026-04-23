@@ -9,47 +9,55 @@ Key Points:
 Game is also rogue-like, with death being a main part used to push the story forward. The player will leave behind 'legacies' based on how much renown they accumulate (renown is detailed more in creative log). For example, if you are a great warrior and you 'retire' with a lot of renown, you might be able to establish a statue in a city and leave a piece of armor or a weapon at the location w/ a requirement for a certain amount of renown to remove it. The next character then has a 'Legacy' quest that can allow them to achieve just that. Characters with enough renown can also have 'legacy' characters that inherit specific skills, or have increased stats based on their predecessor. Almost like a New Game+ concept as it goes on. But the weapons and armor you unlock or forge will also be available to the CPU as time goes on, or a unique weapon you made might fall into the hands of the person who defeated you, which will then be able to be looted if you defeat them in the next life.
 
 ==========================================================================
-FOIL SYSTEM BUILD LOG — Session 2
+FOIL SYSTEM BUILD LOG — End of Session 2
 ==========================================================================
 
-STATUS: Chunks 1–3 of 6 complete.
+STATUS: Chunks 1–3 of 6 complete. Chunk 4 NOT started.
 
-COMPLETED:
-- ADR-003 written and committed (docs/adr/ADR-003-foil-system.md)
-- Chunk 2 — Core data structures committed to scripts/foil/:
-    - foil_enums.gd: FOIL levels (0-4), archetypes, skill categories, renown thresholds
-    - foil_action_record.gd: Single player action log (skill, target, position, outcome)
-    - foil_battle_record.gd: One battle's actions bundled together (one slot in rolling window)
-    - foil_profile.gd: Analyzed output — archetype weights, behavioral stats, trait tags, confidence
-- Chunk 3 — FOIL Tracker committed (scripts/foil/foil_tracker.gd):
-    - Autoload singleton, records actions during battle
-    - Rolling window of 12 battles, auto-trims oldest
-    - begin_battle() / record_action() / commit_battle() lifecycle
-    - save_to_dict() / load_from_dict() for persistence
-    - reset_history() on character death
+FILES COMMITTED TO scripts/foil/ (5 total):
+  1. foil_enums.gd         — Shared enums, constants, FOIL levels 0-4, renown thresholds
+  2. foil_action_record.gd — Data class for a single player action in battle
+  3. foil_battle_record.gd — Data class for one battle's worth of actions (one rolling window slot)
+  4. foil_profile.gd       — Analyzed output: archetype weights, behavioral stats, trait tags, confidence
+  5. foil_tracker.gd       — Autoload singleton: records actions, manages rolling window, save/load
 
-KEY DESIGN DECISIONS CONFIRMED WITH DIRECTOR:
-- FOIL tracks per-character (not global player). Each character builds own profile.
-- Party archetype label added at higher renown as secondary signal.
-- Rolling window of 10-12 battles. Old data drops out BUT permanent trait tags persist.
-- Trait tags come from titles/milestones (e.g., "Master Swordsman" → "melee_range_fighter").
-- Character death resets rolling window. Trait tags lost unless inherited via legacy.
-- FOIL level = renown-driven for free battles, mission-override for story battles.
-- Element/terrain interaction with FOIL is OUT OF SCOPE for v1 — build separately later.
+WHAT THESE DO TOGETHER:
+  - Tracker records every player action during battle via record_action()
+  - Battle lifecycle: begin_battle() → record_action() x N → commit_battle()
+  - Rolling window holds last 12 battles, auto-trims oldest
+  - Profile is the OUTPUT format that the Analyzer (Chunk 4) will populate
+  - Everything serializes via to_dict()/from_dict() for save files
 
-REMAINING CHUNKS:
-- Chunk 4: FOILAnalyzer (reads tracker + trait tags → builds FOILProfile)
-- Chunk 5: FOILLoadoutBuilder (consumes profile + FOIL level → builds enemy team)
-- Chunk 6: Update this log with final integration notes
+NOT YET BUILT (pick up next session):
+  - Chunk 4: foil_analyzer.gd — Reads tracker data + trait tags → builds FOILProfile
+      This is the BRAIN. Counts skill usage, calculates archetype weights,
+      derives behavioral stats (aggression, aoe_tendency, avg distance, etc.)
+  - Chunk 5: foil_loadout_builder.gd — Consumes FOILProfile + FOIL level → builds enemy team
+      This is the OUTPUT. Selects counter-jobs, counter-gear, consumables, AI hints.
+  - Chunk 6: Final integration notes and log update
 
-INTEGRATION NOTES (for when BattleManager is ported to GDScript):
-- BattleManager.start_battle() → FOILTracker.begin_battle()
-- BattleManager.execute_skill() → FOILTracker.record_action() after each player action
-- BattleManager.end_battle() → FOILTracker.commit_battle()
-- Battle setup phase → FOILAnalyzer.build_profile() → FOILLoadoutBuilder.build_enemy_team()
+KEY DESIGN DECISIONS (confirmed with Creative Director):
+  - FOIL tracks per-character, not global player. Each character builds own profile.
+  - Rolling window of 12 battles. Old data drops out BUT permanent trait tags persist.
+  - Trait tags come from titles/milestones (e.g., "Master Swordsman" → "melee_range_fighter").
+  - Character death resets rolling window. Trait tags lost unless inherited via legacy.
+  - FOIL level = renown-driven for free battles, mission-override for story battles.
+  - Party archetype label added at higher renown as secondary signal.
+  - Element/terrain interaction with FOIL is OUT OF SCOPE for v1.
 
-DEPENDENCIES / BLOCKERS:
-- Element system not yet built (not blocking FOIL v1, but needed for v2)
-- Equipment system not yet built (FOIL level 4 counter-gear needs this)
-- Trait tag assignment system not yet built (jobs/milestones need to emit tags)
-- AI behavior system not yet built (FOIL level 3 tactical adjustments need this)
+INTEGRATION HOOKS (for when BattleManager is ported to GDScript):
+  - BattleManager.start_battle()   → FOILTracker.begin_battle()
+  - BattleManager.execute_skill()  → FOILTracker.record_action() after each player action
+  - BattleManager.end_battle()     → FOILTracker.commit_battle()
+  - Battle setup phase             → FOILAnalyzer.build_profile() → FOILLoadoutBuilder.build_enemy_team()
+
+DEPENDENCIES / BLOCKERS (none block FOIL v1, all needed for full v2):
+  - Element system not yet built (needed for elemental counter-gear at FOIL 4)
+  - Equipment system not yet built (FOIL level 4 counter-gear needs this)
+  - Trait tag assignment system not yet built (jobs/milestones need to emit tags)
+  - AI behavior system not yet built (FOIL level 3 tactical adjustments need this)
+
+ADR:
+  - ADR-003 committed at docs/adr/ADR-003-foil-system.md
+
+NEXT SESSION: Start with Chunk 4 (foil_analyzer.gd), then Chunk 5 (foil_loadout_builder.gd).
