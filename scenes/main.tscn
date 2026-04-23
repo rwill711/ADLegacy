@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/grid/grid_visualizer.gd" id="2_grid_viz"]
+[ext_resource type="Script" path="res://scripts/camera/camera_rig.gd" id="3_cam_rig"]
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
@@ -21,8 +22,14 @@ transform = Transform3D(0.5, -0.75, 0.433, 0, 0.5, 0.866, -0.866, -0.433, 0.25, 
 light_energy = 1.1
 shadow_enabled = true
 
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735, 6, 14, 18)
+[node name="CameraRig" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 0, 5.5)
+script = ExtResource("3_cam_rig")
+camera = NodePath("Camera3D")
+initial_rotation_degrees = 45.0
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+transform = Transform3D(1, 0, 0, 0, 0.819, 0.574, 0, -0.574, 0.819, 0, 8.6, 12.3)
 projection = 1
 current = true
 size = 16.0

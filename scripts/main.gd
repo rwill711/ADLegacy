@@ -10,6 +10,7 @@ extends Node3D
 @export var log_tile_events: bool = true
 
 @onready var _visualizer: GridVisualizer = $GridVisualizer
+@onready var _camera_rig: CameraRig = $CameraRig
 
 
 func _ready() -> void:
@@ -19,6 +20,18 @@ func _ready() -> void:
 	_visualizer.tile_hovered.connect(_on_tile_hovered)
 	_visualizer.tile_unhovered.connect(_on_tile_unhovered)
 	_visualizer.tile_clicked.connect(_on_tile_clicked)
+
+	# Center the camera on the grid. Later, the turn system replaces this with
+	# camera_rig.set_focus(active_unit.world_position) at each turn start.
+	_camera_rig.set_focus(_grid_center_world(map), true)
+
+
+func _grid_center_world(map: GridMap) -> Vector3:
+	return Vector3(
+		(float(map.width) - 1.0) * 0.5 * GridEnums.TILE_WORLD_SIZE,
+		0.0,
+		(float(map.height) - 1.0) * 0.5 * GridEnums.TILE_WORLD_SIZE,
+	)
 
 
 func _on_tile_hovered(coord: Vector2i) -> void:

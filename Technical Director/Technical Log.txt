@@ -291,3 +291,85 @@ NOTES ON GODOT-VS-UNITY PORTING TRADEOFFS (for future reference):
 NEXT SESSION: Phase 1B (camera rotation + zoom + follow-active-unit stub).
            Target: end of session, player can spin the camera with Q/E and zoom
            with scroll, and the grid reads cleanly from every angle.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 2 (Phase 1B: Camera System)
+==========================================================================
+
+STATUS: Phase 1B complete. Phase 1 (The Board) fully done.
+        Ready to move to Phase 2 (Units & Jobs).
+
+FILES ADDED:
+  - scripts/camera/camera_rig.gd — FFTA-style pivot-rig camera. Pivot Node3D
+      at the focus point; Camera3D child orbits at a fixed isometric offset
+      (y ≈ 8.6, z ≈ 12.3) pitched −35°. Rotating the pivot around Y rotates
+      the view; the camera itself never changes orientation.
+  - scenes/main.tscn updated: replaced the standalone Camera3D with a
+      CameraRig → Camera3D hierarchy, NodePath-wired via the @export.
+
+CAPABILITIES IMPLEMENTED:
+  - 4-point rotation in 90° snaps (initial 45° → NE diagonal; Q/E step ±90°).
+      Cubic ease-out over 0.22s. Continuous-target pattern so crossing 360°
+      always tweens the short way.
+  - Orthographic zoom bounded to [8, 28] on the Camera3D.size property,
+      ±1.5 per mouse-wheel tick, 0.1s tween for a touch of smoothness.
+  - set_focus(world_position, instant=false) — cubic-ease pan over 0.25s.
+      Used by main.gd to center on grid. Turn system will call this at turn
+      start once units exist.
+  - Signals: rotation_changed(index), zoom_changed(size), focus_changed(pos).
+      UI and debug overlay will subscribe.
+
+INPUT BINDINGS:
+  - camera_rotate_left  = Q + gamepad LB
+  - camera_rotate_right = E + gamepad RB
+  - Mouse wheel = zoom in/out (handled directly — not via InputMap)
+  - Actions are registered at runtime via InputMap.add_action(). Keeps the
+      [input] section of project.godot out of hand-edited binary-ish
+      InputEventKey serialization, which is fragile to author without the
+      editor. Idempotent — safe on hot reload.
+
+KEY DESIGN DECISIONS (worth remembering when we add UI):
+  - Camera3D's orthographic size is the "zoom" value. Never scale the camera
+      node; never touch fov (that's perspective-only). Everything is
+      orthographic so tiles stay uniform across screen — FFTA's read-friendly
+      geometry.
+  - Rig position = world focus point (ground-level). Camera local offset is
+      fixed relative to the pivot. This means the pitch is PERMANENT and
+      rotation cannot accidentally drift off-axis. No gimbal issues.
+  - No draw-order sorting needed after rotation. Godot 3D depth sort handles
+      it. This was an open concern from the roadmap (Phase 1B bullet:
+      "Camera should re-sort or re-render tile/unit draw order correctly
+      after each rotation") — confirmed a non-issue with our 3D approach.
+  - Tile picking (Area3D raycasts) continues to work at any rotation, for
+      free. Verified by inspection of Godot's input forwarding; will confirm
+      behaviorally once we have a build running.
+
+STILL TODO FOR POLISH (deferred, not blocking Alpha):
+  - Edge-pan / middle-mouse-drag pan for free camera movement. Not in the
+      CD's Phase 1B requirements; add if playtest asks for it.
+  - Camera shake for impacts (obvious post-Alpha polish; leaving the rig's
+      pivot free of animation dependencies for now).
+  - Snap-to-90°-cardinal instead of 45°-diagonal view option. FFTA uses
+      diagonals; if designers want cardinal for a specific mission, it's
+      a one-line tweak to `initial_rotation_degrees`.
+
+PHASE 1 RETROSPECTIVE:
+  - Board is complete: grid data + rendering + rotatable camera.
+  - 989 lines added in Session 1 (1A), ~200 in Session 2 (1B). Grid layer
+      is deliberately verbose with lookup tables so downstream systems
+      (pathfinder, battle, FOIL) pull from constants rather than magic numbers.
+  - No scope creep into Phase 2. Phase 1 is closed.
+
+NEXT SESSION: Phase 2 — Units & Jobs.
+  Targets:
+    - Base Unit class (HP, MP, ATK, DEF, MAG, RES, SPD, facing, jump, move range)
+    - 3 Job definitions as Resources: Rogue, Squire, White Mage.
+      Stats per CD's roadmap; ability hooks stubbed (ability data system stays
+      light — name, type, range, target type, MP cost, power — designed for
+      extensibility so every new skill later is pure data).
+    - Placeholder unit visualizer (capsule mesh + colored facing arrow).
+    - Unit spawn at AlphaTestMap.player_spawn_points() / .enemy_spawn_points().
+    - Occupant wiring into GridMap.set_occupant().
+  Out of scope for Phase 2: movement execution, ability resolution, turn order.
+  Those are Phase 3.
