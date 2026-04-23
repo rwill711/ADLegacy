@@ -641,3 +641,137 @@ NEXT SESSION: Phase 3B — Movement & Pathfinding.
       checks see the new position.
   Does not yet include: ability targeting, ability resolution, AI movement
   decisions (those come in 3C).
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 5 (Phase 3B: Movement & Pathfinding)
+==========================================================================
+
+STATUS: Phase 3B complete. Click-to-move with reachable-tile preview, A*
+        pathfinding respecting jump/elevation/occupancy, tile-by-tile
+        animation with facing-toward-step rotation. Ready for Phase 3C.
+
+FILES ADDED:
+
+scripts/movement/
+  pathfinder.gd        — class_name Pathfinder. Static utility. Two public
+                         methods:
+                         • reachable_tiles(grid, unit) → Dictionary
+                             Dijkstra from unit.coord within unit.move_range
+                             budget. Returns Vector2i → float cost-to-reach.
+                             Start tile excluded (no move = no move).
+                         • find_path(grid, unit, goal) → Array[Vector2i]
+                             A* with manhattan heuristic. Returns full path
+                             including start and goal, or [] if unreachable.
+                         Walkability predicate enforces:
+                           - terrain walkable
+                           - occupancy: blocked by any unit except self
+                             (Creative ruling: no pass-through, allies OR foes)
+                           - no object on tile
+                           - jump tolerance on height delta between steps
+                         Internal "array of dicts sorted by min" queue — fine
+                         at 12x12 scale; will swap to binary heap if maps
+                         grow past ~50x50.
+  move_controller.gd   — class_name MoveController extends Node. Orchestrates
+                         the MOVE phase:
+                           turn_started (player, haven't moved) → show preview
+                           tile_clicked on reachable tile        → execute path
+                           move completes                         → declare_moved
+                           turn_ended / battle_ended              → clear preview
+                         Public API: bind(grid, viz, turn_mgr), execute_move
+                         (AI entry — no UI), is_preview_tile(coord),
+                         is_previewing(), is_executing().
+                         Step duration 0.14s per tile, sine ease-in-out,
+                         optional face-toward-step rotation.
+
+Scene + main wiring:
+  - scenes/main.tscn adds MoveController (Node with script).
+  - scripts/main.gd
+      * @onready _move_controller and calls its bind() in _ready.
+      * Hover/unhover handlers now check is_preview_tile(coord):
+          - Reachable tile hovered → PATH color (bright green)
+          - Reachable tile unhovered → MOVE_RANGE color (restored)
+          - Non-reachable tile → standard HOVER / NONE behavior
+        Fixes the visual decay where hovering a preview tile would
+        overwrite MOVE_RANGE and unhover would clear to NONE.
+      * Removed stub_move (M) input — movement is real now. SPACE still
+        ends turn; W waits; A still stub-acts until 3C.
+      * _unhandled_input blocks turn-ending input during move tweens
+        (is_executing() gate) so SPACE mid-animation can't rotate turns
+        before the current move commits.
+  - move_controller defensively re-checks turn_manager.get_active_unit()
+    before calling declare_moved() post-animation, as a second line of
+    defense against the same mid-tween turn-rotation scenario.
+
+MOVE PHASE UX (PER-CLICK):
+  1. Player unit's turn starts → reachable tiles light up MOVE_RANGE (soft blue).
+  2. Hover a reachable tile → that tile switches to PATH (bright green).
+     Other reachable tiles stay blue. Non-reachable tiles show HOVER on hover.
+  3. Left-click a reachable tile → preview clears, unit walks the A* path.
+     Each step ~0.14s, sine ease. Facing rotates toward the step direction.
+  4. On arrival: grid occupancy updates (cleared at start, set at end),
+     unit state → IDLE, turn_manager.declare_moved() fires.
+  5. Player still in AWAITING_ACTION — can still Act (stub), Wait, or end turn.
+
+PATHFINDER RULES (CONTRACT):
+  - Movement cost floats (grass 1.0, forest 1.5, mountain 2.0) summed per
+    step; total must be ≤ unit.move_range (int). No partial-cost rounding —
+    a Rogue with MOVE 5 can enter 3 forest tiles (3×1.5 = 4.5), not a 4th
+    (6.0). Feels correct tactically.
+  - Jump applies PER STEP (not cumulative): stepping from height 0 → height 1
+    requires jump ≥ 1 each time. A unit with jump 1 on a 3-step staircase
+    can climb it; on a wall it cannot.
+  - Unit's own starting tile is always considered passable (so it can LEAVE
+    itself) but never in the reachable set (no "staying put" dressed up as
+    a move).
+
+INPUT BINDINGS NOW:
+  - Left-click highlighted tile = move there
+  - SPACE = end turn
+  - W     = wait + end (always CT_COST_WAIT)
+  - A     = stub declare_acted (replaced by ability UI in 3C)
+  - Input blocked during move animation
+
+EDGE CASES HANDLED:
+  - Click during animation → ignored (is_executing gate in _on_tile_clicked).
+  - SPACE during animation → ignored (main.gd._unhandled_input gate).
+  - Unit dies mid-animation (shouldn't happen without AOE ticking, but
+    defensive) → declare_moved skipped because active_unit check fails.
+  - Path-to-goal has only one step (adjacent move) → animates one hop.
+
+AI USAGE (PHASE 3C):
+  - move_controller.execute_move(unit, goal_coord) is the AI entry.
+    Same path execution machinery, no preview UI. Will be called from the
+    enemy AI stub in 3C after it picks a destination.
+
+DESIGN NOTES / DEFERRED:
+  - No path-preview-along-route (showing the full route highlighted as the
+    player hovers). Roadmap only required "Highlight reachable tiles"; this
+    is polish. Single-tile PATH hover is a compromise that reads clearly.
+  - No terrain-cost-aware move-range display (e.g., "forest costs 2, this
+    is your furthest point on flat ground"). Current MOVE_RANGE color is
+    binary: reachable or not. A future gradient (spend-1, spend-2, etc.)
+    would help players plan around forests. Deferred to polish pass.
+  - Pathfinder queue is an unsorted array with linear-scan min extraction.
+    Good enough at 12×12. If we go past ~50×50 maps, swap to a binary heap.
+
+NEXT SESSION: Phase 3C — Battle / Ability Resolution.
+  Targets:
+    - Ability UI: select a skill from the active unit's kit → show valid
+      target tiles (in ATTACK_RANGE color) given the skill's range/shape.
+    - Click a valid target → resolve:
+        • Physical: damage = ATK × power − DEF, facing mod applied
+        • Magic:    damage = MAG × power − RES, facing mod applied
+        • Healing:  amount = MAG × power (no reduction)
+        • Buffs/debuffs: apply a StatusEffect (minimal implementation)
+    - Facing modifiers (first pass, subject to tuning):
+        Rear  = 1.5× damage (and backstab's extra 2.0× stacks on top)
+        Side  = 1.0×
+        Front = 0.75×
+      All attacks hit for Alpha (no miss chance) per CD Q2 ruling.
+    - Floating damage/heal numbers above target on impact.
+    - Enemy AI stub: pick a random legal target in range and attack; if no
+      target in range, move toward nearest enemy via move_controller.
+    - FOIL integration: route each player action through FOILTracker.record_action
+      via the battle resolver. Per-unit tracker context — may require the
+      deferred FOIL refactor noted in Session 4 (multi-character battles).

@@ -113,7 +113,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 - **Wait** option: Skip remaining actions and end turn immediately (still must choose facing)
 - Display turn order queue on screen (even just a text list for Alpha — who's next matters to the player)
 
-### 3B: Movement & Pathfinding ⏭️ NEXT
+### 3B: Movement & Pathfinding ✅ DONE (Alpha Session 5)
 - A* pathfinding on the grid, accounting for:
   - Tile walkability
   - Elevation and unit's Jump stat
@@ -239,8 +239,8 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 | 🔴 2 | Camera System (FFTA rotation) | ✅ Done (S2) | Grid | Programming Lead |
 | 🔴 3 | Unit Base Class + 3 Jobs | ✅ Done (S3) | Grid (for placement) | Programming Lead + Creative Director (stat review) |
 | 🔴 4 | Turn System (turn order, move/act/face/end loop) | ✅ Done (S4) | Grid + Units | Programming Lead |
-| 🔴 5 | Movement + Pathfinding | ⏭️ Next | Grid + Turn System | Programming Lead |
-| 🔴 6 | Battle / Ability Resolution | ⏭️ | Units + Turn System | Programming Lead |
+| 🔴 5 | Movement + Pathfinding | ✅ Done (S5) | Grid + Turn System | Programming Lead |
+| 🔴 6 | Battle / Ability Resolution | ⏭️ Next | Units + Turn System | Programming Lead |
 | 🔴 7 | End Game Conditions | ⏭️ | Battle System | Programming Lead |
 | 🟡 8 | Debug System (overlay, console, log) | ⏭️ | All above (to inspect them) | Programming Lead |
 | 🟡 9 | FOIL Integration Hooks | ⏭️ | FOIL System + Battle System | Programming Lead |

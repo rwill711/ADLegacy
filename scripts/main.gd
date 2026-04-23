@@ -16,6 +16,7 @@ extends Node3D
 @onready var _units_root: Node3D = $Units
 @onready var _turn_manager: TurnManager = $TurnManager
 @onready var _turn_hud: TurnHUD = $TurnHUD
+@onready var _move_controller: MoveController = $MoveController
 
 var _grid: GridMap = null
 
@@ -38,6 +39,7 @@ func _ready() -> void:
 	_turn_manager.battle_ended.connect(_on_battle_ended)
 
 	_turn_hud.bind_turn_manager(_turn_manager)
+	_move_controller.bind(_grid, _visualizer, _turn_manager)
 
 	_turn_manager.begin_battle(units)
 
@@ -47,22 +49,23 @@ func _ready() -> void:
 # =============================================================================
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Block turn input during a movement animation so SPACE mid-tween can't
+	# rotate to the next unit before the current move commits.
+	if _move_controller != null and _move_controller.is_executing():
+		return
 	if event.is_action_pressed("end_turn"):
 		_turn_manager.end_turn()
 	elif event.is_action_pressed("wait_turn"):
 		_turn_manager.wait_and_end_turn()
-	elif event.is_action_pressed("stub_move"):
-		_turn_manager.declare_moved()
 	elif event.is_action_pressed("stub_act"):
 		_turn_manager.declare_acted()
 
 
-## Register testing-only input actions at runtime so project.godot stays
-## clean. Replaced by proper UI buttons when Phase 3B/3C add real MOVE/ACT.
+## Register testing input actions at runtime so project.godot stays clean.
+## Move is now real (click a highlighted tile). Act stays stubbed until 3C.
 func _register_battle_input_actions() -> void:
 	_ensure_action("end_turn", KEY_SPACE)
 	_ensure_action("wait_turn", KEY_W)
-	_ensure_action("stub_move", KEY_M)
 	_ensure_action("stub_act", KEY_A)
 
 
@@ -120,12 +123,25 @@ func _grid_center_world(map: GridMap) -> Vector3:
 
 
 func _on_tile_hovered(coord: Vector2i) -> void:
-	if _grid != null:
+	if _grid == null:
+		return
+	# During a move-range preview, a reachable tile shows PATH color on hover
+	# (this is my move destination if I click); non-reachable tiles still get
+	# the normal HOVER tint so the rest of the board stays interactable.
+	if _move_controller != null and _move_controller.is_preview_tile(coord):
+		_grid.set_highlight(coord, GridEnums.HighlightState.PATH)
+	else:
 		_grid.set_highlight(coord, GridEnums.HighlightState.HOVER)
 
 
 func _on_tile_unhovered(coord: Vector2i) -> void:
-	if _grid != null:
+	if _grid == null:
+		return
+	# Restore the preview color if the tile is still in the reachable set.
+	# Otherwise clear to NONE.
+	if _move_controller != null and _move_controller.is_preview_tile(coord):
+		_grid.set_highlight(coord, GridEnums.HighlightState.MOVE_RANGE)
+	else:
 		_grid.set_highlight(coord, GridEnums.HighlightState.NONE)
 
 

@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/grid/grid_visualizer.gd" id="2_grid_viz"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/units/unit_spawner.gd" id="4_spawner"]
 [ext_resource type="Script" path="res://scripts/turn/turn_manager.gd" id="5_turn_mgr"]
 [ext_resource type="PackedScene" path="res://scenes/turn_hud.tscn" id="6_turn_hud"]
+[ext_resource type="Script" path="res://scripts/movement/move_controller.gd" id="7_move_ctrl"]
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
@@ -47,5 +48,8 @@ script = ExtResource("4_spawner")
 
 [node name="TurnManager" type="Node" parent="."]
 script = ExtResource("5_turn_mgr")
+
+[node name="MoveController" type="Node" parent="."]
+script = ExtResource("7_move_ctrl")
 
 [node name="TurnHUD" parent="." instance=ExtResource("6_turn_hud")]
