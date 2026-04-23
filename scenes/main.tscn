@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/grid/grid_visualizer.gd" id="2_grid_viz"]
 [ext_resource type="Script" path="res://scripts/camera/camera_rig.gd" id="3_cam_rig"]
+[ext_resource type="Script" path="res://scripts/units/unit_spawner.gd" id="4_spawner"]
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
@@ -36,3 +37,8 @@ size = 16.0
 
 [node name="GridVisualizer" type="Node3D" parent="."]
 script = ExtResource("2_grid_viz")
+
+[node name="Units" type="Node3D" parent="."]
+
+[node name="UnitSpawner" type="Node" parent="."]
+script = ExtResource("4_spawner")

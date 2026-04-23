@@ -373,3 +373,137 @@ NEXT SESSION: Phase 2 — Units & Jobs.
     - Occupant wiring into GridMap.set_occupant().
   Out of scope for Phase 2: movement execution, ability resolution, turn order.
   Those are Phase 3.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 3 (Phase 2: Units & Jobs)
+==========================================================================
+
+STATUS: Phase 2 code-complete. 3 jobs, 8 skills, 6 spawned units on the grid.
+        Occupancy correctly wired. Ready to move to Phase 3 (Turn System).
+
+FILES ADDED (11 total across 4 new folders):
+
+scripts/units/
+  unit_enums.gd      — Team, Facing, UnitState enums. Facing helpers:
+                       facing_to_vector, facing_to_y_rotation,
+                       facing_toward(from, to), opposite_facing,
+                       facing_delta (0=same, 1=flank, 2=rear),
+                       attack_side(attacker_coord, defender_coord, defender_facing)
+                       — last one is the key primitive for facing-modifier damage.
+  unit_stats.gd      — Resource. Pool stats (HP/MP current+max), combat stats
+                       (ATK, DEF, MAG, RES, SPD), movement (move_range, jump).
+                       Helpers: take_damage, heal, spend_mp, restore_mp, reset_to_full.
+  unit.gd            — Node3D. Owns stats + job ref + skills + coord + facing.
+                       Builds visuals on _ready (capsule body + prism facing arrow).
+                       Material tint blends team color with job color so
+                       friend/foe reads first, job identity reads second.
+                       Signals: hp_changed, mp_changed, facing_changed,
+                       state_changed, defeated. place_on_tile(tile, instant)
+                       handles world positioning with optional 0.18s tween.
+  unit_spawner.gd    — Node. spawn_alpha_roster(grid, parent) populates the
+                       3 player + 3 enemy units at AlphaTestMap spawn points
+                       and registers occupancy on the grid.
+                       Auto-faces each unit toward the opposite team's centroid
+                       so placeholder arrows read correctly at spawn.
+                       get_unit(id), get_units_on_team(team), get_all_units().
+
+scripts/jobs/
+  job_data.gd        — Resource. job_name (StringName), display_name, description,
+                       base_stats template (UnitStats), starting_skill_names
+                       (Array of StringName, resolved via SkillLibrary), job_color.
+                       instantiate_stats() — returns a duplicated, full-HP stat block.
+  job_library.gd     — Factory for Rogue, Squire, White Mage with numbers-locked
+                       first-pass stats (see below). all_alpha_jobs() returns all 3.
+
+scripts/skills/
+  skill_enums.gd     — SkillType (7: PHYSICAL_DAMAGE, MAGIC_DAMAGE, HEALING,
+                       BUFF, DEBUFF, STEAL, MOVEMENT), TargetType (6: ENEMY,
+                       ALLY, SELF, ALLY_OR_SELF, TILE, ANY),
+                       AreaShape (5: SINGLE, CROSS, SQUARE, RADIUS, LINE),
+                       Element (8 slots, Alpha all-NONE).
+                       FOIL_CATEGORY_MAP + to_foil_category() bridge so the
+                       battle resolver can push a one-liner to FOILTracker
+                       without a switch at every call site.
+  skill_data.gd      — Resource. The full ability contract: skill_name,
+                       display_name, description, skill_type, power, mp_cost,
+                       target_type, min/max range, area_shape + area_size,
+                       requires_rear_for_bonus + rear_bonus_multiplier
+                       (backstab plumbing), element. Queries:
+                       is_offensive, is_support, is_melee_only, is_area,
+                       foil_category, can_target(caster_team, target_team,
+                       is_self_target). Factory `create(...)` with sensible
+                       defaults so SkillLibrary entries stay one-liners.
+  skill_library.gd   — Factory for 8 Alpha skills:
+                       BASIC_ATTACK, BACKSTAB, STEAL, FIRST_AID,
+                       STONE_THROW, STAFF_BONK, CURE, PROTECT.
+                       get_skill(name) / get_skills(names_array).
+                       StringName constants exported so callers don't
+                       stringly-type skill lookups.
+
+scene/scripts changes:
+  scenes/main.tscn   — Added Units Node3D (container for spawned units) and
+                       a UnitSpawner Node. Scene still single-root (Main Node3D).
+  scripts/main.gd    — Calls unit_spawner.spawn_alpha_roster() on _ready.
+                       Click logging now dumps the occupant's name and HP when
+                       clicking a tile with a unit on it.
+
+ALPHA JOB STATS (FIRST PASS — Phase 10 will retune):
+            HP   MP  ATK  DEF  MAG  RES  SPD  MOVE  JUMP
+  Rogue      80  20   14    8    6    6   14    5    2
+  Squire    110  30   11   11    8    8   10    4    3
+  White Mage 75  60    6    7   14   13    8    3    1
+
+ALPHA SKILL SET:
+  Rogue:       basic_attack, backstab (+2x damage from rear), steal
+  Squire:      basic_attack, first_aid (self-heal, 1.5 power), stone_throw (2-3 rng)
+  White Mage:  staff_bonk (weak 0.6 power melee), cure (4 rng, 4 MP, 2.0 power),
+               protect (4 rng, 6 MP, defense buff)
+
+CONTRACT NOTES (FOR DOWNSTREAM PHASES):
+  - Unit.unit_id is StringName, matches GridMap.occupant_id. Source of truth
+      for "who's on this tile" lives in the grid; Unit just caches its coord.
+      Always update via grid.set_occupant() so signals fire.
+  - Skills are resolved from JobData.starting_skill_names via SkillLibrary
+      each time Unit is spawned. Instances are per-unit so passives that
+      mutate power later won't bleed between characters.
+  - FOIL wiring: when the battle resolver fires, one call per player action:
+      FOILTracker.record_action(
+        skill.skill_name, skill.foil_category(),
+        skill.is_area(), target.display_name, target.job.job_name,
+        target.team != caster.team == false,   # targeted_ally
+        damage_dealt, was_kill, was_hit,
+        GridMap.manhattan(caster.coord, target.coord),
+        caster.coord, target.coord, turn_number
+      )
+      Every field needed by the tracker is available on SkillData + Unit
+      already — no translator layer required.
+
+VISUAL NOTES:
+  - Capsule body: CapsuleMesh radius 0.3, height 1.1. Base sits on tile's
+      top_world_position. Material tint = team_color.lerp(job_color, 0.35).
+      At rotation.y = 0 the capsule faces NORTH (world -Z).
+  - Facing arrow: PrismMesh 0.2 × 0.15 × 0.3 ahead of the body. White,
+      always visible. Rotates with the parent Unit node.
+  - Unit._auto_face_units sets initial facing toward opposite team's
+      centroid. Placeholder — player will choose facing at end of turn once
+      the turn UI lands in Phase 3.
+
+OPEN / DEFERRED:
+  - Status effects (Protect actually doing something) — needs a StatusEffect
+      component on Unit. Phase 3C or later.
+  - Steal resolution — needs a minimal Inventory on Unit. Alpha can just
+      flag steal success/failure without real items. Phase 3C stub.
+  - Skill ".tres" files replacing SkillLibrary — post-Alpha, when design
+      iteration slows and we want designer-authored files.
+
+NEXT SESSION: Phase 3A — Turn System.
+  Targets:
+    - CTR countdown turn order (FFTA-style). Speed stat fills a CT counter;
+      first unit to 100 CT goes.
+    - Active-unit pointer; camera_rig.set_focus(active_unit.global_position)
+      on turn start.
+    - Phase state machine: MOVE → ACT → FACE → END_TURN (any skippable).
+    - Turn-order queue visible on HUD (even as a plain Label list for Alpha).
+  Phase 3B (pathfinding + tween along path) comes right after — it's the
+  piece that lets "Move" actually work on the grid.
