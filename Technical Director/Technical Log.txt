@@ -61,3 +61,129 @@ ADR:
   - ADR-003 committed at docs/adr/ADR-003-foil-system.md
 
 NEXT SESSION: Start with Chunk 4 (foil_analyzer.gd), then Chunk 5 (foil_loadout_builder.gd).
+
+
+==========================================================================
+FOIL SYSTEM BUILD LOG — End of Session 3
+==========================================================================
+
+STATUS: Chunks 1–6 of 6 complete. FOIL v1 is code-complete.
+        The three subsystems talk to each other end-to-end; integration
+        points into BattleManager/EnemySpawner are well-defined and symbolic
+        (see "EnemySpawner contract" below).
+
+FILES ADDED TO scripts/foil/ THIS SESSION:
+  6. foil_analyzer.gd        — BRAIN. Reads tracker data + trait tags → FOILProfile.
+                                Computes category weights, behavioral stats,
+                                archetype weights, dominant archetype, confidence.
+                                Exposes resolve_foil_level(renown, override) helper.
+  7. foil_loadout_builder.gd — OUTPUT. Consumes FOILProfile + FOIL level + base
+                                enemy pool → Dictionary enemy team config with
+                                per-enemy job role, consumable, and gear hints,
+                                plus team-level AI hints at level 3+.
+
+TOTAL FOIL FILES: 7 in scripts/foil/ (+ ADR-003 in docs/adr/).
+
+CHUNK 4 — foil_analyzer.gd DETAILS:
+  - build_profile(tracker, character_name, trait_tags) → FOILProfile
+  - Trait tags permanently vote for archetypes (TRAIT_WEIGHT_PER_TAG = 0.35)
+      even when rolling window is empty — keeps identity from evaporating
+      during long streaks of odd playstyle. Safe to call with no battle data.
+  - Category weights normalized to 0–1 by total action count.
+  - Archetype weights normalized so max archetype = 1.0.
+  - AOE-heavy players get an AOE_BLASTER boost scaled by aoe_tendency;
+      prevents a mage who only casts Fireball from being flagged pure MAGIC_OFFENSE.
+  - Dominant archetype flips to HYBRID if the top two are within HYBRID_MARGIN
+      (0.12) of each other; avoids flip-flopping the CPU's counter target.
+  - Confidence ramps linearly from 0 at MIN_BATTLES to 1.0 at ROLLING_WINDOW_SIZE.
+      Below MIN_BATTLES confidence is hard 0 and the loadout builder uses FOIL 0.
+  - resolve_foil_level(renown, mission_override) — single helper so BattleManager
+      doesn't have to care whether the current battle is a story override or free.
+
+CHUNK 5 — foil_loadout_builder.gd DETAILS:
+  - build_enemy_team(profile, foil_level, base_enemy_pool, party_size) → Dictionary
+  - Return shape:
+      {
+        "foil_level": int,
+        "dominant_archetype": int,
+        "enemies": Array[Dictionary],  # each: {job, role, consumable, gear_hint, ...}
+        "ai_hints": Dictionary,        # {target_priority, formation, engagement_range, ...}
+        "notes": Array[String],        # audit log, useful for dev overlay
+      }
+  - Level-by-level layering mirrors ADR-003 exactly:
+        0 base pool
+        1 + counter consumables
+        2 + half team swapped to counter roles (interleaves top-2 archetypes
+            for clear hybrid players so the enemy team isn't one-note)
+        3 + team AI hints (target_priority, formation, engagement_range, defensive_posture)
+        4 + full team swap + elite_ prefixed consumables + counter gear hints
+  - Graceful fallback: null profile, FOIL 0, or insufficient data → returns the
+      base-pool configuration with notes explaining why.
+  - Symbolic (string-tag) output on purpose — job/equipment/element systems
+      aren't ported yet; EnemySpawner will translate hints → real JobData/ItemData
+      when those come online. See EnemySpawner contract below.
+
+ENEMY-SPAWNER CONTRACT (for when it's built):
+  Input:  the Dictionary returned by FOILLoadoutBuilder.build_enemy_team().
+  Responsibilities:
+    - For each entry in config["enemies"]:
+        if "role" is set and is in COUNTER_JOBS_BY_ARCHETYPE, pick a real
+          JobData from the region's enemy pool that fulfills that role;
+          otherwise use entry["job"] directly.
+        if "consumable" is set, grant one stack at battle start.
+          "elite_*" prefix means use the tier-2 variant.
+        if "gear_hint" is set, swap appropriate equipment slot to the closest
+          match from the enemy pool; fall back silently if no match.
+    - Pass config["ai_hints"] to each enemy's AI controller on spawn.
+    - Log config["notes"] to the dev overlay when a debug flag is on.
+
+FULL PIPELINE (end-to-end, once BattleManager is in GDScript):
+
+  [Battle start]
+    level := FOILAnalyzer.resolve_foil_level(character.renown, mission.foil_override)
+    profile := FOILAnalyzer.build_profile(FOILTracker, character.name, character.trait_tags)
+    team_config := FOILLoadoutBuilder.build_enemy_team(profile, level, encounter.base_pool, party_size)
+    EnemySpawner.spawn_from_config(team_config)
+    FOILTracker.begin_battle(character.name, character.job, level)
+
+  [During battle — per player action]
+    FOILTracker.record_action(skill_name, category, is_aoe, target_name, target_job,
+                              targeted_ally, damage, was_kill, was_hit,
+                              distance, caster_pos, target_pos, turn_number)
+
+  [Battle end]
+    FOILTracker.commit_battle(total_turns, player_won)
+
+  [Save / Load]
+    save["foil"] = FOILTracker.save_to_dict()
+    FOILTracker.load_from_dict(save["foil"])
+
+TUNING KNOBS WORTH REVISITING AFTER PLAYTEST:
+  - FOILEnums.RENOWN_THRESHOLDS   — how fast FOIL ramps for free battles
+  - FOILEnums.ROLLING_WINDOW_SIZE / ROLLING_WINDOW_MIN_BATTLES
+  - FOILAnalyzer.TRAIT_WEIGHT_PER_TAG — how strongly titles push archetype
+  - FOILAnalyzer.HYBRID_MARGIN   — how committed a player must be before the CPU locks in a counter
+  - AOE boost threshold (0.4) and multiplier (0.5) in _compute_archetype_weights
+  - AI hint thresholds in FOILLoadoutBuilder._build_ai_hints (distance, aggression, aoe_tendency)
+  - Per-archetype counter maps (COUNTER_JOBS/CONSUMABLES/GEAR_BY_ARCHETYPE)
+
+DEPENDENCIES STILL OUTSTANDING (block full value, not FOIL v1 itself):
+  - BattleManager port to GDScript — nothing is calling FOILTracker yet.
+  - Trait tag assignment — titles/milestones need to emit tag strings that
+      match keys in FOILAnalyzer.TRAIT_ARCHETYPE_SIGNALS. Plain-string contract
+      keeps the two systems loosely coupled.
+  - EnemySpawner — consumer of build_enemy_team() output. See contract above.
+  - Element / Equipment / AI systems — needed for level-4 counter gear and
+      level-3 AI hint actuation. FOIL will happily emit hints the AI ignores
+      until that system lands; safe to ship partial.
+
+ADR:
+  - ADR-003 updated: moved Chunks 4 & 5 from "planned" to "implemented" file list.
+
+NEXT SESSION (recommendation, not locked):
+  - Port BattleManager.cs → battle_manager.gd, wire the four FOIL hooks in.
+  - Stub an EnemySpawner that reads build_enemy_team() output using placeholder
+      JobData so we can run an end-to-end test before the full asset pipeline is there.
+  - Write a headless test harness under scripts/foil/tests/ that drives the
+      tracker → analyzer → builder flow with a scripted set of fake battles
+      and snapshots the output — catches regressions when we retune.

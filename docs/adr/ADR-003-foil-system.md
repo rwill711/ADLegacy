@@ -62,13 +62,19 @@ FOILLoadoutBuilder.build_enemy_team(profile, foil_level, enemy_pool) → configu
 
 ### File Structure
 ```
-scripts/foil/foil_enums.gd
-scripts/foil/foil_action_record.gd
-scripts/foil/foil_profile.gd
-scripts/foil/foil_tracker.gd
-scripts/foil/foil_analyzer.gd
-scripts/foil/foil_loadout_builder.gd
+scripts/foil/foil_enums.gd            [implemented]
+scripts/foil/foil_action_record.gd    [implemented]
+scripts/foil/foil_battle_record.gd    [implemented]
+scripts/foil/foil_profile.gd          [implemented]
+scripts/foil/foil_tracker.gd          [implemented]
+scripts/foil/foil_analyzer.gd         [implemented]
+scripts/foil/foil_loadout_builder.gd  [implemented]
 ```
+
+FOIL v1 is code-complete. Consumer integration (BattleManager hooks, EnemySpawner
+translation of symbolic hints → JobData/ItemData) is pending those systems being
+ported to GDScript. See `Technical Director/Technical Log.txt` Session 3 entry
+for the full pipeline, the EnemySpawner contract, and tuning-knob locations.
 
 ## Risks
 - Overtightening: If FOIL counters too aggressively, player feels punished for having a build. Tuning knobs needed per level.
