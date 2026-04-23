@@ -124,6 +124,31 @@ func is_executing() -> bool:
 	return _executing
 
 
+## Re-show the move preview for the active unit if they still have their
+## move available. Called by the action controller after an ACT completes
+## (player can still move after acting, per the CD's flexible-order ruling).
+func refresh_preview() -> void:
+	if _executing:
+		return
+	if _turn_manager == null:
+		return
+	if _turn_manager.has_moved():
+		return
+	var active := _turn_manager.get_active_unit()
+	if active == null or active.team != UnitEnums.Team.PLAYER or not active.is_alive():
+		return
+	_active_unit = active
+	_clear_preview()
+	_show_move_preview(active)
+
+
+## Suppress the move preview without marking the unit as moved. Used by the
+## action controller when entering targeting mode so left-clicks on a
+## still-reachable-but-not-an-attack-target tile don't trigger a move.
+func hide_preview() -> void:
+	_clear_preview()
+
+
 # =============================================================================
 # CLICK → EXECUTE
 # =============================================================================
@@ -144,13 +169,15 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 
 
 ## Public entry for AI movement in Phase 3C. Skips the preview UI.
+## Awaitable: caller can `await _move_controller.execute_move(unit, goal)` to
+## block until the animation finishes and occupancy is committed.
 func execute_move(unit: Unit, goal: Vector2i) -> void:
 	if _executing or unit == null:
 		return
 	var path: Array = Pathfinder.find_path(_grid, unit, goal)
 	if path.size() < 2:
 		return
-	_execute_path(unit, path)
+	await _execute_path(unit, path)
 
 
 # =============================================================================

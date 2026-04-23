@@ -35,6 +35,11 @@ var _outcome: TurnEnums.BattleOutcome = TurnEnums.BattleOutcome.ONGOING
 var _moved_this_turn: bool = false
 var _acted_this_turn: bool = false
 
+## Monotonic turn counter. Increments each time _advance_to_next_turn hands
+## control to a new unit. Used by FOIL and the debug log to sequence events
+## that share wall-clock time. Resets to 0 on begin_battle.
+var _turn_number: int = 0
+
 
 ## --- Config -----------------------------------------------------------------
 ## How many upcoming turns to predict for the HUD queue display.
@@ -57,6 +62,7 @@ func begin_battle(units: Array) -> void:
 	_active_unit = null
 	_moved_this_turn = false
 	_acted_this_turn = false
+	_turn_number = 0
 
 	battle_started.emit(_units)
 	_advance_to_next_turn()
@@ -161,6 +167,18 @@ func get_ct(unit_id: StringName) -> int:
 	return _ct_table.get(unit_id, 0)
 
 
+## Monotonic turn number (1 = first turn of the battle).
+func get_turn_number() -> int:
+	return _turn_number
+
+
+## Re-evaluate win/lose right now. The action controller calls this after
+## damage lands so the battle can end on the killing blow rather than on
+## the next end_turn().
+func check_outcome() -> TurnEnums.BattleOutcome:
+	return _evaluate_outcome()
+
+
 ## Predict the next N turns without mutating real state. Each returned Unit
 ## is the one whose CT would cross the threshold next in simulation.
 func predict_turn_queue(count: int = -1) -> Array:
@@ -217,6 +235,7 @@ func _advance_to_next_turn() -> void:
 	_active_unit = next_unit
 	_moved_this_turn = false
 	_acted_this_turn = false
+	_turn_number += 1
 
 	_set_phase(TurnEnums.TurnPhase.TURN_START)
 	turn_started.emit(_active_unit)

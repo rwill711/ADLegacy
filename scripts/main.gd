@@ -1,14 +1,13 @@
 extends Node3D
 ## Alpha entry scene. Builds the grid, spawns the roster, starts the battle,
-## wires hover/click feedback, and drives the camera from the active unit.
-##
-## Phase 3A scope: turn system is live but MOVE/ACT are stubs. SPACE ends
-## the current unit's turn. Enemy turns auto-end after a short delay so
-## the CT queue keeps rotating during manual testing.
+## and orchestrates the player vs enemy turn loop via the subsystem
+## controllers. Keeps the scene root thin — each concern (grid, camera,
+## units, turns, moves, actions) owns its own module.
 
 
 @export var log_tile_events: bool = true
-@export var enemy_auto_end_delay: float = 0.5  # seconds before enemies auto-end-turn
+@export var enemy_think_delay: float = 0.4  # "thinking" pause before enemy acts
+
 
 @onready var _visualizer: GridVisualizer = $GridVisualizer
 @onready var _camera_rig: CameraRig = $CameraRig
@@ -17,6 +16,9 @@ extends Node3D
 @onready var _turn_manager: TurnManager = $TurnManager
 @onready var _turn_hud: TurnHUD = $TurnHUD
 @onready var _move_controller: MoveController = $MoveController
+@onready var _action_controller: ActionController = $ActionController
+@onready var _ability_bar: AbilityBar = $AbilityBar
+
 
 var _grid: GridMap = null
 
@@ -40,6 +42,19 @@ func _ready() -> void:
 
 	_turn_hud.bind_turn_manager(_turn_manager)
 	_move_controller.bind(_grid, _visualizer, _turn_manager)
+	_action_controller.bind(
+		_grid, _visualizer, _turn_manager, _unit_spawner,
+		_move_controller, _ability_bar, self
+	)
+
+	# Kick off FOIL battle records for every player unit up front, so even
+	# actions on the first turn land in the rolling window.
+	var foil: Node = get_tree().root.get_node_or_null("FOILTracker")
+	if foil != null:
+		for unit in units:
+			if unit.team == UnitEnums.Team.PLAYER:
+				var job_name: String = String(unit.job.job_name) if unit.job != null else ""
+				foil.begin_battle(unit.display_name, job_name, 0)
 
 	_turn_manager.begin_battle(units)
 
@@ -49,30 +64,27 @@ func _ready() -> void:
 # =============================================================================
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Block turn input during a movement animation so SPACE mid-tween can't
-	# rotate to the next unit before the current move commits.
-	if _move_controller != null and _move_controller.is_executing():
+	# Block turn input while any controller is mid-animation.
+	if _move_controller.is_executing() or _action_controller.is_executing():
+		return
+	if event.is_action_pressed("cancel_action"):
+		_action_controller.cancel_targeting()
 		return
 	if event.is_action_pressed("end_turn"):
 		_turn_manager.end_turn()
 	elif event.is_action_pressed("wait_turn"):
 		_turn_manager.wait_and_end_turn()
-	elif event.is_action_pressed("stub_act"):
-		_turn_manager.declare_acted()
 
 
-## Register testing input actions at runtime so project.godot stays clean.
-## Move is now real (click a highlighted tile). Act stays stubbed until 3C.
 func _register_battle_input_actions() -> void:
 	_ensure_action("end_turn", KEY_SPACE)
 	_ensure_action("wait_turn", KEY_W)
-	_ensure_action("stub_act", KEY_A)
+	_ensure_action("cancel_action", KEY_ESCAPE)
 
 
 static func _ensure_action(action: StringName, keycode: int) -> void:
 	if not InputMap.has_action(action):
 		InputMap.add_action(action)
-	# De-dupe binding on hot reload.
 	for existing in InputMap.action_get_events(action):
 		if existing is InputEventKey and (existing as InputEventKey).keycode == keycode:
 			return
@@ -82,36 +94,103 @@ static func _ensure_action(action: StringName, keycode: int) -> void:
 
 
 # =============================================================================
-# TURN-DRIVEN CAMERA + AI STUB
+# TURN-DRIVEN CAMERA + ENEMY AI
 # =============================================================================
 
 func _on_turn_started(unit: Unit) -> void:
 	_camera_rig.set_focus(unit.global_position)
 
-	# Phase 3A placeholder: enemies don't have AI yet, so we auto-end their
-	# turn so the CT queue keeps rotating during testing. Replace in Phase 3C
-	# when we wire up actual enemy decision-making.
 	if unit.team != UnitEnums.Team.PLAYER:
-		_auto_end_enemy_turn(unit)
+		# Run the enemy brain. Async so we can sequence think-delay → act →
+		# move → act again → end.
+		_run_enemy_turn(unit)
 
 
-func _auto_end_enemy_turn(unit: Unit) -> void:
-	var tween := get_tree().create_tween()
-	tween.tween_interval(enemy_auto_end_delay)
-	tween.tween_callback(func():
-		# Guard against the unit dying or the battle ending mid-delay.
-		if _turn_manager.get_active_unit() == unit \
-		and _turn_manager.get_phase() == TurnEnums.TurnPhase.AWAITING_ACTION:
-			_turn_manager.wait_and_end_turn()
-	)
+func _run_enemy_turn(unit: Unit) -> void:
+	await get_tree().create_timer(enemy_think_delay).timeout
+
+	if not _still_this_unit_turn(unit):
+		return
+
+	# First pass: can we already hit someone?
+	var acted: bool = _action_controller.enemy_act_if_possible(unit)
+	if acted:
+		await get_tree().create_timer(enemy_think_delay).timeout
+
+	# Move toward the nearest enemy if we still have the move.
+	if _still_this_unit_turn(unit) and not _turn_manager.has_moved():
+		var goal: Vector2i = _closest_reachable_toward_enemy(unit)
+		if goal != unit.coord:
+			await _move_controller.execute_move(unit, goal)
+
+			if not _still_this_unit_turn(unit):
+				return
+
+			# Second pass: now that we moved, maybe we can hit.
+			if not _turn_manager.has_acted():
+				acted = _action_controller.enemy_act_if_possible(unit)
+				if acted:
+					await get_tree().create_timer(enemy_think_delay).timeout
+
+	if _still_this_unit_turn(unit):
+		_turn_manager.end_turn()
+
+
+## Pick the reachable tile closest (manhattan) to the nearest hostile unit.
+## If already in attack range, stays put. If no hostile alive, no movement.
+func _closest_reachable_toward_enemy(unit: Unit) -> Vector2i:
+	var nearest_enemy: Unit = _nearest_hostile(unit)
+	if nearest_enemy == null:
+		return unit.coord
+
+	var reachable: Dictionary = Pathfinder.reachable_tiles(_grid, unit)
+	if reachable.is_empty():
+		return unit.coord
+
+	var best_coord: Vector2i = unit.coord
+	var best_dist: int = GridMap.manhattan(unit.coord, nearest_enemy.coord)
+	for coord in reachable:
+		var dist: int = GridMap.manhattan(coord, nearest_enemy.coord)
+		if dist < best_dist:
+			best_dist = dist
+			best_coord = coord
+	return best_coord
+
+
+func _nearest_hostile(unit: Unit) -> Unit:
+	var best: Unit = null
+	var best_dist: int = 999999
+	for other in _unit_spawner.get_all_units():
+		if other == null or not other.is_alive():
+			continue
+		if not UnitEnums.teams_are_hostile(unit.team, other.team):
+			continue
+		var d: int = GridMap.manhattan(unit.coord, other.coord)
+		if d < best_dist:
+			best_dist = d
+			best = other
+	return best
+
+
+func _still_this_unit_turn(unit: Unit) -> bool:
+	return _turn_manager.get_active_unit() == unit \
+		and _turn_manager.get_outcome() == TurnEnums.BattleOutcome.ONGOING
 
 
 func _on_battle_ended(outcome: int) -> void:
 	print("[battle] ended with outcome=%d" % outcome)
+	# Commit every player-unit FOIL record at once. Retains whoever's data
+	# was in-flight into the rolling window for next session's analyzer.
+	var foil: Node = get_tree().root.get_node_or_null("FOILTracker")
+	if foil == null:
+		return
+	var was_victory: bool = outcome == TurnEnums.BattleOutcome.PLAYER_VICTORY
+	var turn_count: int = _turn_manager.get_turn_number()
+	foil.commit_all_battles(turn_count, was_victory)
 
 
 # =============================================================================
-# TILE INPUT FEEDBACK (from Phase 1A, unchanged)
+# TILE INPUT FEEDBACK
 # =============================================================================
 
 func _grid_center_world(map: GridMap) -> Vector3:
@@ -125,10 +204,11 @@ func _grid_center_world(map: GridMap) -> Vector3:
 func _on_tile_hovered(coord: Vector2i) -> void:
 	if _grid == null:
 		return
-	# During a move-range preview, a reachable tile shows PATH color on hover
-	# (this is my move destination if I click); non-reachable tiles still get
-	# the normal HOVER tint so the rest of the board stays interactable.
-	if _move_controller != null and _move_controller.is_preview_tile(coord):
+	# Hover highlight priority: move preview beats base, act preview beats
+	# move preview.
+	if _action_controller.is_target_tile(coord):
+		_grid.set_highlight(coord, GridEnums.HighlightState.TARGET)
+	elif _move_controller.is_preview_tile(coord):
 		_grid.set_highlight(coord, GridEnums.HighlightState.PATH)
 	else:
 		_grid.set_highlight(coord, GridEnums.HighlightState.HOVER)
@@ -137,9 +217,10 @@ func _on_tile_hovered(coord: Vector2i) -> void:
 func _on_tile_unhovered(coord: Vector2i) -> void:
 	if _grid == null:
 		return
-	# Restore the preview color if the tile is still in the reachable set.
-	# Otherwise clear to NONE.
-	if _move_controller != null and _move_controller.is_preview_tile(coord):
+	# Restore the underlying preview color, or NONE if no preview applies.
+	if _action_controller.is_target_tile(coord):
+		_grid.set_highlight(coord, GridEnums.HighlightState.ATTACK_RANGE)
+	elif _move_controller.is_preview_tile(coord):
 		_grid.set_highlight(coord, GridEnums.HighlightState.MOVE_RANGE)
 	else:
 		_grid.set_highlight(coord, GridEnums.HighlightState.NONE)

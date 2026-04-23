@@ -759,19 +759,200 @@ NEXT SESSION: Phase 3C — Battle / Ability Resolution.
   Targets:
     - Ability UI: select a skill from the active unit's kit → show valid
       target tiles (in ATTACK_RANGE color) given the skill's range/shape.
-    - Click a valid target → resolve:
-        • Physical: damage = ATK × power − DEF, facing mod applied
-        • Magic:    damage = MAG × power − RES, facing mod applied
-        • Healing:  amount = MAG × power (no reduction)
-        • Buffs/debuffs: apply a StatusEffect (minimal implementation)
-    - Facing modifiers (first pass, subject to tuning):
-        Rear  = 1.5× damage (and backstab's extra 2.0× stacks on top)
-        Side  = 1.0×
-        Front = 0.75×
-      All attacks hit for Alpha (no miss chance) per CD Q2 ruling.
+    - Click a valid target → resolve damage / heal / buff.
+    - Facing modifiers (Front 0.75x / Side 1.0x / Rear 1.5x, backstab stacks).
     - Floating damage/heal numbers above target on impact.
-    - Enemy AI stub: pick a random legal target in range and attack; if no
-      target in range, move toward nearest enemy via move_controller.
-    - FOIL integration: route each player action through FOILTracker.record_action
-      via the battle resolver. Per-unit tracker context — may require the
-      deferred FOIL refactor noted in Session 4 (multi-character battles).
+    - Enemy AI stub.
+    - FOIL integration: route player actions through FOILTracker.record_action.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 6 (Phase 3C: Battle & Ability Resolution)
+==========================================================================
+
+STATUS: Phase 3C complete. Full combat loop is live — player can select a
+        skill, target a unit, resolve damage/heal with facing modifiers,
+        see floating numbers, and the battle ends on last-enemy kill.
+        Enemy AI acts and moves toward players. FOIL records each player
+        action per-character via the v2 tracker refactor.
+
+FOIL TRACKER REFACTOR (v1 → v2):
+  Problem: v1 held ONE active battle via _current_battle + _battle_active,
+  but an Alpha party has 3 characters all acting in one battle.
+  Solution: _current_battles Dictionary keyed by StringName(character_name).
+  API changes:
+    - begin_battle(character_name, job, foil_level)       — same shape, now
+                                                            callable N times
+                                                            per battle
+    - record_action(character_name, skill_name, ...)      — character_name added
+    - commit_battle(character_name, turn_count, victory)  — character_name added
+    - commit_all_battles(turn_count, victory)             — new convenience
+    - abort_battle(character_name), abort_all_battles()   — split from single-abort
+    - has_character_battle(name)                          — idempotency check
+  Save format bumped: version 2 in save_to_dict(); v1 loads still work since
+  battle_history schema is unchanged.
+
+FILES ADDED THIS SESSION:
+
+scripts/battle/
+  targeting.gd        — class_name Targeting. Static.
+                        valid_anchors(grid, caster, skill, all_units) returns
+                        the Vector2i list of legal skill anchor coords given
+                        range, target_type, team hostility, and alive-status.
+                        Does NOT expand AoE — the resolver does that.
+                        expand_area(skill, anchor, grid) handles SINGLE /
+                        CROSS / SQUARE / RADIUS / LINE shapes.
+  ability_resolver.gd — class_name AbilityResolver. Static.
+                        resolve(caster, skill, anchor, grid, units, turn_num)
+                        → Dictionary describing what happened. Mutates
+                        target.stats directly; floating text, FOIL logging,
+                        and audio are the caller's responsibility.
+                        Facing modifiers as CD specified (0.75 / 1.0 / 1.5).
+                        Backstab stacks: rear + requires_rear_for_bonus =
+                        1.5 × 2.0 = 3.0x the base stat.
+                        Damage formula: max(1, int(attacker_stat × power × facing)
+                                           − target_defense_stat).
+                        Returns effects[] array with per-target damage/heal/kill/side.
+  action_controller.gd — class_name ActionController extends Node. Mirror of
+                        MoveController in shape. State machine:
+                          IDLE → SELECTING_SKILL → SELECTING_TARGET → EXECUTING → IDLE
+                        Coordinates with MoveController: hides move preview
+                        when entering targeting, restores it on cancel_targeting
+                        (if unit still has move).
+                        Enemy entry: enemy_act_if_possible(unit) does a simple
+                        scoring pass (offensive on low-HP foe > healing low-HP
+                        ally > buff > nothing) and fires the same resolver.
+                        Checks turn_manager.check_outcome() after each resolve;
+                        ends battle immediately on killing blow so the victory
+                        banner doesn't wait for SPACE.
+                        Routes every player-side effect through
+                        FOILTracker.record_action with engagement_distance,
+                        caster/target coords, damage_dealt, was_kill, etc.
+                        All FOILActionRecord fields are one-hop from SkillData
+                        + Unit, no translator layer.
+
+scripts/ui/
+  ability_bar.gd       — class_name AbilityBar extends CanvasLayer. Populated
+                        per player-unit turn with one button per skill
+                        (greyed if unaffordable MP). Emits skill_selected.
+                        show_targeting(skill) dims non-selected buttons while
+                        waiting for the target click.
+  floating_text.gd    — class_name FloatingText extends Node3D. Label3D with
+                        billboard enabled so numbers stay readable after
+                        Q/E camera rotation. Tweens upward 1.2 world units
+                        over 1.0s, fade-out in the back half. static spawn()
+                        fire-and-forget factory.
+
+scenes/
+  ability_bar.tscn    — CanvasLayer + anchored bottom panel (buttons row +
+                        unit label + hint). unique_name_in_owner on the key
+                        refs so the script @onready-picks them cleanly.
+
+scripts/
+  main.gd rewrite     — Now binds all controllers in order (TurnHUD →
+                        MoveController → ActionController) and starts a FOIL
+                        battle record for each player unit before begin_battle.
+                        Enemy turns drive a simple brain: wait → try-act →
+                        move-toward-nearest-hostile → try-act-again → end_turn.
+                        All steps guarded against the unit dying or the
+                        battle ending mid-sequence via _still_this_unit_turn().
+                        Hover/unhover logic now respects three preview layers:
+                        ACTION target > MOVE preview > base HOVER.
+                        ESC bound to cancel_targeting.
+                        Commits every player-unit's FOIL record via
+                        commit_all_battles on battle_ended.
+
+scripts/turn/turn_manager.gd updates:
+  - Added monotonic _turn_number counter. Exposed via get_turn_number().
+    Used by FOIL routing. (The CT-derived approximation I had earlier was
+    wrong because CT resets each turn.)
+  - Added check_outcome() — re-evaluates win/lose synchronously. Action
+    controller calls it after damage resolves so killing blows end the
+    battle immediately instead of waiting for end_turn.
+
+scripts/movement/move_controller.gd updates:
+  - hide_preview() — public clear. Action controller calls it when entering
+    target selection so clicks don't ambiguously hit both systems.
+  - refresh_preview() — re-shows preview for the active unit if they still
+    have move available. Called by action controller after canceling
+    targeting or after a successful act-before-move.
+  - execute_move is now awaitable (has `await _execute_path`) so the enemy
+    AI can sequence: `await execute_move(goal)` → try to act again.
+
+COMBAT FLOW (PLAYER TURN):
+  1. Turn starts → ability bar populates with skills, move preview shows.
+  2. Player either:
+     a) Clicks a blue tile → walk there, preview clears. Ability bar stays.
+     b) Clicks an ability button → preview clears, ATTACK_RANGE highlights.
+        - Hover target → TARGET color, damage/kill feedback visible.
+        - Click target → resolve, floating numbers, FOIL record. If unit
+          hasn't moved, move preview re-opens automatically.
+        - ESC or right-click → cancel targeting, skill menu reopens, move
+          preview restored.
+  3. Player ends turn with SPACE or W (Wait). Facing stays as-is (explicit
+     facing-picker UI is still stubbed — Phase 4/5 adds a real picker).
+
+COMBAT FLOW (ENEMY TURN):
+  1. Turn starts → camera pans, think-delay (0.4s).
+  2. enemy_act_if_possible: score each skill × each valid anchor; pick the
+     highest-scoring pair. Offense on low-HP foe > heal low-HP ally > buff >
+     nothing. If any pair scores > 0, resolve it.
+  3. If move unspent, find the reachable tile closest to the nearest hostile,
+     walk there.
+  4. After move, re-run enemy_act_if_possible — we may now be in range.
+  5. end_turn().
+
+FACING MODIFIERS (TUNING KNOBS):
+  const FRONT_MOD = 0.75   (AbilityResolver)
+  const FLANK_MOD = 1.0
+  const REAR_MOD  = 1.5
+  Backstab rear_bonus_multiplier = 2.0 in SkillLibrary, stacks to 3.0x when
+  fired from the rear (1.5 × 2.0). Front attacks still land (no miss chance
+  for Alpha per CD Q2). Damage floor = 1 so a heavy-armor fight doesn't
+  deadlock.
+
+STATUS EFFECTS (INTENTIONALLY STUBBED):
+  - BUFF and DEBUFF skills resolve to a buff_label in the result but do NOT
+    apply a real stat modifier yet. The floating text reads "PROTECT!" /
+    "STEAL" / etc. so the feedback loop exists.
+  - Full StatusEffect system (stat mods, durations, visual badges, stack
+    rules) is scoped to Phase 4/5. When it lands, AbilityResolver will grow
+    a fourth skill_type branch that writes to a status_effects list on the
+    target.
+
+FOIL INTEGRATION STATE:
+  - begin_battle fires for every PLAYER unit in main._ready, so records
+    are open from turn 1.
+  - record_action fires for every player-unit effect inside
+    ActionController._record_foil_actions.
+  - commit_all_battles fires on battle_ended in main.gd.
+  - Every FOILActionRecord field is populated: damage, was_kill, was_hit
+    (always true for Alpha), engagement_distance (manhattan), caster/target
+    coords, turn_number, targeted_ally (inverted hostility), skill_category
+    via SkillData.foil_category().
+  - NOT YET wired: FOILAnalyzer + FOILLoadoutBuilder at battle SETUP
+    (that's Phase 6 "FOIL Integration Hooks"). The tracker is recording;
+    the loadout-influence loop closes in Phase 6.
+
+DESIGN NOTES / DEFERRED:
+  - AoE preview highlighting — hovering a skill's target tile could
+    preview the full AoE fan. Skipped for Alpha (no AoE skills yet). Easy
+    to add via Targeting.expand_area(skill, hover_coord, grid).
+  - Damage prediction tooltip on target hover — polish. Post-Alpha.
+  - Skill ordering / grouping in the ability bar — all skills flat for
+    now; will need categories (Basic / Weapon / Magic / Support) once
+    kits grow past ~5.
+  - Facing-picker UI — CD wants explicit choose-your-facing at end of
+    turn, non-negotiable. Currently turn keeps current facing. Phase 4
+    adds the 4-button picker since End Game UX fits the same HUD work.
+
+NEXT SESSION: Phase 4 — End Game Conditions (+ facing picker).
+  Targets:
+    - Explicit Victory / Defeat overlay with a basic summary: turns taken,
+      damage dealt, abilities used by each player unit.
+    - Retry button (Producer call deferred; useful for test iteration).
+    - Facing-picker UI overlay: during CHOOSING_FACING phase, show four
+      arrow buttons around the active unit; click one to set facing and
+      close the turn.
+    - Also a good spot to surface FOIL profile summary in a corner panel
+      so we can see profile data building between battles.

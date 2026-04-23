@@ -121,7 +121,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 - Highlight reachable tiles when unit is selected to move
 - Movement animates unit across path tile-by-tile (even at placeholder level — don't teleport, it kills readability)
 
-### 3C: Battle / Action Resolution
+### 3C: Battle / Action Resolution ✅ DONE (Alpha Session 6)
 - Ability use: select ability → show valid targets/range → select target → resolve
 - Damage formula (starting point, subject to tuning):
   - `Physical Damage = Attack × Ability Power − Target Defense` (with facing modifier)
@@ -240,8 +240,8 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 | 🔴 3 | Unit Base Class + 3 Jobs | ✅ Done (S3) | Grid (for placement) | Programming Lead + Creative Director (stat review) |
 | 🔴 4 | Turn System (turn order, move/act/face/end loop) | ✅ Done (S4) | Grid + Units | Programming Lead |
 | 🔴 5 | Movement + Pathfinding | ✅ Done (S5) | Grid + Turn System | Programming Lead |
-| 🔴 6 | Battle / Ability Resolution | ⏭️ Next | Units + Turn System | Programming Lead |
-| 🔴 7 | End Game Conditions | ⏭️ | Battle System | Programming Lead |
+| 🔴 6 | Battle / Ability Resolution | ✅ Done (S6) | Units + Turn System | Programming Lead |
+| 🔴 7 | End Game Conditions | ⏭️ Next | Battle System | Programming Lead |
 | 🟡 8 | Debug System (overlay, console, log) | ⏭️ | All above (to inspect them) | Programming Lead |
 | 🟡 9 | FOIL Integration Hooks | ⏭️ | FOIL System + Battle System | Programming Lead |
 | 🟢 10 | Tuning Pass (damage values, move ranges, speed, facing modifiers) | ⏭️ | Everything functional | Creative Director + QA Lead |
@@ -267,10 +267,10 @@ Alpha is **done** when:
 - [x] Camera rotates in 4 directions, FFTA-style
 - [x] 3 units per side, each with distinct jobs (Rogue, Squire, White Mage)
 - [x] Units take turns based on speed
-- [~] Units can move, use an ability, choose facing, and end their turn *(phase flow + end-turn live; MOVE/ACT execution pending Phase 3B/3C)*
-- [ ] Damage, healing, and buffs resolve correctly with facing modifiers
-- [ ] A battle can be won or lost
-- [ ] FOIL system records player actions and influences enemy setup
+- [~] Units can move, use an ability, choose facing, and end their turn *(move+act+end live; explicit facing-picker UI still stubbed — turn keeps current facing on end)*
+- [x] Damage, healing, and buffs resolve correctly with facing modifiers *(buffs currently log-only; full StatusEffect system is Phase 4/5)*
+- [x] A battle can be won or lost *(TurnManager.check_outcome fires win/lose banner)*
+- [~] FOIL system records player actions and influences enemy setup *(record_action live per-unit; loadout influence is Phase 6)*
 - [ ] Debug tools allow inspection of all systems
 - [ ] A tester can play 3 consecutive battles and see FOIL adaptation shift enemy loadouts
 
