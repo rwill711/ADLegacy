@@ -63,7 +63,7 @@ func _ready() -> void:
 	_turn_manager.battle_ended.connect(_on_battle_ended)
 
 	_turn_hud.bind_turn_manager(_turn_manager)
-	_move_controller.bind(_grid, _visualizer, _turn_manager)
+	_move_controller.bind(_grid, _visualizer, _turn_manager, _unit_spawner)
 	_action_controller.bind(
 		_grid, _visualizer, _turn_manager, _unit_spawner,
 		_move_controller, _ability_bar, self
@@ -211,7 +211,11 @@ func _closest_reachable_toward_enemy(unit: Unit) -> Vector2i:
 	if nearest_enemy == null:
 		return unit.coord
 
-	var reachable: Dictionary = Pathfinder.reachable_tiles(_grid, unit)
+	var ally_ids: Dictionary = {}
+	for ally in _unit_spawner.get_units_on_team(unit.team):
+		if ally.unit_id != unit.unit_id and ally.is_alive():
+			ally_ids[ally.unit_id] = true
+	var reachable: Dictionary = Pathfinder.reachable_tiles(_grid, unit, ally_ids)
 	if reachable.is_empty():
 		return unit.coord
 

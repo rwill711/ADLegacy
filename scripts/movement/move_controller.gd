@@ -25,6 +25,7 @@ signal move_undone
 var _grid: BattleGrid = null
 var _visualizer: GridVisualizer = null
 var _turn_manager: TurnManager = null
+var _spawner = null  # UnitSpawner — typed as Variant to avoid circular ref
 
 
 ## --- State ------------------------------------------------------------------
@@ -32,6 +33,7 @@ var _active_unit: Unit = null
 var _reachable: Dictionary = {}
 var _preview_active: bool = false
 var _executing: bool = false
+var _ally_ids: Dictionary = {}  # unit_ids of passable allies for current preview
 
 ## Stored before a move executes so undo_move() can teleport back.
 var _pre_move_coord: Vector2i = Vector2i(-1, -1)
@@ -41,10 +43,11 @@ var _pre_move_coord: Vector2i = Vector2i(-1, -1)
 # WIRING
 # =============================================================================
 
-func bind(grid: BattleGrid, visualizer: GridVisualizer, turn_manager: TurnManager) -> void:
+func bind(grid: BattleGrid, visualizer: GridVisualizer, turn_manager: TurnManager, spawner = null) -> void:
 	_grid = grid
 	_visualizer = visualizer
 	_turn_manager = turn_manager
+	_spawner = spawner
 
 	_turn_manager.turn_started.connect(_on_turn_started)
 	_turn_manager.turn_ended.connect(_on_turn_ended)
@@ -110,10 +113,21 @@ func hide_preview() -> void:
 
 
 func _show_move_preview(unit: Unit) -> void:
-	_reachable = Pathfinder.reachable_tiles(_grid, unit)
+	_ally_ids = _build_ally_ids(unit)
+	_reachable = Pathfinder.reachable_tiles(_grid, unit, _ally_ids)
 	for coord in _reachable:
 		_grid.set_highlight(coord, GridEnums.HighlightState.MOVE_RANGE)
 	_preview_active = true
+
+
+func _build_ally_ids(unit: Unit) -> Dictionary:
+	var ids: Dictionary = {}
+	if _spawner == null:
+		return ids
+	for ally in _spawner.get_units_on_team(unit.team):
+		if ally.unit_id != unit.unit_id and ally.is_alive():
+			ids[ally.unit_id] = true
+	return ids
 
 
 func _clear_preview() -> void:
@@ -186,7 +200,7 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 	if not _reachable.has(coord):
 		return
 
-	var path: Array = Pathfinder.find_path(_grid, _active_unit, coord)
+	var path: Array = Pathfinder.find_path(_grid, _active_unit, coord, _ally_ids)
 	if path.size() < 2:
 		return
 	_execute_path(_active_unit, path)

@@ -204,6 +204,7 @@ func _build_visuals() -> void:
 	_body_mesh.add_child(_hp_bar_fg)
 
 	hp_changed.connect(func(_hp, _max): _update_hp_bar())
+	defeated.connect(_on_defeated_visual)
 
 	# Job label — billboard letter above the unit so you can ID them at a glance.
 	var label := Label3D.new()
@@ -245,6 +246,15 @@ func _update_hp_bar() -> void:
 		_hp_bar_mat.albedo_color = Color(0.9, 0.75, 0.1)
 	else:
 		_hp_bar_mat.albedo_color = Color(0.85, 0.15, 0.1)
+
+
+func _on_defeated_visual() -> void:
+	if _body_mesh == null:
+		return
+	var t := create_tween()
+	t.set_ease(Tween.EASE_OUT)
+	t.set_trans(Tween.TRANS_CUBIC)
+	t.tween_property(_body_mesh, "rotation_degrees:z", 90.0, 0.35)
 
 
 func _apply_tint() -> void:

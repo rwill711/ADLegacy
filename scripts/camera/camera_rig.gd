@@ -41,6 +41,10 @@ signal focus_changed(world_position: Vector3)
 @export_group("Focus")
 @export var focus_tween_duration: float = 0.25
 
+@export_group("Pan")
+## World-units per second when holding a pan key.
+@export var pan_speed: float = 8.0
+
 
 ## --- State (runtime) ---------------------------------------------------------
 var _rotation_index: int = 0
@@ -156,6 +160,26 @@ func _change_zoom(delta: float) -> void:
 # INPUT
 # =============================================================================
 
+func _process(delta: float) -> void:
+	var pan_dir := Vector3.ZERO
+	# Compute local forward/right from current pivot Y rotation.
+	var angle: float = deg_to_rad(rotation_degrees.y)
+	var fwd  := Vector3(-sin(angle), 0.0, -cos(angle))
+	var rgt  := Vector3( cos(angle), 0.0, -sin(angle))
+
+	if Input.is_action_pressed("camera_pan_up"):
+		pan_dir += fwd
+	if Input.is_action_pressed("camera_pan_down"):
+		pan_dir -= fwd
+	if Input.is_action_pressed("camera_pan_left"):
+		pan_dir -= rgt
+	if Input.is_action_pressed("camera_pan_right"):
+		pan_dir += rgt
+
+	if pan_dir.length_squared() > 0.0:
+		global_position += pan_dir.normalized() * pan_speed * delta
+
+
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("camera_rotate_left"):
 		rotate_left()
@@ -189,6 +213,10 @@ func _register_input_actions() -> void:
 		_key_event(KEY_E),
 		_joy_button_event(JOY_BUTTON_RIGHT_SHOULDER),
 	])
+	_ensure_action("camera_pan_up",    [_key_event(KEY_UP)])
+	_ensure_action("camera_pan_down",  [_key_event(KEY_DOWN)])
+	_ensure_action("camera_pan_left",  [_key_event(KEY_LEFT)])
+	_ensure_action("camera_pan_right", [_key_event(KEY_RIGHT)])
 
 
 static func _ensure_action(action: StringName, events: Array) -> void:

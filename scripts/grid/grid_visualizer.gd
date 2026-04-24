@@ -22,6 +22,11 @@ var _grid: BattleGrid = null
 ## Map coord → {mesh: MeshInstance3D, overlay: MeshInstance3D, area: Area3D, material: StandardMaterial3D}
 var _tile_nodes: Dictionary = {}
 
+## Track the last tile the cursor entered so fast mouse movement doesn't leave
+## stale hover highlights. When entering a new tile we emit unhover for the old
+## one before emitting hover for the new one.
+var _last_hovered: Vector2i = Vector2i(-1, -1)
+
 ## Shared floor material cache so we don't allocate N copies of identical
 ## StandardMaterial3D when the whole map is one terrain type.
 var _material_cache: Dictionary = {}
@@ -248,10 +253,15 @@ func _get_terrain_material(terrain: GridEnums.TerrainType) -> StandardMaterial3D
 # =============================================================================
 
 func _on_area_mouse_entered(coord: Vector2i) -> void:
+	if _last_hovered != Vector2i(-1, -1) and _last_hovered != coord:
+		tile_unhovered.emit(_last_hovered)
+	_last_hovered = coord
 	tile_hovered.emit(coord)
 
 
 func _on_area_mouse_exited(coord: Vector2i) -> void:
+	if _last_hovered == coord:
+		_last_hovered = Vector2i(-1, -1)
 	tile_unhovered.emit(coord)
 
 

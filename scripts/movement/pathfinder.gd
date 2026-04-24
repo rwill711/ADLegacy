@@ -24,7 +24,14 @@ class_name Pathfinder
 ## Return the set of tiles reachable by `unit` from its current coord within
 ## its move budget. Dictionary maps Vector2i → float cost-to-reach.
 ## The unit's starting coord is NOT in the returned set.
-static func reachable_tiles(grid: BattleGrid, unit: Unit) -> Dictionary:
+##
+## `passable_ids` — unit_ids of allies the unit can walk through (but not
+## end their turn on). Populated by the caller from the ally unit list.
+static func reachable_tiles(
+	grid: BattleGrid,
+	unit: Unit,
+	passable_ids: Dictionary = {}
+) -> Dictionary:
 	var out: Dictionary = {}
 	if grid == null or unit == null or unit.stats == null:
 		return out
@@ -50,7 +57,7 @@ static func reachable_tiles(grid: BattleGrid, unit: Unit) -> Dictionary:
 			continue
 
 		for neighbor in grid.neighbors(coord):
-			if not _can_step_to(grid, unit, coord, neighbor.coord, jump):
+			if not _can_step_to(grid, unit, coord, neighbor.coord, jump, passable_ids):
 				continue
 			var step_cost: float = neighbor.movement_cost()
 			var new_cost: float = cost + step_cost
@@ -63,6 +70,13 @@ static func reachable_tiles(grid: BattleGrid, unit: Unit) -> Dictionary:
 
 	# Strip the start tile — "don't move" isn't a move.
 	best_cost.erase(start)
+
+	# Strip ally-occupied tiles — unit can pass through allies but not stop on them.
+	for coord in best_cost.keys():
+		var tile := grid.get_tile(coord)
+		if tile != null and tile.occupant_id != &"" and passable_ids.has(tile.occupant_id):
+			best_cost.erase(coord)
+
 	return best_cost
 
 
@@ -73,7 +87,12 @@ static func reachable_tiles(grid: BattleGrid, unit: Unit) -> Dictionary:
 ## IMPORTANT: this ignores the unit's move budget. Use it for path computation
 ## to a tile already known to be in the reachable set; the caller is
 ## responsible for budget-checking via reachable_tiles() first.
-static func find_path(grid: BattleGrid, unit: Unit, goal: Vector2i) -> Array:
+static func find_path(
+	grid: BattleGrid,
+	unit: Unit,
+	goal: Vector2i,
+	passable_ids: Dictionary = {}
+) -> Array:
 	if grid == null or unit == null or unit.stats == null:
 		return []
 
@@ -99,7 +118,7 @@ static func find_path(grid: BattleGrid, unit: Unit, goal: Vector2i) -> Array:
 		var current_g: float = g_score.get(current, INF)
 
 		for neighbor in grid.neighbors(current):
-			if not _can_step_to(grid, unit, current, neighbor.coord, jump):
+			if not _can_step_to(grid, unit, current, neighbor.coord, jump, passable_ids):
 				continue
 			var tentative_g: float = current_g + neighbor.movement_cost()
 			if tentative_g >= g_score.get(neighbor.coord, INF):
@@ -119,13 +138,16 @@ static func find_path(grid: BattleGrid, unit: Unit, goal: Vector2i) -> Array:
 ## Can `unit` step from `from` to `to` this turn?
 ## Considers: terrain walkable, occupancy, jump delta.
 ## Special case: a tile currently occupied by `unit` itself is passable
-## (we're the one leaving it).
+## (we're the one leaving it). Tiles occupied by a unit_id in `passable_ids`
+## (allies) can be stepped through but not stopped on — reachable_tiles
+## strips those from the final output.
 static func _can_step_to(
 	grid: BattleGrid,
 	unit: Unit,
 	from: Vector2i,
 	to: Vector2i,
-	jump: int
+	jump: int,
+	passable_ids: Dictionary = {}
 ) -> bool:
 	var from_tile := grid.get_tile(from)
 	var to_tile := grid.get_tile(to)
@@ -136,9 +158,10 @@ static func _can_step_to(
 	if not to_tile.is_terrain_walkable():
 		return false
 
-	# Occupancy check — allow own tile (we're on it right now) but nothing else.
+	# Occupancy check — allow own tile and passable allies; block everything else.
 	if to_tile.occupant_id != &"" and to_tile.occupant_id != unit.unit_id:
-		return false
+		if not passable_ids.has(to_tile.occupant_id):
+			return false
 	if to_tile.object_id != &"":
 		return false
 
