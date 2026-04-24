@@ -24,11 +24,28 @@ static func valid_anchors(
 	if grid == null or caster == null or skill == null:
 		return valid
 
-	# In-range tile set is a cheap manhattan filter; refine below.
-	var candidate_tiles := grid.tiles_in_range(caster.coord, skill.max_range)
+	var is_magic: bool = skill.skill_type in [
+		SkillEnums.SkillType.MAGIC_DAMAGE,
+		SkillEnums.SkillType.HEALING,
+		SkillEnums.SkillType.BUFF,
+		SkillEnums.SkillType.DEBUFF,
+	]
+	var is_ranged: bool = skill.max_range > 1
+	var caster_tile: GridTile = grid.get_tile(caster.coord)
+	var caster_height: int = caster_tile.height if caster_tile != null else 0
+
+	# Fetch a slightly wider pool so height bonus tiles aren't missed.
+	var fetch_range: int = skill.max_range + (2 if is_ranged and not is_magic else 0)
+	var candidate_tiles := grid.tiles_in_range(caster.coord, fetch_range)
 	for tile in candidate_tiles:
 		var dist: int = BattleGrid.manhattan(caster.coord, tile.coord)
-		if dist < skill.min_range or dist > skill.max_range:
+
+		var effective_max: int = skill.max_range
+		if is_ranged and not is_magic:
+			var height_delta: int = caster_height - tile.height
+			effective_max = clampi(skill.max_range + height_delta, skill.min_range, skill.max_range + 2)
+
+		if dist < skill.min_range or dist > effective_max:
 			continue
 
 		var is_self: bool = (tile.coord == caster.coord)

@@ -93,6 +93,8 @@ func declare_moved() -> void:
 	if _phase != TurnEnums.TurnPhase.AWAITING_ACTION:
 		return
 	_moved_this_turn = true
+	if _acted_this_turn:
+		end_turn()
 
 
 ## Mark that the active unit has used their action this turn.
@@ -101,6 +103,8 @@ func declare_acted() -> void:
 	if _phase != TurnEnums.TurnPhase.AWAITING_ACTION:
 		return
 	_acted_this_turn = true
+	if _moved_this_turn:
+		end_turn()
 
 
 ## End the current unit's turn. Transitions to CHOOSING_FACING and waits

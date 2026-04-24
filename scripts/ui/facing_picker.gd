@@ -1,42 +1,28 @@
 class_name FacingPicker extends CanvasLayer
 ## Modal overlay that appears when the active unit enters CHOOSING_FACING.
-## Four compass buttons (N/E/S/W) + ESC cancels back to AWAITING_ACTION.
-##
-## Per Creative Director: choosing facing before ending the turn is
-## non-negotiable core tactics feel — this UI enforces it.
-
-
-signal facing_chosen(facing: UnitEnums.Facing)
-signal cancelled()
+## Player clicks any tile and the unit swivels to face it. ESC cancels back
+## to AWAITING_ACTION.
 
 
 @onready var _root: Control = %Root
 @onready var _unit_label: Label = %UnitLabel
 @onready var _hint_label: Label = %HintLabel
-@onready var _button_n: Button = %ButtonN
-@onready var _button_e: Button = %ButtonE
-@onready var _button_s: Button = %ButtonS
-@onready var _button_w: Button = %ButtonW
 
 
 var _turn_manager: TurnManager = null
+var _visualizer: GridVisualizer = null
 var _current_unit: Unit = null
+var _listening: bool = false
 
 
 func _ready() -> void:
 	_root.visible = false
-	_button_n.pressed.connect(func(): _emit_and_close(UnitEnums.Facing.NORTH))
-	_button_e.pressed.connect(func(): _emit_and_close(UnitEnums.Facing.EAST))
-	_button_s.pressed.connect(func(): _emit_and_close(UnitEnums.Facing.SOUTH))
-	_button_w.pressed.connect(func(): _emit_and_close(UnitEnums.Facing.WEST))
 
 
 # =============================================================================
 # BINDING
 # =============================================================================
 
-## Attach to a turn manager. The picker listens to phase_changed and shows
-## itself when CHOOSING_FACING is entered for a player unit.
 func bind_turn_manager(manager: TurnManager) -> void:
 	if _turn_manager == manager:
 		return
@@ -45,6 +31,10 @@ func bind_turn_manager(manager: TurnManager) -> void:
 	_turn_manager = manager
 	if _turn_manager != null:
 		_turn_manager.phase_changed.connect(_on_phase_changed)
+
+
+func bind_visualizer(visualizer: GridVisualizer) -> void:
+	_visualizer = visualizer
 
 
 # =============================================================================
@@ -57,7 +47,6 @@ func _on_phase_changed(phase: int) -> void:
 		if unit != null and unit.team == UnitEnums.Team.PLAYER:
 			_show(unit)
 	else:
-		# Any other phase → hide. Covers cancel, commit, battle end.
 		_hide()
 
 
@@ -81,52 +70,35 @@ func _unhandled_input(event: InputEvent) -> void:
 func _show(unit: Unit) -> void:
 	_current_unit = unit
 	_unit_label.text = "%s — Choose Facing" % unit.display_name
-	_hint_label.text = "Pick a direction. ESC to cancel and keep acting."
-	_highlight_current_facing(unit.facing)
+	_hint_label.text = "Click a tile to face it. ESC to cancel."
 	_root.visible = true
+	if _visualizer != null and not _listening:
+		_visualizer.tile_clicked.connect(_on_tile_clicked)
+		_listening = true
 
 
 func _hide() -> void:
 	_root.visible = false
 	_current_unit = null
-
-
-func _highlight_current_facing(facing: UnitEnums.Facing) -> void:
-	# Dim all then brighten the current direction so the player sees where
-	# they're already facing — common case of "keep this" becomes a single
-	# click.
-	for b in [_button_n, _button_e, _button_s, _button_w]:
-		b.modulate = Color(1, 1, 1, 0.65)
-	var current_button: Button = _button_for_facing(facing)
-	if current_button != null:
-		current_button.modulate = Color.WHITE
-
-
-func _button_for_facing(facing: UnitEnums.Facing) -> Button:
-	match facing:
-		UnitEnums.Facing.NORTH: return _button_n
-		UnitEnums.Facing.EAST:  return _button_e
-		UnitEnums.Facing.SOUTH: return _button_s
-		UnitEnums.Facing.WEST:  return _button_w
-	return null
+	if _visualizer != null and _listening:
+		_visualizer.tile_clicked.disconnect(_on_tile_clicked)
+		_listening = false
 
 
 # =============================================================================
-# CHOICE COMMIT
+# TILE CLICK → FACING
 # =============================================================================
 
-func _emit_and_close(facing: UnitEnums.Facing) -> void:
+func _on_tile_clicked(coord: Vector2i, _button_index: int) -> void:
 	if _current_unit == null:
 		return
-	_current_unit.set_facing(facing)
-	facing_chosen.emit(facing)
+	_current_unit.face_toward(coord)
 	_hide()
 	if _turn_manager != null:
 		_turn_manager.confirm_end_turn()
 
 
 func _cancel() -> void:
-	cancelled.emit()
 	_hide()
 	if _turn_manager != null:
 		_turn_manager.cancel_end_turn()

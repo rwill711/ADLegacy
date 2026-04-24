@@ -28,6 +28,7 @@ static func register_all(mgr) -> void:
 	mgr.register_command("win",           _cmd_win.bind(mgr),           "force victory")
 	mgr.register_command("lose",          _cmd_lose.bind(mgr),          "force defeat")
 	mgr.register_command("next_turn",     _cmd_next_turn.bind(mgr),     "skip the current unit's turn")
+	mgr.register_command("end_turn",      _cmd_end_turn.bind(mgr),      "end the active unit's turn immediately")
 
 	# FOIL
 	mgr.register_command("foil_profile",  _cmd_foil_profile.bind(mgr),  "foil_profile [character] — dump FOIL profile")
@@ -163,6 +164,16 @@ static func _cmd_next_turn(mgr, _args: PackedStringArray) -> String:
 		return "no active unit"
 	mgr.turn_manager.end_turn_immediate()
 	return "skipped %s's turn" % active.unit_id
+
+
+static func _cmd_end_turn(mgr, _args: PackedStringArray) -> String:
+	if mgr.turn_manager == null:
+		return "no active battle"
+	var active: Unit = mgr.turn_manager.get_active_unit()
+	if active == null:
+		return "no active unit"
+	mgr.turn_manager.end_turn()
+	return "ending %s's turn — choose facing" % active.unit_id
 
 
 # =============================================================================

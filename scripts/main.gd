@@ -67,9 +67,7 @@ func _ready() -> void:
 		_move_controller, _ability_bar, self
 	)
 	_facing_picker.bind_turn_manager(_turn_manager)
-
-	_ability_bar.wait_pressed.connect(_turn_manager.wait_and_end_turn)
-	_ability_bar.end_turn_pressed.connect(_turn_manager.end_turn)
+	_facing_picker.bind_visualizer(_visualizer)
 
 	_battle_summary.retry_pressed.connect(_on_retry_pressed)
 	_battle_summary.quit_pressed.connect(_on_quit_pressed)

@@ -59,6 +59,11 @@ var gear_hint: String = ""
 var _body_mesh: MeshInstance3D = null
 var _facing_arrow: MeshInstance3D = null
 var _body_material: StandardMaterial3D = null
+var _hp_bar_fg: MeshInstance3D = null
+var _hp_bar_mat: StandardMaterial3D = null
+
+const _HP_BAR_WIDTH: float = 0.55
+const _HP_BAR_HEIGHT: float = 0.07
 
 
 # =============================================================================
@@ -134,6 +139,38 @@ func _build_visuals() -> void:
 
 	_body_mesh.add_child(_facing_arrow)
 
+	# HP bar — two billboard quads above the unit body.
+	var bar_y: float = capsule.height + 0.45
+	var bg := MeshInstance3D.new()
+	bg.name = "HPBarBG"
+	var bg_quad := QuadMesh.new()
+	bg_quad.size = Vector2(_HP_BAR_WIDTH, _HP_BAR_HEIGHT)
+	bg.mesh = bg_quad
+	var bg_mat := StandardMaterial3D.new()
+	bg_mat.albedo_color = Color(0.5, 0.05, 0.05)
+	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	bg_mat.no_depth_test = true
+	bg.material_override = bg_mat
+	bg.position = Vector3(0, bar_y, 0)
+	_body_mesh.add_child(bg)
+
+	_hp_bar_fg = MeshInstance3D.new()
+	_hp_bar_fg.name = "HPBarFG"
+	var fg_quad := QuadMesh.new()
+	fg_quad.size = Vector2(_HP_BAR_WIDTH, _HP_BAR_HEIGHT)
+	_hp_bar_fg.mesh = fg_quad
+	_hp_bar_mat = StandardMaterial3D.new()
+	_hp_bar_mat.albedo_color = Color(0.2, 0.85, 0.2)
+	_hp_bar_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_hp_bar_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	_hp_bar_mat.no_depth_test = true
+	_hp_bar_fg.material_override = _hp_bar_mat
+	_hp_bar_fg.position = Vector3(0, bar_y, 0.002)
+	_body_mesh.add_child(_hp_bar_fg)
+
+	hp_changed.connect(func(_hp, _max): _update_hp_bar())
+
 	# Job label — billboard letter above the unit so you can ID them at a glance.
 	var label := Label3D.new()
 	label.name = "JobLabel"
@@ -152,10 +189,28 @@ func _apply_visual_state() -> void:
 	# place_on_tile() for the correct world y. This method just handles facing
 	# and tint; position is set externally.
 	_apply_tint()
+	_update_hp_bar()
 	rotation.y = UnitEnums.facing_to_y_rotation(facing)
 	var job_label := _body_mesh.get_node_or_null("JobLabel") as Label3D
 	if job_label != null:
 		job_label.text = display_name.left(1).to_upper() if display_name != "" else "?"
+
+
+func _update_hp_bar() -> void:
+	if _hp_bar_fg == null or stats == null:
+		return
+	var pct: float = float(stats.hp) / float(stats.max_hp) if stats.max_hp > 0 else 0.0
+	pct = clampf(pct, 0.0, 1.0)
+	var fg_mesh: QuadMesh = _hp_bar_fg.mesh as QuadMesh
+	if fg_mesh != null:
+		fg_mesh.size = Vector2(_HP_BAR_WIDTH * pct, _HP_BAR_HEIGHT)
+	_hp_bar_fg.position.x = -_HP_BAR_WIDTH * (1.0 - pct) * 0.5
+	if pct > 0.5:
+		_hp_bar_mat.albedo_color = Color(0.2, 0.85, 0.2)
+	elif pct > 0.25:
+		_hp_bar_mat.albedo_color = Color(0.9, 0.75, 0.1)
+	else:
+		_hp_bar_mat.albedo_color = Color(0.85, 0.15, 0.1)
 
 
 func _apply_tint() -> void:

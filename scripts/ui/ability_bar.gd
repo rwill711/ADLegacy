@@ -9,8 +9,6 @@ class_name AbilityBar extends CanvasLayer
 
 
 signal skill_selected(skill: SkillData)
-signal wait_pressed
-signal end_turn_pressed
 
 
 @onready var _buttons_row: HBoxContainer = %ButtonsRow
@@ -48,10 +46,6 @@ func show_for_unit(unit: Unit) -> void:
 	for skill in unit.skills:
 		_buttons_row.add_child(_build_button(skill, unit))
 
-	_buttons_row.add_child(_build_separator())
-	_buttons_row.add_child(_build_action_button("Wait", wait_pressed))
-	_buttons_row.add_child(_build_action_button("End Turn", end_turn_pressed))
-
 	_root.visible = true
 
 
@@ -68,6 +62,8 @@ func show_targeting(skill: SkillData) -> void:
 	_hint_label.text = "Targeting %s. Click a highlighted tile. ESC to cancel." % skill.display_name
 	# Dim unselected buttons.
 	for button in _buttons_row.get_children():
+		if not button is Button:
+			continue
 		var b: Button = button
 		if b.get_meta("skill_name") == skill.skill_name:
 			b.modulate = Color.WHITE
@@ -98,20 +94,6 @@ func _build_button(skill: SkillData, unit: Unit) -> Button:
 
 func _on_button_pressed(skill: SkillData) -> void:
 	skill_selected.emit(skill)
-
-
-func _build_separator() -> VSeparator:
-	var sep := VSeparator.new()
-	sep.custom_minimum_size = Vector2(8, 0)
-	return sep
-
-
-func _build_action_button(label: String, sig: Signal) -> Button:
-	var button := Button.new()
-	button.text = label
-	button.custom_minimum_size = Vector2(110, 40)
-	button.pressed.connect(func(): sig.emit())
-	return button
 
 
 func _clear_buttons() -> void:
