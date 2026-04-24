@@ -4,6 +4,10 @@ class_name Unit extends Node3D
 ##
 ## Phase 2 scope: placement, facing, stats, skill listing, HP/MP plumbing.
 ## Phase 3 adds movement along a path; Phase 3C adds ability execution.
+##
+## ADR-004: Units now carry base_attributes alongside derived stats. The
+## attribute block is the source of truth; stats are re-derivable at any
+## time via rederive_stats() (used after level-ups, equipment changes, etc).
 
 
 ## --- Signals ----------------------------------------------------------------
@@ -23,8 +27,9 @@ signal defeated()
 
 
 ## --- Data refs --------------------------------------------------------------
-## Job template; never mutated. Per-unit stats are a duplicated instance.
+## Job template; never mutated. Per-unit stats are derived from attributes.
 var job: JobData = null
+var base_attributes: BaseAttributes = null
 var stats: UnitStats = null
 var skills: Array = []
 
@@ -89,6 +94,15 @@ func initialize(
 	display_name = p_display_name
 	team = p_team
 	job = p_job
+
+	# Store a duplicate of the job's base attributes on this unit.
+	# Future growth (leveling, events) mutates this copy, not the job template.
+	if p_job.base_attributes != null:
+		base_attributes = p_job.base_attributes.duplicate(true)
+	else:
+		push_error("Unit.initialize: job '%s' has no base_attributes" % p_job.job_name)
+		base_attributes = BaseAttributes.new()
+
 	stats = p_job.instantiate_stats()
 	skills = p_job.get_starting_skills()
 	coord = p_coord
@@ -97,6 +111,26 @@ func initialize(
 	# If we're already in the tree, apply visuals now. Otherwise _ready will.
 	if is_inside_tree() and _body_mesh != null:
 		_apply_visual_state()
+
+
+## Recalculate derived stats from current base_attributes. Call after
+## level-ups, equipment changes, or any event that modifies attributes.
+## Preserves current HP/MP ratios so a mid-battle re-derive doesn't
+## accidentally full-heal the unit.
+func rederive_stats() -> void:
+	if base_attributes == null or job == null:
+		return
+	var hp_ratio: float = float(stats.hp) / float(stats.max_hp) if stats.max_hp > 0 else 1.0
+	var mp_ratio: float = float(stats.mp) / float(stats.max_mp) if stats.max_mp > 0 else 1.0
+
+	stats = StatFormulas.derive(base_attributes, job.base_move_range, job.base_jump)
+
+	# Restore HP/MP to same percentage of new max
+	stats.hp = clampi(int(hp_ratio * float(stats.max_hp)), 1 if hp_ratio > 0.0 else 0, stats.max_hp)
+	stats.mp = clampi(int(mp_ratio * float(stats.max_mp)), 0, stats.max_mp)
+
+	hp_changed.emit(stats.hp, stats.max_hp)
+	mp_changed.emit(stats.mp, stats.max_mp)
 
 
 # =============================================================================
