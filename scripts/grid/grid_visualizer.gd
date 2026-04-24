@@ -94,7 +94,7 @@ func _build_tile_node(tile: GridTile) -> void:
 	quad.size = Vector2(size_xy, size_xy)
 	overlay.mesh = quad
 	overlay.rotation_degrees = Vector3(-90, 0, 0)  # lay flat
-	overlay.position = tile.top_world_position() + Vector3(0, 0.015, 0)
+	overlay.position = Vector3(0, size_y * 0.5 + 0.015, 0)  # local to mesh_instance
 
 	var overlay_mat := StandardMaterial3D.new()
 	overlay_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -161,7 +161,7 @@ func _on_tile_changed(coord: Vector2i) -> void:
 	if box != null:
 		box.size = Vector3(size_xy, size_y, size_xy)
 	mesh_instance.position = tile.mesh_center_position()
-	overlay.position = tile.top_world_position() + Vector3(0, 0.015, 0)
+	overlay.position = Vector3(0, size_y * 0.5 + 0.015, 0)  # local to mesh_instance
 
 	_apply_highlight(overlay, overlay_mat, tile.highlight_state)
 

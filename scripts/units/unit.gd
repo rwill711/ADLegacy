@@ -134,6 +134,17 @@ func _build_visuals() -> void:
 
 	_body_mesh.add_child(_facing_arrow)
 
+	# Job label — billboard letter above the unit so you can ID them at a glance.
+	var label := Label3D.new()
+	label.name = "JobLabel"
+	label.text = display_name.left(1).to_upper() if display_name != "" else "?"
+	label.font_size = 48
+	label.modulate = Color(1, 1, 1, 0.95)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.position = Vector3(0, capsule.height + 0.25, 0)
+	_body_mesh.add_child(label)
+
 
 func _apply_visual_state() -> void:
 	# World position: on top of the tile at this unit's coord, including height.
@@ -142,6 +153,9 @@ func _apply_visual_state() -> void:
 	# and tint; position is set externally.
 	_apply_tint()
 	rotation.y = UnitEnums.facing_to_y_rotation(facing)
+	var job_label := _body_mesh.get_node_or_null("JobLabel") as Label3D
+	if job_label != null:
+		job_label.text = display_name.left(1).to_upper() if display_name != "" else "?"
 
 
 func _apply_tint() -> void:
