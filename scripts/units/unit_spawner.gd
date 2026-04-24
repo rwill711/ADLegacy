@@ -5,6 +5,9 @@ class_name UnitSpawner extends Node
 ## Dictionary (produced by FOILBattleSetup). When no loadout is supplied
 ## the spawner falls back to the Alpha default (mirrored roster), so the
 ## project still runs standalone without FOIL data.
+##
+## ADR-004: Stats are now derived from BaseAttributes via StatFormulas.
+## Consumable bonuses have been rescaled to match the tighter stat ranges.
 
 
 ## --- Config -----------------------------------------------------------------
@@ -71,14 +74,17 @@ const ROLE_TO_JOB_NAME: Dictionary = {
 
 ## Consumable → stat bonus map for FOIL level 1+. Applied to each enemy at
 ## spawn as a flat stat boost. Elite variants (FOIL 4) scale x2.
-## For consumables whose effect requires a status/equipment system we don't
-## have yet, the entry is empty — spawner no-ops them and notes it.
+##
+## ADR-004: Rescaled from the old 75–110 HP era to the new 30–50 HP era.
+## A defense_potion giving +5 DEF when max DEF is ~10 would be +50%, which
+## is absurd. New values are tuned to be noticeable but not dominant (~15-20%
+## of a typical stat).
 const CONSUMABLE_STAT_BONUSES: Dictionary = {
-	"defense_potion":       {"defense": 5},
+	"defense_potion":       {"defense": 2},
 	"speed_potion":         {"speed": 2},
-	"magic_resist_potion":  {"resistance": 5},
-	"armor_pierce_elixir":  {"attack": 3},
-	"generic_elixir":       {"max_hp": 10, "hp": 10},
+	"magic_resist_potion":  {"resistance": 2},
+	"armor_pierce_elixir":  {"attack": 2},
+	"generic_elixir":       {"max_hp": 5, "hp": 5},
 	# Status-dependent — leave empty until the status system lands.
 	"silence_scroll":       {},
 	"reflect_shield":       {},
@@ -302,8 +308,9 @@ func _spawn_one(
 	grid.set_occupant(coord, unit_id)
 
 	if log_spawns:
-		print("[spawn] %s (%s) team=%s at %s" % [
-			unit_id, job.display_name, _team_label(team), coord
+		print("[spawn] %s (%s) team=%s at %s | HP:%d ATK:%d DEF:%d SPD:%d" % [
+			unit_id, job.display_name, _team_label(team), coord,
+			unit.stats.max_hp, unit.stats.attack, unit.stats.defense, unit.stats.speed
 		])
 
 	return unit
