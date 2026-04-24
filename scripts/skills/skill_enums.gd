@@ -16,6 +16,7 @@ enum SkillType {
 	DEBUFF,            # Applies a negative status on an enemy
 	STEAL,             # Removes an item/consumable from target
 	MOVEMENT,          # Self-movement skills (teleport, dash) — no damage
+	TERRAIN_MODIFY,    # Modifies tile terrain (Chop, Push Rock)
 }
 
 
@@ -86,6 +87,7 @@ const FOIL_CATEGORY_MAP: Dictionary = {
 	SkillType.DEBUFF:          FOILEnums.SkillCategory.DEBUFF,
 	SkillType.STEAL:           FOILEnums.SkillCategory.ITEM_USE,
 	SkillType.MOVEMENT:        FOILEnums.SkillCategory.MOVEMENT_ABILITY,
+	SkillType.TERRAIN_MODIFY:  FOILEnums.SkillCategory.MOVEMENT_ABILITY,
 }
 
 

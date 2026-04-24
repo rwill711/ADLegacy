@@ -66,7 +66,8 @@ static func _squire() -> JobData:
 	)
 	return JobData.create(
 		SQUIRE, "Squire", stats,
-		[SkillLibrary.BASIC_ATTACK, SkillLibrary.FIRST_AID, SkillLibrary.STONE_THROW],
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.FIRST_AID, SkillLibrary.STONE_THROW,
+		 SkillLibrary.CHOP, SkillLibrary.PUSH_ROCK],
 		Color(0.9, 0.85, 0.55),  # warm tan
 		"Balanced frontliner. Reliable melee with ranged and self-heal options."
 	)

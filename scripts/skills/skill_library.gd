@@ -18,6 +18,8 @@ const STONE_THROW     := &"stone_throw"
 const STAFF_BONK      := &"staff_bonk"
 const CURE            := &"cure"
 const PROTECT         := &"protect"
+const CHOP            := &"chop"
+const PUSH_ROCK       := &"push_rock"
 
 
 ## --- Lookup -----------------------------------------------------------------
@@ -34,6 +36,8 @@ static func get_skill(skill_name: StringName) -> SkillData:
 		STAFF_BONK:   return _staff_bonk()
 		CURE:         return _cure()
 		PROTECT:      return _protect()
+		CHOP:         return _chop()
+		PUSH_ROCK:    return _push_rock()
 	push_warning("SkillLibrary: unknown skill '%s'" % [skill_name])
 	return null
 
@@ -139,3 +143,30 @@ static func _protect() -> SkillData:
 		1, 4, 1.0, 6,
 		"Raise an ally's Defense for several turns."
 	)
+
+
+## Cut down an adjacent tree, clearing the tile for movement.
+static func _chop() -> SkillData:
+	var s := SkillData.create(
+		CHOP, "Chop",
+		SkillEnums.SkillType.TERRAIN_MODIFY,
+		SkillEnums.TargetType.TILE,
+		1, 1, 0.0, 0,
+		"Chop down an adjacent tree, clearing the tile."
+	)
+	s.required_terrain = GridEnums.TerrainType.FOREST
+	return s
+
+
+## Push an adjacent rock one tile forward (in the direction from caster to rock).
+## Fails silently if the destination is blocked.
+static func _push_rock() -> SkillData:
+	var s := SkillData.create(
+		PUSH_ROCK, "Push Rock",
+		SkillEnums.SkillType.TERRAIN_MODIFY,
+		SkillEnums.TargetType.TILE,
+		1, 1, 0.0, 0,
+		"Shove an adjacent rock one tile in the direction you're pushing."
+	)
+	s.required_terrain = GridEnums.TerrainType.MOUNTAIN
+	return s

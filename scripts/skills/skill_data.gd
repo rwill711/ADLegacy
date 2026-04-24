@@ -46,6 +46,11 @@ class_name SkillData extends Resource
 @export var rear_bonus_multiplier: float = 1.0
 
 
+## --- Terrain requirement (TERRAIN_MODIFY skills only) -----------------------
+## For TILE-targeted terrain skills: only tiles with this terrain are valid.
+## -1 means no terrain restriction.
+@export var required_terrain: int = -1
+
 ## --- Element (future) -------------------------------------------------------
 @export var element: SkillEnums.Element = SkillEnums.Element.NONE
 

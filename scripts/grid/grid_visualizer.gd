@@ -86,15 +86,17 @@ func _build_tile_node(tile: GridTile) -> void:
 
 	add_child(mesh_instance)
 
+	# --- Terrain prop (tree or rock sits on top of tile) ---
+	_add_terrain_prop(mesh_instance, tile.terrain, size_y)
+
 	# --- Overlay quad sitting just above the tile's top surface ---
-	# Used for highlight states (hover, move range, etc.). Hidden until set.
 	var overlay := MeshInstance3D.new()
 	overlay.name = "Overlay"
 	var quad := QuadMesh.new()
 	quad.size = Vector2(size_xy, size_xy)
 	overlay.mesh = quad
-	overlay.rotation_degrees = Vector3(-90, 0, 0)  # lay flat
-	overlay.position = Vector3(0, size_y * 0.5 + 0.015, 0)  # local to mesh_instance
+	overlay.rotation_degrees = Vector3(-90, 0, 0)
+	overlay.position = Vector3(0, size_y * 0.5 + 0.015, 0)
 
 	var overlay_mat := StandardMaterial3D.new()
 	overlay_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -105,7 +107,7 @@ func _build_tile_node(tile: GridTile) -> void:
 	overlay.visible = false
 	mesh_instance.add_child(overlay)
 
-	# --- Picking area so the camera's mouse raycast can hit the tile ---
+	# --- Picking area ---
 	var area := Area3D.new()
 	area.name = "Pick"
 	area.input_ray_pickable = true
@@ -116,7 +118,6 @@ func _build_tile_node(tile: GridTile) -> void:
 	area.add_child(collider)
 	mesh_instance.add_child(area)
 
-	# Capture the coord so the signal callback knows which tile fired.
 	var coord_copy: Vector2i = tile.coord
 	area.mouse_entered.connect(func(): _on_area_mouse_entered(coord_copy))
 	area.mouse_exited.connect(func(): _on_area_mouse_exited(coord_copy))
@@ -143,27 +144,14 @@ func _on_tile_changed(coord: Vector2i) -> void:
 	if _grid == null:
 		return
 	var tile := _grid.get_tile(coord)
-	var entry = _tile_nodes.get(coord, null)
-	if entry == null or tile == null:
+	if tile == null:
 		return
-
-	var mesh_instance: MeshInstance3D = entry["mesh"]
-	var overlay: MeshInstance3D = entry["overlay"]
-	var overlay_mat: StandardMaterial3D = entry["overlay_material"]
-
-	# Terrain might have been swapped at runtime (e.g., debug console).
-	mesh_instance.material_override = _get_terrain_material(tile.terrain)
-
-	# Elevation change: resize the box and reposition.
-	var size_y: float = tile.mesh_height()
-	var size_xy: float = GridEnums.TILE_WORLD_SIZE * 0.98
-	var box: BoxMesh = mesh_instance.mesh as BoxMesh
-	if box != null:
-		box.size = Vector3(size_xy, size_y, size_xy)
-	mesh_instance.position = tile.mesh_center_position()
-	overlay.position = Vector3(0, size_y * 0.5 + 0.015, 0)  # local to mesh_instance
-
-	_apply_highlight(overlay, overlay_mat, tile.highlight_state)
+	# Full rebuild handles terrain prop changes (tree/rock appear or disappear).
+	var entry = _tile_nodes.get(coord, null)
+	if entry != null:
+		entry["mesh"].free()
+		_tile_nodes.erase(coord)
+	_build_tile_node(tile)
 
 
 func _on_occupancy_changed(_coord: Vector2i) -> void:
@@ -171,6 +159,58 @@ func _on_occupancy_changed(_coord: Vector2i) -> void:
 	# themselves. Hook reserved for future footprint effects (occupied tile
 	# subtle tint) so downstream systems can connect cleanly.
 	pass
+
+
+# =============================================================================
+# TERRAIN PROPS (tree / rock meshes on top of tiles)
+# =============================================================================
+
+func _add_terrain_prop(
+	parent: MeshInstance3D,
+	terrain: GridEnums.TerrainType,
+	size_y: float
+) -> void:
+	match terrain:
+		GridEnums.TerrainType.FOREST:
+			# Trunk
+			var trunk := MeshInstance3D.new()
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = 0.05
+			cyl.bottom_radius = 0.09
+			cyl.height = 0.35
+			trunk.mesh = cyl
+			trunk.position = Vector3(0, size_y * 0.5 + 0.175, 0)
+			var trunk_mat := StandardMaterial3D.new()
+			trunk_mat.albedo_color = Color(0.42, 0.28, 0.14)
+			trunk_mat.roughness = 1.0
+			trunk.material_override = trunk_mat
+			parent.add_child(trunk)
+			# Canopy
+			var canopy := MeshInstance3D.new()
+			var sph := SphereMesh.new()
+			sph.radius = 0.3
+			sph.height = 0.55
+			canopy.mesh = sph
+			canopy.position = Vector3(0, size_y * 0.5 + 0.62, 0)
+			var canopy_mat := StandardMaterial3D.new()
+			canopy_mat.albedo_color = Color(0.12, 0.52, 0.14)
+			canopy_mat.roughness = 0.95
+			canopy.material_override = canopy_mat
+			parent.add_child(canopy)
+
+		GridEnums.TerrainType.MOUNTAIN:
+			var rock := MeshInstance3D.new()
+			var sph := SphereMesh.new()
+			sph.radius = 0.28
+			sph.height = 0.38
+			rock.mesh = sph
+			rock.scale = Vector3(1.1, 0.8, 0.95)
+			rock.position = Vector3(0.05, size_y * 0.5 + 0.16, -0.05)
+			var rock_mat := StandardMaterial3D.new()
+			rock_mat.albedo_color = Color(0.55, 0.52, 0.48)
+			rock_mat.roughness = 1.0
+			rock.material_override = rock_mat
+			parent.add_child(rock)
 
 
 # =============================================================================

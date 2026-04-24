@@ -143,6 +143,14 @@ func confirm_end_turn() -> void:
 	_commit_turn_end()
 
 
+## Reverse a declare_moved() call (undo move). Only valid while the unit
+## hasn't acted yet — the ability bar enforces this but we guard here too.
+func undeclare_moved() -> void:
+	if _phase != TurnEnums.TurnPhase.AWAITING_ACTION:
+		return
+	_moved_this_turn = false
+
+
 ## Cancel a pending end-turn. Returns the unit to AWAITING_ACTION so they
 ## can still move/act. Useful for ESC on the facing picker — player changed
 ## their mind.

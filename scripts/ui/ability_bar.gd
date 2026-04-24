@@ -1,14 +1,13 @@
 class_name AbilityBar extends CanvasLayer
-## Bottom-of-screen ability bar. Populated with one button per castable skill
-## for whichever player unit currently has the turn. Hidden during enemy
-## turns and between turns.
+## Bottom-of-screen ability bar. Populated per player turn with Move, skill
+## buttons, and optionally Undo Move / Wait. Hidden during enemy turns.
 ##
-## Emits `skill_selected(skill)` when the player clicks a button. The action
-## controller listens and enters target-selection mode. Does not know about
-## targeting, resolution, or the grid — pure widget.
+## Pure widget — emits signals for all actions, knows nothing about game state.
 
 
 signal skill_selected(skill: SkillData)
+signal move_requested
+signal undo_move_requested
 signal wait_pressed
 
 
@@ -30,9 +29,16 @@ func _ready() -> void:
 	_root.visible = false
 
 
-## Show the bar populated for `unit`. Called when a player unit's ACT phase
-## becomes available (turn start, or after a move if they haven't acted yet).
-func show_for_unit(unit: Unit) -> void:
+## Show the bar for `unit`. Flags control which action buttons are present:
+##   can_move      — show the Move button (unit hasn't moved yet)
+##   can_undo_move — show Undo Move (unit moved but hasn't acted yet)
+##   can_act       — show skill buttons (unit hasn't used their action yet)
+func show_for_unit(
+	unit: Unit,
+	can_move: bool = true,
+	can_undo_move: bool = false,
+	can_act: bool = true
+) -> void:
 	_current_unit = unit
 	_selected_skill = null
 	_clear_buttons()
@@ -41,19 +47,42 @@ func show_for_unit(unit: Unit) -> void:
 		_root.visible = false
 		return
 
-	_unit_label.text = "%s — Abilities" % unit.display_name
-	_hint_label.text = "Click a skill to target. ESC / right-click cancels."
+	_unit_label.text = "%s — Choose Action" % unit.display_name
+	_hint_label.text = "Select Move or a skill. Right-click to go back."
 
-	for skill in unit.skills:
-		_buttons_row.add_child(_build_button(skill, unit))
+	if can_move:
+		var move_btn := Button.new()
+		move_btn.text = "Move"
+		move_btn.custom_minimum_size = Vector2(110, 40)
+		move_btn.set_meta("skill_name", &"__move__")
+		move_btn.pressed.connect(func(): move_requested.emit())
+		_buttons_row.add_child(move_btn)
 
-	var sep := VSeparator.new()
-	sep.custom_minimum_size = Vector2(8, 0)
-	_buttons_row.add_child(sep)
+	if can_act:
+		if can_move:
+			var sep := VSeparator.new()
+			sep.custom_minimum_size = Vector2(8, 0)
+			_buttons_row.add_child(sep)
+
+		for skill in unit.skills:
+			_buttons_row.add_child(_build_button(skill, unit))
+
+	var sep2 := VSeparator.new()
+	sep2.custom_minimum_size = Vector2(8, 0)
+	_buttons_row.add_child(sep2)
+
+	if can_undo_move:
+		var undo_btn := Button.new()
+		undo_btn.text = "Undo Move"
+		undo_btn.custom_minimum_size = Vector2(110, 40)
+		undo_btn.set_meta("skill_name", &"__undo__")
+		undo_btn.pressed.connect(func(): undo_move_requested.emit())
+		_buttons_row.add_child(undo_btn)
 
 	var wait_btn := Button.new()
 	wait_btn.text = "Wait"
 	wait_btn.custom_minimum_size = Vector2(110, 40)
+	wait_btn.set_meta("skill_name", &"__wait__")
 	wait_btn.pressed.connect(func(): wait_pressed.emit())
 	_buttons_row.add_child(wait_btn)
 
@@ -66,12 +95,10 @@ func hide_bar() -> void:
 	_selected_skill = null
 
 
-## Swap to "selected" state after a skill was picked — show which skill is
-## being targeted, reduce visual clutter.
+## Swap to "selected" state after a skill was picked.
 func show_targeting(skill: SkillData) -> void:
 	_selected_skill = skill
-	_hint_label.text = "Targeting %s. Click a highlighted tile. ESC to cancel." % skill.display_name
-	# Dim unselected buttons.
+	_hint_label.text = "Targeting %s. Click a highlighted tile. Right-click to cancel." % skill.display_name
 	for button in _buttons_row.get_children():
 		if not button is Button:
 			continue

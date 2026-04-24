@@ -66,6 +66,15 @@ func set_tile(coord: Vector2i, tile: GridTile) -> void:
 	tile_changed.emit(coord)
 
 
+## Change a tile's terrain type and notify the visualizer.
+func set_terrain(coord: Vector2i, terrain: GridEnums.TerrainType) -> void:
+	var tile := get_tile(coord)
+	if tile == null:
+		return
+	tile.terrain = terrain
+	tile_changed.emit(coord)
+
+
 ## Iterate every tile once. Order: row-major (y then x).
 func iter_tiles() -> Array:
 	var out: Array = []

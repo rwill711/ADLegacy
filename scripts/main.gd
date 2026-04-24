@@ -23,6 +23,8 @@ extends Node3D
 
 
 var _grid: BattleGrid = null
+var _inspect_panel: PanelContainer = null
+var _inspect_label: Label = null
 
 ## Cached encounter config from FOILBattleSetup at battle start. Consumed by
 ## the HUD status line and the FOIL debug panel.
@@ -68,11 +70,14 @@ func _ready() -> void:
 	)
 	_facing_picker.bind_turn_manager(_turn_manager)
 	_facing_picker.bind_visualizer(_visualizer)
+	_facing_picker.bind_grid(_grid)
 
 	_ability_bar.wait_pressed.connect(_turn_manager.wait_and_end_turn)
 
 	_battle_summary.retry_pressed.connect(_on_retry_pressed)
 	_battle_summary.quit_pressed.connect(_on_quit_pressed)
+
+	_build_inspect_panel()
 
 	# Bind the debug autoload to this scene so console commands can reach
 	# the grid / units / controllers. Safe to re-bind on every scene reload
@@ -290,10 +295,10 @@ func _grid_center_world(map: BattleGrid) -> Vector3:
 func _on_tile_hovered(coord: Vector2i) -> void:
 	if _grid == null:
 		return
-	# Hover highlight priority: move preview beats base, act preview beats
-	# move preview.
 	if _action_controller.is_target_tile(coord):
 		_grid.set_highlight(coord, GridEnums.HighlightState.TARGET)
+	elif _action_controller.is_range_tile(coord):
+		_grid.set_highlight(coord, GridEnums.HighlightState.HOVER)
 	elif _move_controller.is_preview_tile(coord):
 		_grid.set_highlight(coord, GridEnums.HighlightState.PATH)
 	else:
@@ -303,8 +308,10 @@ func _on_tile_hovered(coord: Vector2i) -> void:
 func _on_tile_unhovered(coord: Vector2i) -> void:
 	if _grid == null:
 		return
-	# Restore the underlying preview color, or NONE if no preview applies.
 	if _action_controller.is_target_tile(coord):
+		_grid.set_highlight(coord, GridEnums.HighlightState.ATTACK_RANGE)
+	elif _action_controller.is_range_tile(coord):
+		# Restore full-range highlight for empty in-range tiles.
 		_grid.set_highlight(coord, GridEnums.HighlightState.ATTACK_RANGE)
 	elif _move_controller.is_preview_tile(coord):
 		_grid.set_highlight(coord, GridEnums.HighlightState.MOVE_RANGE)
@@ -361,10 +368,29 @@ static func _archetype_name(a: FOILEnums.Archetype) -> String:
 
 
 func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
-	if not log_tile_events or _grid == null:
+	if _grid == null:
 		return
+
 	var tile := _grid.get_tile(coord)
 	if tile == null:
+		return
+
+	# Unit inspect: left-click a tile with a unit when not in move/target mode.
+	if button_index == MOUSE_BUTTON_LEFT \
+	and not _move_controller.is_previewing() \
+	and not _action_controller.is_selecting_target() \
+	and not _action_controller.is_executing() \
+	and not _action_controller.is_in_move_mode() \
+	and tile.occupant_id != &"":
+		var u := _unit_spawner.get_unit(tile.occupant_id)
+		if u != null:
+			_show_unit_inspect(u)
+		else:
+			_hide_unit_inspect()
+	else:
+		_hide_unit_inspect()
+
+	if not log_tile_events:
 		return
 	var occupant_info: String = ""
 	if tile.occupant_id != &"":
@@ -379,3 +405,52 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 		coord, int(tile.terrain), tile.height, tile.is_walkable(),
 		button_index, occupant_info
 	])
+
+
+# =============================================================================
+# UNIT INSPECT PANEL (dynamic, no .tscn needed)
+# =============================================================================
+
+func _build_inspect_panel() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 4
+	add_child(layer)
+
+	_inspect_panel = PanelContainer.new()
+	_inspect_panel.position = Vector2(12, 120)
+	_inspect_panel.visible = false
+	layer.add_child(_inspect_panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	_inspect_panel.add_child(margin)
+
+	_inspect_label = Label.new()
+	_inspect_label.add_theme_font_size_override("font_size", 13)
+	margin.add_child(_inspect_label)
+
+
+func _show_unit_inspect(unit: Unit) -> void:
+	if _inspect_panel == null:
+		return
+	var job_name: String = unit.job.display_name if unit.job != null else "—"
+	var skill_names: Array = []
+	for s in unit.skills:
+		skill_names.append(s.display_name)
+	var skills_str: String = ", ".join(skill_names) if not skill_names.is_empty() else "none"
+	var team_str: String = "Player" if unit.team == UnitEnums.Team.PLAYER else "Enemy"
+	_inspect_label.text = "%s  [%s]\nHP %d/%d  MP %d/%d\nJob: %s\nSkills: %s" % [
+		unit.display_name, team_str,
+		unit.stats.hp, unit.stats.max_hp,
+		unit.stats.mp, unit.stats.max_mp,
+		job_name, skills_str,
+	]
+	_inspect_panel.visible = true
+
+
+func _hide_unit_inspect() -> void:
+	if _inspect_panel != null:
+		_inspect_panel.visible = false

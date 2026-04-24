@@ -49,32 +49,45 @@ const FLOOR_THICKNESS: float = 0.2
 
 
 ## --- Terrain properties ------------------------------------------------------
-## Base walkability (before occupancy checks). Water kinds are NOT walkable
-## by default; when we add flying / aquatic jobs they'll ignore this.
+## Base walkability (before occupancy checks).
+## FOREST = tree (impassable), MOUNTAIN = rock (impassable),
+## WATER = passable but costs 2x movement.
 const TERRAIN_WALKABLE: Dictionary = {
 	TerrainType.GRASS:      true,
 	TerrainType.STONE:      true,
-	TerrainType.FOREST:     true,
-	TerrainType.MOUNTAIN:   true,
-	TerrainType.WATER:      false,
+	TerrainType.FOREST:     false,  # tree — blocks movement
+	TerrainType.MOUNTAIN:   false,  # rock — blocks movement
+	TerrainType.WATER:      true,   # shallow water — wading is slow but possible
 	TerrainType.DEEP_WATER: false,
 	TerrainType.LAVA:       true,   # walkable but damaging
 	TerrainType.FIRE:       true,   # ditto
 	TerrainType.VOID:       false,
 }
 
-## Movement cost multiplier. Forests/mountains slow you down.
-## Pathfinding will multiply this against the base cost of entering the tile.
+## Movement cost multiplier. Water is wading-speed (2x). Trees/rocks are walls.
 const TERRAIN_MOVEMENT_COST: Dictionary = {
 	TerrainType.GRASS:      1.0,
 	TerrainType.STONE:      1.0,
-	TerrainType.FOREST:     1.5,
-	TerrainType.MOUNTAIN:   2.0,
-	TerrainType.WATER:      1.0,
+	TerrainType.FOREST:     1.0,   # never reached (not walkable)
+	TerrainType.MOUNTAIN:   1.0,   # never reached (not walkable)
+	TerrainType.WATER:      2.0,   # wading costs twice as much
 	TerrainType.DEEP_WATER: 1.0,
 	TerrainType.LAVA:       1.0,
 	TerrainType.FIRE:       1.0,
 	TerrainType.VOID:       1.0,
+}
+
+## Which terrain types block line-of-sight for ranged (non-magic) attacks.
+const TERRAIN_BLOCKS_LOS: Dictionary = {
+	TerrainType.GRASS:      false,
+	TerrainType.STONE:      false,
+	TerrainType.FOREST:     true,   # trees block LOS
+	TerrainType.MOUNTAIN:   false,  # rocks don't block LOS
+	TerrainType.WATER:      false,
+	TerrainType.DEEP_WATER: false,
+	TerrainType.LAVA:       false,
+	TerrainType.FIRE:       false,
+	TerrainType.VOID:       false,
 }
 
 ## Damage inflicted on any unit that ends its turn on this tile.
@@ -134,3 +147,7 @@ static func terrain_movement_cost(terrain: TerrainType) -> float:
 
 static func terrain_damage_per_turn(terrain: TerrainType) -> int:
 	return TERRAIN_DAMAGE_PER_TURN.get(terrain, 0)
+
+
+static func terrain_blocks_los(terrain: TerrainType) -> bool:
+	return TERRAIN_BLOCKS_LOS.get(terrain, false)

@@ -1,22 +1,23 @@
 class_name MoveController extends Node
 ## Orchestrates the MOVE phase of a unit's turn.
 ##
-## Flow:
-##   turn_started (player unit, haven't moved) → show move-range highlights
-##   tile_clicked on a reachable tile          → execute path, animate unit
-##   move completes                            → clear highlights, update grid
-##                                               occupancy, call turn_manager.declare_moved()
-##   turn_ended                                → clear highlights defensively
+## Flow (new):
+##   Player clicks "Move" in ability bar → show_move_preview_for(unit)
+##   tile_clicked on a reachable tile   → execute path, animate unit
+##   move completes                     → clear highlights, update grid, emit move_completed
+##   turn_ended                         → clear highlights defensively
 ##
-## This Node does NOT touch the turn manager's phase directly. It only calls
-## declare_moved() on completion; turn_manager stays in AWAITING_ACTION until
-## the player explicitly ends the turn. That mirrors FFTA's flow where you
-## move, then decide what to act on (or skip act entirely).
+## Undo move is supported while the unit has not yet acted (only_if_not_acted
+## is enforced by the caller — ability bar won't show the button after acting).
+
+
+signal move_completed
+signal move_undone
 
 
 ## --- Config -----------------------------------------------------------------
 @export var step_duration_seconds: float = 0.14
-@export var face_toward_step: bool = true  # rotate unit as it walks each step
+@export var face_toward_step: bool = true
 @export var log_moves: bool = true
 
 
@@ -28,9 +29,12 @@ var _turn_manager: TurnManager = null
 
 ## --- State ------------------------------------------------------------------
 var _active_unit: Unit = null
-var _reachable: Dictionary = {}  # Vector2i → float cost (from pathfinder)
+var _reachable: Dictionary = {}
 var _preview_active: bool = false
 var _executing: bool = false
+
+## Stored before a move executes so undo_move() can teleport back.
+var _pre_move_coord: Vector2i = Vector2i(-1, -1)
 
 
 # =============================================================================
@@ -54,24 +58,16 @@ func bind(grid: BattleGrid, visualizer: GridVisualizer, turn_manager: TurnManage
 
 func _on_turn_started(unit: Unit) -> void:
 	_active_unit = unit
+	_pre_move_coord = Vector2i(-1, -1)
 	_clear_preview()
-
-	# Only player units get the move preview UI. Enemies move via AI
-	# (Phase 3C) — they'll call execute_path directly without highlighting.
-	if unit == null or unit.team != UnitEnums.Team.PLAYER:
-		return
-
-	# If the unit has already moved this turn (shouldn't happen on fresh
-	# turn_started, but defensive), don't re-show preview.
-	if _turn_manager.has_moved():
-		return
-
-	_show_move_preview(unit)
+	# Move preview is no longer auto-shown at turn start.
+	# The player picks "Move" from the ability bar first.
 
 
 func _on_turn_ended(_unit: Unit) -> void:
 	_clear_preview()
 	_active_unit = null
+	_pre_move_coord = Vector2i(-1, -1)
 
 
 func _on_battle_ended(_outcome: int) -> void:
@@ -79,8 +75,39 @@ func _on_battle_ended(_outcome: int) -> void:
 
 
 # =============================================================================
-# MOVE PREVIEW
+# MOVE PREVIEW — public entry points
 # =============================================================================
+
+## Show the move preview for the active unit. Called when the player clicks
+## the "Move" button in the ability bar.
+func show_move_preview_for(unit: Unit) -> void:
+	if unit == null or unit.team != UnitEnums.Team.PLAYER:
+		return
+	_active_unit = unit
+	_clear_preview()
+	_show_move_preview(unit)
+
+
+## Re-show the move preview for the current active unit without a button press.
+## Used after cancel-targeting to restore move option when unit hasn't moved.
+func refresh_preview() -> void:
+	if _executing:
+		return
+	if _turn_manager == null or _turn_manager.has_moved():
+		return
+	var active := _turn_manager.get_active_unit()
+	if active == null or active.team != UnitEnums.Team.PLAYER or not active.is_alive():
+		return
+	_active_unit = active
+	_clear_preview()
+	_show_move_preview(active)
+
+
+## Suppress the move preview without marking the unit as moved (used when
+## the player cancels the move selection or enters targeting mode).
+func hide_preview() -> void:
+	_clear_preview()
+
 
 func _show_move_preview(unit: Unit) -> void:
 	_reachable = Pathfinder.reachable_tiles(_grid, unit)
@@ -93,7 +120,6 @@ func _clear_preview() -> void:
 	if not _preview_active:
 		_reachable.clear()
 		return
-	# Only clear MOVE_RANGE / PATH highlights, not HOVER (main.gd owns that).
 	for coord in _reachable:
 		var tile := _grid.get_tile(coord)
 		if tile == null:
@@ -106,10 +132,9 @@ func _clear_preview() -> void:
 
 
 # =============================================================================
-# PREVIEW QUERIES (used by main.gd's hover logic)
+# PREVIEW QUERIES
 # =============================================================================
 
-## True if a preview is active AND the given coord is a valid move destination.
 func is_preview_tile(coord: Vector2i) -> bool:
 	return _preview_active and _reachable.has(coord)
 
@@ -118,35 +143,35 @@ func is_previewing() -> bool:
 	return _preview_active
 
 
-## True while a move tween is in progress. Used by input handlers to lock
-## out end_turn / other actions mid-animation.
 func is_executing() -> bool:
 	return _executing
 
 
-## Re-show the move preview for the active unit if they still have their
-## move available. Called by the action controller after an ACT completes
-## (player can still move after acting, per the CD's flexible-order ruling).
-func refresh_preview() -> void:
-	if _executing:
-		return
-	if _turn_manager == null:
-		return
-	if _turn_manager.has_moved():
-		return
-	var active := _turn_manager.get_active_unit()
-	if active == null or active.team != UnitEnums.Team.PLAYER or not active.is_alive():
-		return
-	_active_unit = active
-	_clear_preview()
-	_show_move_preview(active)
+# =============================================================================
+# UNDO MOVE
+# =============================================================================
 
+## Teleport the unit back to where they were before their last move. Only
+## valid while _pre_move_coord is set (i.e., the unit moved this turn).
+## Caller must also call turn_manager.undeclare_moved().
+func undo_move() -> void:
+	if _pre_move_coord == Vector2i(-1, -1) or _active_unit == null:
+		return
+	var pre_tile: GridTile = _grid.get_tile(_pre_move_coord)
+	if pre_tile == null:
+		return
 
-## Suppress the move preview without marking the unit as moved. Used by the
-## action controller when entering targeting mode so left-clicks on a
-## still-reachable-but-not-an-attack-target tile don't trigger a move.
-func hide_preview() -> void:
-	_clear_preview()
+	_grid.clear_occupant(_active_unit.coord)
+	_active_unit.coord = _pre_move_coord
+	_active_unit.global_position = pre_tile.top_world_position()
+	_grid.set_occupant(_pre_move_coord, _active_unit.unit_id)
+
+	_pre_move_coord = Vector2i(-1, -1)
+
+	if _turn_manager != null:
+		_turn_manager.undeclare_moved()
+
+	move_undone.emit()
 
 
 # =============================================================================
@@ -161,16 +186,13 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 	if not _reachable.has(coord):
 		return
 
-	# Player clicked a reachable tile — commit the move.
 	var path: Array = Pathfinder.find_path(_grid, _active_unit, coord)
 	if path.size() < 2:
 		return
 	_execute_path(_active_unit, path)
 
 
-## Public entry for AI movement in Phase 3C. Skips the preview UI.
-## Awaitable: caller can `await _move_controller.execute_move(unit, goal)` to
-## block until the animation finishes and occupancy is committed.
+## Public AI entry. Awaitable — caller can `await execute_move(unit, goal)`.
 func execute_move(unit: Unit, goal: Vector2i) -> void:
 	if _executing or unit == null:
 		return
@@ -186,11 +208,10 @@ func execute_move(unit: Unit, goal: Vector2i) -> void:
 
 func _execute_path(unit: Unit, path: Array) -> void:
 	_executing = true
+	_pre_move_coord = unit.coord  # save for undo
 	_clear_preview()
 	unit.set_state(UnitEnums.UnitState.MOVING)
 
-	# Clear current occupancy at move start so reachable checks for other
-	# units (not relevant mid-turn, but defensive) see the tile as free.
 	_grid.clear_occupant(unit.coord)
 
 	var move_msg: String = "%s: %s → %s (%d steps)" % [
@@ -204,24 +225,19 @@ func _execute_path(unit: Unit, path: Array) -> void:
 
 	await _animate_along_path(unit, path)
 
-	# Commit new occupancy at the destination.
 	var final_coord: Vector2i = path[path.size() - 1]
 	unit.coord = final_coord
 	_grid.set_occupant(final_coord, unit.unit_id)
 
 	unit.set_state(UnitEnums.UnitState.IDLE)
-
 	_executing = false
 
-	# Defensive: if the turn ended or rotated during the animation (shouldn't
-	# be possible given main.gd's input lockout, but cheap to check), skip
-	# the declare_moved — it would otherwise mis-credit the next unit's turn.
 	if _turn_manager != null and _turn_manager.get_active_unit() == unit:
 		_turn_manager.declare_moved()
+		move_completed.emit()
 
 
 func _animate_along_path(unit: Unit, path: Array) -> void:
-	# path[0] is the start tile — unit is already there. Walk each next hop.
 	for i in range(1, path.size()):
 		var next_coord: Vector2i = path[i]
 		var next_tile := _grid.get_tile(next_coord)
@@ -230,10 +246,6 @@ func _animate_along_path(unit: Unit, path: Array) -> void:
 
 		if face_toward_step:
 			unit.face_toward(next_coord)
-		# Update the unit's logical coord as it arrives on each tile.
-		# Useful if a future hook (traps, terrain-damage-per-tile) wants
-		# per-step callbacks. Intermediate occupancy isn't updated — the grid
-		# sees one clear→set transition.
 		unit.coord = next_coord
 
 		var t := create_tween()

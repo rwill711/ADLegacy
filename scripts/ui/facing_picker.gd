@@ -1,7 +1,7 @@
 class_name FacingPicker extends CanvasLayer
 ## Modal overlay that appears when the active unit enters CHOOSING_FACING.
-## Player clicks any tile and the unit swivels to face it. ESC cancels back
-## to AWAITING_ACTION.
+## Highlights only the 4 cardinal (N/S/E/W) neighbour tiles. Player clicks one
+## to set facing. ESC cancels back to AWAITING_ACTION.
 
 
 @onready var _root: Control = %Root
@@ -11,8 +11,10 @@ class_name FacingPicker extends CanvasLayer
 
 var _turn_manager: TurnManager = null
 var _visualizer: GridVisualizer = null
+var _grid: BattleGrid = null
 var _current_unit: Unit = null
 var _listening: bool = false
+var _cardinal_coords: Array = []
 
 
 func _ready() -> void:
@@ -35,6 +37,10 @@ func bind_turn_manager(manager: TurnManager) -> void:
 
 func bind_visualizer(visualizer: GridVisualizer) -> void:
 	_visualizer = visualizer
+
+
+func bind_grid(grid: BattleGrid) -> void:
+	_grid = grid
 
 
 # =============================================================================
@@ -70,8 +76,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _show(unit: Unit) -> void:
 	_current_unit = unit
 	_unit_label.text = "%s — Choose Facing" % unit.display_name
-	_hint_label.text = "Click a tile to face it. ESC to cancel."
+	_hint_label.text = "Click a cardinal tile (N/S/E/W) to face it. ESC to cancel."
 	_root.visible = true
+	_highlight_cardinals(unit.coord)
 	if _visualizer != null and not _listening:
 		_visualizer.tile_clicked.connect(_on_tile_clicked)
 		_listening = true
@@ -79,10 +86,35 @@ func _show(unit: Unit) -> void:
 
 func _hide() -> void:
 	_root.visible = false
+	_clear_cardinal_highlights()
 	_current_unit = null
+	_cardinal_coords.clear()
 	if _visualizer != null and _listening:
 		_visualizer.tile_clicked.disconnect(_on_tile_clicked)
 		_listening = false
+
+
+# =============================================================================
+# CARDINAL HIGHLIGHT
+# =============================================================================
+
+func _highlight_cardinals(origin: Vector2i) -> void:
+	_cardinal_coords.clear()
+	if _grid == null:
+		return
+	var offsets: Array = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
+	for off in offsets:
+		var c: Vector2i = origin + off
+		if _grid.is_in_bounds(c):
+			_cardinal_coords.append(c)
+			_grid.set_highlight(c, GridEnums.HighlightState.HOVER)
+
+
+func _clear_cardinal_highlights() -> void:
+	if _grid == null:
+		return
+	for c in _cardinal_coords:
+		_grid.set_highlight(c, GridEnums.HighlightState.NONE)
 
 
 # =============================================================================
@@ -91,6 +123,8 @@ func _hide() -> void:
 
 func _on_tile_clicked(coord: Vector2i, _button_index: int) -> void:
 	if _current_unit == null:
+		return
+	if not coord in _cardinal_coords:
 		return
 	_current_unit.face_toward(coord)
 	_hide()
