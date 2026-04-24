@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/grid/grid_visualizer.gd" id="2_grid_viz"]
@@ -11,6 +11,8 @@
 [ext_resource type="PackedScene" path="res://scenes/ability_bar.tscn" id="9_ability_bar"]
 [ext_resource type="PackedScene" path="res://scenes/facing_picker.tscn" id="10_fp"]
 [ext_resource type="PackedScene" path="res://scenes/battle_summary.tscn" id="11_bs"]
+[ext_resource type="PackedScene" path="res://scenes/debug_overlay.tscn" id="12_do"]
+[ext_resource type="PackedScene" path="res://scenes/debug_console.tscn" id="13_dc"]
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
@@ -66,3 +68,7 @@ script = ExtResource("8_act_ctrl")
 [node name="FacingPicker" parent="." instance=ExtResource("10_fp")]
 
 [node name="BattleSummary" parent="." instance=ExtResource("11_bs")]
+
+[node name="DebugOverlay" parent="." instance=ExtResource("12_do")]
+
+[node name="DebugConsole" parent="." instance=ExtResource("13_dc")]

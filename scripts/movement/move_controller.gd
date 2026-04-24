@@ -193,10 +193,14 @@ func _execute_path(unit: Unit, path: Array) -> void:
 	# units (not relevant mid-turn, but defensive) see the tile as free.
 	_grid.clear_occupant(unit.coord)
 
+	var move_msg: String = "%s: %s → %s (%d steps)" % [
+		unit.unit_id, path[0], path[path.size() - 1], path.size() - 1
+	]
 	if log_moves:
-		print("[move] %s: %s → %s (%d steps)" % [
-			unit.unit_id, path[0], path[path.size() - 1], path.size() - 1
-		])
+		print("[move] " + move_msg)
+	var debug_mgr: Node = get_tree().root.get_node_or_null("DebugManager")
+	if debug_mgr != null:
+		debug_mgr.log(DebugEnums.CATEGORY_MOVEMENT, move_msg)
 
 	await _animate_along_path(unit, path)
 

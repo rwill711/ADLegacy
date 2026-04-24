@@ -206,6 +206,7 @@ func _execute_skill(anchor: Vector2i) -> void:
 
 	if log_actions:
 		_log_result(caster, skill, result)
+	_push_to_debug_log(caster, skill, result)
 
 	_spawn_effect_visuals(caster, skill, result)
 
@@ -286,6 +287,11 @@ func _pick_enemy_action(unit: Unit, all_units: Array) -> Dictionary:
 ## Simple heuristic: offensive skills score higher on low-HP enemies
 ## (finish-the-kill preference). Healing scores low-HP allies. Buffs score
 ## something minimal so the AI sometimes uses them.
+##
+## Phase 6: respects the caster's ai_hints. At FOIL level ≥ 3 the loadout
+## builder sets target_priority = "focus_healer" for healer-heavy parties;
+## we add a bias on top of the base score when the target is a healer
+## (job name check is cheap and non-intrusive).
 static func _score_enemy_target(
 	unit: Unit,
 	skill: SkillData,
@@ -296,19 +302,59 @@ static func _score_enemy_target(
 	if target == null:
 		return -1
 
+	var base_score: int
 	if skill.is_offensive():
 		if not UnitEnums.teams_are_hostile(unit.team, target.team):
 			return -1
 		# Prefer finishing enemies — low HP scores higher.
 		var missing: int = target.stats.max_hp - target.stats.hp
-		return 100 + missing
-	if skill.skill_type == SkillEnums.SkillType.HEALING:
+		base_score = 100 + missing
+	elif skill.skill_type == SkillEnums.SkillType.HEALING:
 		if UnitEnums.teams_are_hostile(unit.team, target.team):
 			return -1
-		return 60 + (target.stats.max_hp - target.stats.hp)
-	if skill.skill_type == SkillEnums.SkillType.BUFF:
-		return 20
-	return 5
+		base_score = 60 + (target.stats.max_hp - target.stats.hp)
+	elif skill.skill_type == SkillEnums.SkillType.BUFF:
+		base_score = 20
+	else:
+		base_score = 5
+
+	return base_score + _ai_hint_bonus(unit, skill, target)
+
+
+## Extra score applied based on the caster's ai_hints (set by UnitSpawner
+## from the FOIL loadout builder at battle setup). Separate function so the
+## policy reads cleanly and is easy to extend with new hint types.
+static func _ai_hint_bonus(unit: Unit, skill: SkillData, target: Unit) -> int:
+	var hints: Dictionary = unit.ai_hints
+	if hints.is_empty():
+		return 0
+
+	var bonus: int = 0
+
+	# focus_healer: offensive skills targeting a healer are strongly preferred.
+	# Uses job name rather than scanning skill kits because the FOIL loadout
+	# builder already classified the PLAYER's profile; we just need to pick
+	# the right TARGET unit to hit.
+	if hints.get("target_priority", "") == "focus_healer" \
+	and skill.is_offensive() \
+	and _looks_like_healer(target):
+		bonus += 60
+
+	return bonus
+
+
+static func _looks_like_healer(target: Unit) -> bool:
+	if target == null or target.job == null:
+		return false
+	# Alpha heuristic: any job named "white_mage" (or whose skills include
+	# a HEALING skill). Keeps this readable even when new healer-ish jobs
+	# land post-Alpha.
+	if String(target.job.job_name) == "white_mage":
+		return true
+	for skill in target.skills:
+		if skill.skill_type == SkillEnums.SkillType.HEALING:
+			return true
+	return false
 
 
 static func _find_unit_at(all_units: Array, coord: Vector2i) -> Unit:
@@ -355,6 +401,30 @@ func _spawn_effect_visuals(_caster: Unit, skill: SkillData, result: Dictionary) 
 		# landed. Not strictly necessary with the skill's own label, but a
 		# future polish pass can add a small caster-side toast.
 		var _ = skill  # reserved for future caster-side feedback
+
+
+# =============================================================================
+# DEBUG LOG
+# =============================================================================
+
+func _push_to_debug_log(caster: Unit, skill: SkillData, result: Dictionary) -> void:
+	var mgr: Node = get_tree().root.get_node_or_null("DebugManager")
+	if mgr == null:
+		return
+	var summary_parts: Array = []
+	summary_parts.append("%s cast %s" % [caster.unit_id, skill.skill_name])
+	for effect in result["effects"]:
+		var fragment: String = ""
+		if effect["damage"] > 0:
+			fragment = "%s -%d%s" % [effect["target_id"], effect["damage"],
+				" KILL" if effect["was_kill"] else ""]
+		elif effect["heal"] > 0:
+			fragment = "%s +%d heal" % [effect["target_id"], effect["heal"]]
+		elif effect["buff_label"] != "":
+			fragment = "%s buff=%s" % [effect["target_id"], effect["buff_label"]]
+		if fragment != "":
+			summary_parts.append(fragment)
+	mgr.log(DebugEnums.CATEGORY_COMBAT, " | ".join(summary_parts))
 
 
 # =============================================================================

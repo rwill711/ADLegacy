@@ -24,6 +24,10 @@ extends Node3D
 
 var _grid: GridMap = null
 
+## Cached encounter config from FOILBattleSetup at battle start. Consumed by
+## the HUD status line and the FOIL debug panel.
+var _current_encounter: Dictionary = {}
+
 
 func _ready() -> void:
 	_register_battle_input_actions()
@@ -35,7 +39,21 @@ func _ready() -> void:
 	_visualizer.tile_unhovered.connect(_on_tile_unhovered)
 	_visualizer.tile_clicked.connect(_on_tile_clicked)
 
-	var units: Array = _unit_spawner.spawn_alpha_roster(_grid, _units_root)
+	# Phase 6: run FOIL setup BEFORE spawning enemies so the loadout builder
+	# can influence which jobs / consumables / AI hints the spawner uses.
+	# The player character list comes from PLAYER_JOB_ORDER (parallel with
+	# the display names the spawner will assign). We derive display names
+	# from JobLibrary the same way the spawner does, so FOIL keys match.
+	var player_names: Array = _predict_player_character_names()
+	var encounter: Dictionary = FOILBattleSetup.build_encounter(
+		player_names,
+		UnitSpawner.default_base_enemy_pool(),
+		3,
+	)
+	var units: Array = _unit_spawner.spawn_alpha_roster(
+		_grid, _units_root, encounter["loadout"]
+	)
+	_current_encounter = encounter
 
 	_camera_rig.set_focus(_grid_center_world(_grid), true)
 
@@ -52,6 +70,32 @@ func _ready() -> void:
 
 	_battle_summary.retry_pressed.connect(_on_retry_pressed)
 	_battle_summary.quit_pressed.connect(_on_quit_pressed)
+
+	# Bind the debug autoload to this scene so console commands can reach
+	# the grid / units / controllers. Safe to re-bind on every scene reload
+	# (Retry) — DebugManager.bind_scene is idempotent.
+	var debug_mgr: Node = get_tree().root.get_node_or_null("DebugManager")
+	if debug_mgr != null:
+		debug_mgr.bind_scene(
+			_grid, _unit_spawner, _turn_manager,
+			_move_controller, _action_controller,
+			_camera_rig, self,
+		)
+		# Register the FOIL debug tab via the extensibility contract. Runs
+		# after bind_scene so the panel can already see live scene refs.
+		# Always register a fresh instance — on Retry the previous panel was
+		# queue_freed along with the old overlay, but DebugManager's dict
+		# still holds the stale ref; register_panel overwrites it so the new
+		# overlay picks up a valid node.
+		debug_mgr.register_panel("FOIL", FOILDebugPanel.new())
+
+	# Update the HUD's FOIL status line so the player can see the current
+	# level + who's being countered.
+	_turn_hud.set_foil_status(
+		encounter["level"],
+		_archetype_name(encounter["profile"].dominant_archetype)
+	)
+	_log_encounter_summary(encounter)
 
 	# Kick off FOIL battle records for every player unit up front, so even
 	# actions on the first turn land in the rolling window.
@@ -263,6 +307,54 @@ func _on_tile_unhovered(coord: Vector2i) -> void:
 		_grid.set_highlight(coord, GridEnums.HighlightState.MOVE_RANGE)
 	else:
 		_grid.set_highlight(coord, GridEnums.HighlightState.NONE)
+
+
+# =============================================================================
+# FOIL HELPERS
+# =============================================================================
+
+## The spawner assigns display_names from JobData.display_name. Predict what
+## those will be so we can pull FOIL profiles for those exact keys BEFORE
+## the units are instantiated. If JobLibrary.get_job returns null for some
+## reason, fall back to a title-cased job-name string.
+func _predict_player_character_names() -> Array:
+	var names: Array = []
+	for job_name in UnitSpawner.PLAYER_JOB_ORDER:
+		var job := JobLibrary.get_job(job_name)
+		if job != null and not job.display_name.is_empty():
+			names.append(job.display_name)
+		else:
+			names.append(String(job_name).capitalize())
+	return names
+
+
+func _log_encounter_summary(encounter: Dictionary) -> void:
+	var debug_mgr: Node = get_tree().root.get_node_or_null("DebugManager")
+	if debug_mgr == null:
+		return
+	var profile: FOILProfile = encounter["profile"]
+	debug_mgr.log(DebugEnums.CATEGORY_FOIL, "encounter: level=%d source=%s primary=%s dominant=%s conf=%.2f" % [
+		encounter["level"],
+		encounter["level_source"],
+		encounter["primary_character"],
+		_archetype_name(profile.dominant_archetype),
+		profile.confidence,
+	])
+	for note in encounter["loadout"].get("notes", []):
+		debug_mgr.log(DebugEnums.CATEGORY_FOIL, "  loadout note: " + str(note))
+
+
+static func _archetype_name(a: FOILEnums.Archetype) -> String:
+	match a:
+		FOILEnums.Archetype.MELEE_AGGRO:    return "MELEE_AGGRO"
+		FOILEnums.Archetype.RANGED_KITE:    return "RANGED_KITE"
+		FOILEnums.Archetype.MAGIC_OFFENSE:  return "MAGIC_OFFENSE"
+		FOILEnums.Archetype.HEALER_SUPPORT: return "HEALER_SUPPORT"
+		FOILEnums.Archetype.TANK_WALL:      return "TANK_WALL"
+		FOILEnums.Archetype.AOE_BLASTER:    return "AOE_BLASTER"
+		FOILEnums.Archetype.DEBUFFER:       return "DEBUFFER"
+		FOILEnums.Archetype.HYBRID:         return "HYBRID"
+	return "?"
 
 
 func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:

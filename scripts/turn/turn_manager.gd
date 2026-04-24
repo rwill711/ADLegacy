@@ -73,7 +73,14 @@ func begin_battle(units: Array) -> void:
 func end_battle(outcome: TurnEnums.BattleOutcome) -> void:
 	_outcome = outcome
 	_set_phase(TurnEnums.TurnPhase.BATTLE_OVER)
+	_log("battle ended: outcome=%d (%d turns)" % [int(outcome), _turn_number])
 	battle_ended.emit(outcome)
+
+
+func _log(text: String) -> void:
+	var mgr: Node = get_tree().root.get_node_or_null("DebugManager")
+	if mgr != null:
+		mgr.log(DebugEnums.CATEGORY_TURN, text)
 
 
 # =============================================================================
@@ -161,6 +168,9 @@ func _commit_turn_end() -> void:
 	var new_ct: int = maxi(0, _ct_table.get(_active_unit.unit_id, 0) - cost)
 	_ct_table[_active_unit.unit_id] = new_ct
 
+	_log("turn end: %s (moved=%s, acted=%s, cost=%d, CT now %d)" % [
+		_active_unit.unit_id, _moved_this_turn, _acted_this_turn, cost, new_ct
+	])
 	turn_ended.emit(_active_unit)
 
 	var outcome := _evaluate_outcome()
@@ -271,6 +281,11 @@ func _advance_to_next_turn() -> void:
 	_turn_number += 1
 
 	_set_phase(TurnEnums.TurnPhase.TURN_START)
+	_log("turn %d start: %s (CT=%d, SPD=%d)" % [
+		_turn_number, _active_unit.unit_id,
+		_ct_table.get(_active_unit.unit_id, 0),
+		_active_unit.stats.speed if _active_unit.stats != null else 0,
+	])
 	turn_started.emit(_active_unit)
 
 	_set_phase(TurnEnums.TurnPhase.AWAITING_ACTION)

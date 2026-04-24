@@ -1,5 +1,10 @@
 # Adventure Legacy — Alpha Build Roadmap
 ### Creative Director | RBW Studios
+
+> **STATUS: 🎯 ALPHA CODE-COMPLETE (Session 9).** All 10 rows of the Build
+> Order table are ✅ Done through row 9. Row 10 (tuning pass) is an ongoing
+> balance concern, not a blocking milestone. Success Criteria all checked.
+
 ---
 
 ## Vision Statement
@@ -157,7 +162,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 
 ---
 
-## Phase 5 — Debug System
+## Phase 5 — Debug System ✅ DONE (Alpha Session 8)
 *We are building a living game. The debugger has to grow with it.*
 
 ### Core Philosophy
@@ -200,7 +205,7 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 
 ---
 
-## Phase 6 — FOIL Integration (Post-Foundation)
+## Phase 6 — FOIL Integration (Post-Foundation) ✅ DONE (Alpha Session 9)
 *FOIL is already built (or will be by tomorrow). This phase wires it into the Alpha systems.*
 
 - Hook `FOILTracker.begin_battle()` into battle start
@@ -242,8 +247,8 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 | 🔴 5 | Movement + Pathfinding | ✅ Done (S5) | Grid + Turn System | Programming Lead |
 | 🔴 6 | Battle / Ability Resolution | ✅ Done (S6) | Units + Turn System | Programming Lead |
 | 🔴 7 | End Game Conditions | ✅ Done (S7) | Battle System | Programming Lead |
-| 🟡 8 | Debug System (overlay, console, log) | ⏭️ Next | All above (to inspect them) | Programming Lead |
-| 🟡 9 | FOIL Integration Hooks | ⏭️ | FOIL System + Battle System | Programming Lead |
+| 🟡 8 | Debug System (overlay, console, log) | ✅ Done (S8) | All above (to inspect them) | Programming Lead |
+| 🟡 9 | FOIL Integration Hooks | ✅ Done (S9) | FOIL System + Battle System | Programming Lead |
 | 🟢 10 | Tuning Pass (damage values, move ranges, speed, facing modifiers) | ⏭️ | Everything functional | Creative Director + QA Lead |
 
 > 🔴 = Critical Path | 🟡 = High Priority | 🟢 = Polish / Balance
@@ -263,16 +268,16 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 
 ## Success Criteria
 Alpha is **done** when:
-- [~] A player can start a battle on a grid map *(grid + camera done; spawn & battle loop pending)*
+- [x] A player can start a battle on a grid map
 - [x] Camera rotates in 4 directions, FFTA-style
 - [x] 3 units per side, each with distinct jobs (Rogue, Squire, White Mage)
 - [x] Units take turns based on speed
 - [x] Units can move, use an ability, choose facing, and end their turn *(facing picker modal enforces a pick on every end-turn and Wait)*
 - [x] Damage, healing, and buffs resolve correctly with facing modifiers *(buffs currently log-only; full StatusEffect system is Phase 5+)*
 - [x] A battle can be won or lost *(end-of-battle summary screen with Retry / Quit)*
-- [~] FOIL system records player actions and influences enemy setup *(record_action live per-unit; loadout influence is Phase 6)*
-- [ ] Debug tools allow inspection of all systems
-- [~] A tester can play 3 consecutive battles and see FOIL adaptation shift enemy loadouts *(Retry loop in place; loadout influence hookup is Phase 6)*
+- [x] FOIL system records player actions and influences enemy setup
+- [x] Debug tools allow inspection of all systems
+- [x] A tester can play 3 consecutive battles and see FOIL adaptation shift enemy loadouts
 
 ---
 
