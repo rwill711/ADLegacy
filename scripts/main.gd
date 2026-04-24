@@ -272,12 +272,8 @@ func _on_battle_ended(outcome: int) -> void:
 
 
 func _on_retry_pressed() -> void:
-	# Reload the whole battle scene. Units, stats, turn order — all rebuilt.
-	# The FOIL rolling window persists across reloads because FOILTracker is
-	# an autoload; that's exactly the "3 consecutive battles show FOIL
-	# adaptation" success criterion from the roadmap.
 	_battle_summary.hide_summary()
-	get_tree().reload_current_scene()
+	get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
 
 
 func _on_quit_pressed() -> void:
