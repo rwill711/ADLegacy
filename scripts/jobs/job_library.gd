@@ -82,7 +82,7 @@ static func _squire() -> JobData:
 
 static func _white_mage() -> JobData:
 	#              STR  DEX  CON  CHA  LCK  WIS  = 30
-	var attrs := BaseAttributes.create(2, 4, 4, 5, 4, 9)
+	var attrs := BaseAttributes.create(2, 4, 4, 5, 6, 9)
 	# (WIS near cap: this is the high-magic job; room to grow to 10)
 	return JobData.create(
 		WHITE_MAGE, "White Mage", attrs,
