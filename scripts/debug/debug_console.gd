@@ -13,7 +13,7 @@ const MAX_VISIBLE_ENTRIES: int = 200
 
 @onready var _root: Control = %Root
 @onready var _output: RichTextLabel = %Output
-@onready var _input: LineEdit = %Input
+@onready var _input_field: LineEdit = %Input
 
 
 var _manager: Node = null
@@ -34,7 +34,7 @@ func _ready() -> void:
 
 	_register_toggle_action()
 
-	_input.text_submitted.connect(_on_submit)
+	_input_field.text_submitted.connect(_on_submit)
 
 	_manager = get_tree().root.get_node_or_null("DebugManager")
 	if _manager != null:
@@ -91,13 +91,13 @@ func _open() -> void:
 	_rebuild_output()
 	# One-frame deferral so the LineEdit is ready to receive focus.
 	await get_tree().process_frame
-	_input.grab_focus()
-	_input.clear()
+	_input_field.grab_focus()
+	_input_field.clear()
 
 
 func _close() -> void:
 	_root.visible = false
-	_input.release_focus()
+	_input_field.release_focus()
 
 
 # =============================================================================
@@ -105,7 +105,7 @@ func _close() -> void:
 # =============================================================================
 
 func _on_submit(line: String) -> void:
-	_input.clear()
+	_input_field.clear()
 	if line.strip_edges().is_empty():
 		return
 
@@ -122,7 +122,7 @@ func _on_submit(line: String) -> void:
 	if not output.is_empty():
 		_manager.log(DebugEnums.CATEGORY_CONSOLE, output)
 
-	_input.grab_focus()
+	_input_field.grab_focus()
 
 
 # =============================================================================
@@ -136,8 +136,8 @@ func _history_back() -> void:
 		_history_cursor = _history.size() - 1
 	else:
 		_history_cursor = maxi(0, _history_cursor - 1)
-	_input.text = _history[_history_cursor]
-	_input.caret_column = _input.text.length()
+	_input_field.text = _history[_history_cursor]
+	_input_field.caret_column = _input_field.text.length()
 
 
 func _history_forward() -> void:
@@ -146,10 +146,10 @@ func _history_forward() -> void:
 	_history_cursor += 1
 	if _history_cursor >= _history.size():
 		_history_cursor = -1
-		_input.clear()
+		_input_field.clear()
 		return
-	_input.text = _history[_history_cursor]
-	_input.caret_column = _input.text.length()
+	_input_field.text = _history[_history_cursor]
+	_input_field.caret_column = _input_field.text.length()
 
 
 # =============================================================================
