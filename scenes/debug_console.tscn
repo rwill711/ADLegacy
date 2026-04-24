@@ -1,0 +1,48 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/debug/debug_console.gd" id="1_dc"]
+
+[node name="DebugConsole" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_dc")
+
+[node name="Root" type="Control" parent="."]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 0.5
+
+[node name="Backdrop" type="ColorRect" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.06, 0.09, 0.9)
+
+[node name="Margin" type="MarginContainer" parent="Root"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 6
+
+[node name="Box" type="VBoxContainer" parent="Root/Margin"]
+theme_override_constants/separation = 4
+
+[node name="Output" type="RichTextLabel" parent="Root/Margin/Box"]
+unique_name_in_owner = true
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true
+focus_mode = 0
+
+[node name="InputRow" type="HBoxContainer" parent="Root/Margin/Box"]
+
+[node name="Prompt" type="Label" parent="Root/Margin/Box/InputRow"]
+text = ">"
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.65, 0.95, 0.65, 1)
+
+[node name="Input" type="LineEdit" parent="Root/Margin/Box/InputRow"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+placeholder_text = "type 'help' for commands"

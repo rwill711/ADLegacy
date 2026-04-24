@@ -1,0 +1,78 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/debug/debug_overlay.gd" id="1_do"]
+
+[node name="DebugOverlay" type="CanvasLayer"]
+layer = 9
+script = ExtResource("1_do")
+
+[node name="Root" type="Control" parent="."]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="Root"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 104.0
+offset_right = -8.0
+offset_bottom = -8.0
+
+[node name="Margin" type="MarginContainer" parent="Root/Panel"]
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="Box" type="VBoxContainer" parent="Root/Panel/Margin"]
+theme_override_constants/separation = 6
+
+[node name="Header" type="Label" parent="Root/Panel/Margin/Box"]
+text = "Debug Overlay — F1 to toggle"
+theme_override_font_sizes/font_size = 14
+modulate = Color(1, 1, 1, 0.75)
+
+[node name="Tabs" type="TabContainer" parent="Root/Panel/Margin/Box"]
+unique_name_in_owner = true
+size_flags_vertical = 3
+theme_override_constants/side_margin = 4
+
+[node name="Units" type="ScrollContainer" parent="Root/Panel/Margin/Box/Tabs"]
+horizontal_scroll_mode = 0
+
+[node name="UnitsList" type="VBoxContainer" parent="Root/Panel/Margin/Box/Tabs/Units"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="Turn Order" type="ScrollContainer" parent="Root/Panel/Margin/Box/Tabs"]
+horizontal_scroll_mode = 0
+
+[node name="TurnList" type="VBoxContainer" parent="Root/Panel/Margin/Box/Tabs/Turn Order"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 2
+
+[node name="Log" type="VBoxContainer" parent="Root/Panel/Margin/Box/Tabs"]
+
+[node name="FilterRow" type="HBoxContainer" parent="Root/Panel/Margin/Box/Tabs/Log"]
+theme_override_constants/separation = 6
+
+[node name="FilterLabel" type="Label" parent="Root/Panel/Margin/Box/Tabs/Log/FilterRow"]
+text = "Filter:"
+theme_override_font_sizes/font_size = 12
+
+[node name="LogFilter" type="OptionButton" parent="Root/Panel/Margin/Box/Tabs/Log/FilterRow"]
+unique_name_in_owner = true
+
+[node name="LogList" type="RichTextLabel" parent="Root/Panel/Margin/Box/Tabs/Log"]
+unique_name_in_owner = true
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true

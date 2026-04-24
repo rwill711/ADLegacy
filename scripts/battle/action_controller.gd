@@ -206,6 +206,7 @@ func _execute_skill(anchor: Vector2i) -> void:
 
 	if log_actions:
 		_log_result(caster, skill, result)
+	_push_to_debug_log(caster, skill, result)
 
 	_spawn_effect_visuals(caster, skill, result)
 
@@ -355,6 +356,30 @@ func _spawn_effect_visuals(_caster: Unit, skill: SkillData, result: Dictionary) 
 		# landed. Not strictly necessary with the skill's own label, but a
 		# future polish pass can add a small caster-side toast.
 		var _ = skill  # reserved for future caster-side feedback
+
+
+# =============================================================================
+# DEBUG LOG
+# =============================================================================
+
+func _push_to_debug_log(caster: Unit, skill: SkillData, result: Dictionary) -> void:
+	var mgr: Node = get_tree().root.get_node_or_null("DebugManager")
+	if mgr == null:
+		return
+	var summary_parts: Array = []
+	summary_parts.append("%s cast %s" % [caster.unit_id, skill.skill_name])
+	for effect in result["effects"]:
+		var fragment: String = ""
+		if effect["damage"] > 0:
+			fragment = "%s -%d%s" % [effect["target_id"], effect["damage"],
+				" KILL" if effect["was_kill"] else ""]
+		elif effect["heal"] > 0:
+			fragment = "%s +%d heal" % [effect["target_id"], effect["heal"]]
+		elif effect["buff_label"] != "":
+			fragment = "%s buff=%s" % [effect["target_id"], effect["buff_label"]]
+		if fragment != "":
+			summary_parts.append(fragment)
+	mgr.log(DebugEnums.CATEGORY_COMBAT, " | ".join(summary_parts))
 
 
 # =============================================================================

@@ -157,7 +157,7 @@ The Alpha Build is a **functional proof-of-concept** — no art, no polish, just
 
 ---
 
-## Phase 5 — Debug System
+## Phase 5 — Debug System ✅ DONE (Alpha Session 8)
 *We are building a living game. The debugger has to grow with it.*
 
 ### Core Philosophy
@@ -242,8 +242,8 @@ The debug system must be **modular and extensible**. It's not a one-off — ever
 | 🔴 5 | Movement + Pathfinding | ✅ Done (S5) | Grid + Turn System | Programming Lead |
 | 🔴 6 | Battle / Ability Resolution | ✅ Done (S6) | Units + Turn System | Programming Lead |
 | 🔴 7 | End Game Conditions | ✅ Done (S7) | Battle System | Programming Lead |
-| 🟡 8 | Debug System (overlay, console, log) | ⏭️ Next | All above (to inspect them) | Programming Lead |
-| 🟡 9 | FOIL Integration Hooks | ⏭️ | FOIL System + Battle System | Programming Lead |
+| 🟡 8 | Debug System (overlay, console, log) | ✅ Done (S8) | All above (to inspect them) | Programming Lead |
+| 🟡 9 | FOIL Integration Hooks | ⏭️ Next | FOIL System + Battle System | Programming Lead |
 | 🟢 10 | Tuning Pass (damage values, move ranges, speed, facing modifiers) | ⏭️ | Everything functional | Creative Director + QA Lead |
 
 > 🔴 = Critical Path | 🟡 = High Priority | 🟢 = Polish / Balance
@@ -271,7 +271,7 @@ Alpha is **done** when:
 - [x] Damage, healing, and buffs resolve correctly with facing modifiers *(buffs currently log-only; full StatusEffect system is Phase 5+)*
 - [x] A battle can be won or lost *(end-of-battle summary screen with Retry / Quit)*
 - [~] FOIL system records player actions and influences enemy setup *(record_action live per-unit; loadout influence is Phase 6)*
-- [ ] Debug tools allow inspection of all systems
+- [x] Debug tools allow inspection of all systems
 - [~] A tester can play 3 consecutive battles and see FOIL adaptation shift enemy loadouts *(Retry loop in place; loadout influence hookup is Phase 6)*
 
 ---

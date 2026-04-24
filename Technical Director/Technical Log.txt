@@ -1109,3 +1109,165 @@ NEXT SESSION: Phase 5 — Debug System.
       without editing debug code itself.
   Also: this unlocks real FOIL-profile visibility, which is a nice handshake
   before Phase 6 wires the loadout builder.
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 8 (Phase 5: Debug System)
+==========================================================================
+
+STATUS: Phase 5 complete. DebugManager autoload + in-game console + F1
+        overlay + persistent categorized log. 12 built-in Alpha commands.
+        Extensibility contract in place for future systems to register
+        their own commands and panels without touching debug code.
+
+FILES ADDED:
+
+scripts/debug/
+  debug_enums.gd       — Category string constants (SYSTEM, COMBAT, MOVEMENT,
+                         TURN, FOIL, AI, CONSOLE) + per-category display
+                         colors + category_color(tag) helper. Strings not
+                         ints so external systems can invent new categories
+                         without enum churn.
+  debug_manager.gd     — Autoload singleton (extends Node, no class_name to
+                         avoid collision with the autoload name). Owns:
+                           • _commands dict (name → {callable, description})
+                           • _panels dict (name → Control)
+                           • _log ring buffer capped at 500 entries
+                           • scene refs (grid, spawner, turn_mgr, move_ctrl,
+                             action_ctrl, camera_rig, main_scene)
+                         Public API — the CD's extensibility contract:
+                           register_command(name, callable, description)
+                           register_panel(name, control)
+                           log(category, text)
+                         Plus: execute_command(line) parses + dispatches,
+                         get_log(filter) for filtering, export_log() writes
+                         to user://debug_log_<ts>.txt.
+                         bind_scene() is idempotent — main.gd calls it on
+                         every _ready (including Retry reloads) so commands
+                         always have fresh refs while the autoload's log
+                         and history survive.
+  debug_commands.gd    — Static class. register_all(mgr) wires 12 Alpha
+                         commands:
+                           help / ?     — list all commands
+                           clear        — clear log
+                           log_export   — save to user://
+                           heal / damage / kill / set_hp / move
+                           win / lose / next_turn
+                           foil_profile [name]  — dumps archetype + stats
+                           foil_level <0-4>     — stores override for Phase 6
+                           list_units / list_tiles
+                         _find_unit does exact id match then fuzzy substring,
+                         so `heal rogue` finds `player_rogue`.
+                         Debug-dealt damage re-runs check_outcome so lethal
+                         console kills pop the summary modal.
+  debug_console.gd     — class_name DebugConsole extends CanvasLayer.
+                         Backtick toggles. LineEdit input with up/down
+                         history navigation. RichTextLabel scrollback with
+                         per-category color tint. Caps visible tail at 200
+                         entries so the output stays performant after long
+                         play sessions. ESC closes.
+  debug_overlay.gd     — class_name DebugOverlay extends CanvasLayer.
+                         F1 toggles. TabContainer with three built-in tabs:
+                           Units      — per-unit stat block + live FOIL
+                                        profile summary (archetype, agg,
+                                        aoe, support, dist, confidence)
+                           Turn Order — active unit, phase, full CT table,
+                                        predicted next 10 turns
+                           Log        — filterable RichTextLabel, listens
+                                        to log_added for live updates
+                         Panels rebuild on a 0.3s timer while visible — rough
+                         but fine for read-only debug. External panels
+                         registered via DebugManager.register_panel() get
+                         appended to the tab container automatically
+                         (panel_registered signal).
+
+scenes/
+  debug_console.tscn   — Top-half CanvasLayer (layer=10 so it sits above
+                         everything). Dark backdrop, RichTextLabel output,
+                         LineEdit input row with green `>` prompt.
+  debug_overlay.tscn   — Left-half CanvasLayer (layer=9). Panel contains
+                         TabContainer with Units, Turn Order, Log tabs.
+                         Log tab has an OptionButton filter bound to the
+                         category tags.
+
+INTEGRATION HOOKS (added to existing systems):
+  turn_manager.gd       — _log() helper pushes TURN-category entries on
+                          every turn_started, turn_ended, end_battle.
+  move_controller.gd    — Logs MOVEMENT entries alongside existing print()
+                          on every move execution.
+  action_controller.gd  — _push_to_debug_log summarizes each resolve
+                          (who cast what, per-target damage/heal/kill/buff)
+                          as one COMBAT entry.
+
+PROJECT:
+  project.godot         — DebugManager registered as second autoload
+                          (FOILTracker is first — order doesn't matter).
+
+SCENE:
+  scenes/main.tscn      — Adds DebugOverlay + DebugConsole as instanced
+                          children. No other scene changes.
+
+USAGE (LOCKED FOR TESTERS / QA):
+  Backtick (`)   — toggle console
+  F1             — toggle overlay
+  ESC            — closes console; also cancels targeting (from Phase 3C)
+  In console:
+    help                          — full command list
+    heal rogue 50                 — fuzzy-match player_rogue, heal 50
+    kill enemy_squire             — kill by id
+    set_hp player_white_mage 1    — set exact HP
+    move player_rogue 5 5         — teleport
+    win / lose                    — force outcome
+    next_turn                     — skip current turn
+    foil_profile                  — dump active player's FOIL profile
+    foil_level 3                  — set override for next battle (Phase 6)
+    log_export                    — save log to user:// dir
+  Up/Down arrows walk command history.
+
+EXTENSIBILITY CONTRACT (PROVEN — STEP BY STEP):
+  Any system can do this without editing debug code:
+    var mgr = get_tree().root.get_node_or_null("DebugManager")
+    if mgr != null:
+        mgr.register_command("my_cmd", _on_my_cmd, "my_cmd <arg> — what it does")
+        mgr.register_panel("My Panel", control_instance)
+        mgr.log(DebugEnums.CATEGORY_SYSTEM, "thing happened")
+  Commands registered after _ready are picked up live (command_registered signal).
+  Panels registered after _ready are auto-added to the overlay's TabContainer.
+  Categories are free-form strings — add new ones just by using them.
+
+DESIGN NOTES / DEFERRED:
+  - Grid-coord overlay (Label3Ds on every tile) — listed in Alpha spec,
+    deferred. The tile inspector panel effectively covers the use case
+    ("what's at this tile?"). Add as a toggle command `coord` if QA asks.
+  - `spawn` command — CD's list included it, but spawning mid-battle needs
+    to plug into TurnManager's unit array + CT table carefully. Deferred to
+    a dedicated session; Phase 6's encounter setup will build most of the
+    plumbing anyway.
+  - Console history doesn't persist across scene reloads. Fine for Alpha;
+    would move to DebugManager storage to fix.
+  - No keybind remapping UI — binds are hardcoded (backtick, F1).
+
+FOIL HANDSHAKE:
+  - foil_profile in-console dumps archetype weights, behavioral stats,
+    confidence. Visual proof that FOILTracker is recording correctly —
+    profile should build up as the player takes actions across Retry loops.
+  - foil_level override stored on DebugManager via set_meta. Phase 6's
+    battle-setup code will read it via `mgr.get_meta("foil_level_override", -1)`
+    before deciding FOIL level from renown.
+
+NEXT SESSION: Phase 6 — FOIL Integration Hooks.
+  Targets:
+    - Read FOILTracker data at battle setup → build FOILProfile via
+      FOILAnalyzer → feed into FOILLoadoutBuilder.
+    - Apply the builder's output to the enemy spawn step. For Alpha this
+      means swapping enemy jobs at FOIL ≥ 2, distributing consumables at
+      FOIL ≥ 1, and wiring AI-hints on enemies at FOIL ≥ 3. Level 4's
+      counter-gear hinges on the equipment system (not in Alpha scope).
+    - Respect DebugManager's foil_level_override when set; otherwise
+      derive from renown (renown isn't wired yet — use 0 for Alpha and
+      leave a TODO).
+    - Add a FOIL-status line to the TurnHUD: "Level N — countering MELEE"
+      so players can see when adaptation kicks in.
+    - Register a "FOIL" tab on DebugOverlay showing per-character profile
+      + predicted enemy composition preview (leverages the panel-registration
+      contract — proves the extensibility design).

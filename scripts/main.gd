@@ -53,6 +53,17 @@ func _ready() -> void:
 	_battle_summary.retry_pressed.connect(_on_retry_pressed)
 	_battle_summary.quit_pressed.connect(_on_quit_pressed)
 
+	# Bind the debug autoload to this scene so console commands can reach
+	# the grid / units / controllers. Safe to re-bind on every scene reload
+	# (Retry) — DebugManager.bind_scene is idempotent.
+	var debug_mgr: Node = get_tree().root.get_node_or_null("DebugManager")
+	if debug_mgr != null:
+		debug_mgr.bind_scene(
+			_grid, _unit_spawner, _turn_manager,
+			_move_controller, _action_controller,
+			_camera_rig, self,
+		)
+
 	# Kick off FOIL battle records for every player unit up front, so even
 	# actions on the first turn land in the rolling window.
 	var foil: Node = get_tree().root.get_node_or_null("FOILTracker")
