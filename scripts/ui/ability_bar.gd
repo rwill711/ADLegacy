@@ -9,6 +9,7 @@ class_name AbilityBar extends CanvasLayer
 
 
 signal skill_selected(skill: SkillData)
+signal wait_pressed
 
 
 @onready var _buttons_row: HBoxContainer = %ButtonsRow
@@ -45,6 +46,16 @@ func show_for_unit(unit: Unit) -> void:
 
 	for skill in unit.skills:
 		_buttons_row.add_child(_build_button(skill, unit))
+
+	var sep := VSeparator.new()
+	sep.custom_minimum_size = Vector2(8, 0)
+	_buttons_row.add_child(sep)
+
+	var wait_btn := Button.new()
+	wait_btn.text = "Wait"
+	wait_btn.custom_minimum_size = Vector2(110, 40)
+	wait_btn.pressed.connect(func(): wait_pressed.emit())
+	_buttons_row.add_child(wait_btn)
 
 	_root.visible = true
 
