@@ -1,7 +1,7 @@
 class_name GridVisualizer extends Node3D
-## Renders a GridMap as 3D box tiles and handles hover/click input.
+## Renders a BattleGrid as 3D box tiles and handles hover/click input.
 ##
-## Data flow is one-way: GridMap is the source of truth, this node only reads
+## Data flow is one-way: BattleGrid is the source of truth, this node only reads
 ## and re-renders when `tile_changed` fires. Never mutate the map from here.
 ##
 ## Input: a Camera3D in the scene handles raycast picking via Area3D children,
@@ -17,7 +17,7 @@ signal tile_clicked(coord: Vector2i, button_index: int)
 
 ## --- Config ------------------------------------------------------------------
 ## The grid being rendered. Assign via set_grid() so signals wire up correctly.
-var _grid: GridMap = null
+var _grid: BattleGrid = null
 
 ## Map coord → {mesh: MeshInstance3D, overlay: MeshInstance3D, area: Area3D, material: StandardMaterial3D}
 var _tile_nodes: Dictionary = {}
@@ -31,7 +31,7 @@ var _material_cache: Dictionary = {}
 # PUBLIC API
 # =============================================================================
 
-func set_grid(grid: GridMap) -> void:
+func set_grid(grid: BattleGrid) -> void:
 	if _grid == grid:
 		return
 	if _grid != null:
@@ -48,7 +48,7 @@ func set_grid(grid: GridMap) -> void:
 		_grid.occupancy_changed.connect(_on_occupancy_changed)
 
 
-func get_grid() -> GridMap:
+func get_grid() -> BattleGrid:
 	return _grid
 
 

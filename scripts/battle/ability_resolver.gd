@@ -52,7 +52,7 @@ static func resolve(
 	caster: Unit,
 	skill: SkillData,
 	anchor: Vector2i,
-	grid: GridMap,
+	grid: BattleGrid,
 	all_units: Array,
 	turn_number: int
 ) -> Dictionary:
@@ -173,7 +173,7 @@ static func _side_modifier(side: int) -> float:
 	return FLANK_MOD
 
 
-static func _unit_at(grid: GridMap, all_units: Array, coord: Vector2i) -> Unit:
+static func _unit_at(grid: BattleGrid, all_units: Array, coord: Vector2i) -> Unit:
 	var tile := grid.get_tile(coord)
 	if tile == null or tile.occupant_id == &"":
 		return null

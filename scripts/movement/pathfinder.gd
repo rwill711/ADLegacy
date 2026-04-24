@@ -24,7 +24,7 @@ class_name Pathfinder
 ## Return the set of tiles reachable by `unit` from its current coord within
 ## its move budget. Dictionary maps Vector2i → float cost-to-reach.
 ## The unit's starting coord is NOT in the returned set.
-static func reachable_tiles(grid: GridMap, unit: Unit) -> Dictionary:
+static func reachable_tiles(grid: BattleGrid, unit: Unit) -> Dictionary:
 	var out: Dictionary = {}
 	if grid == null or unit == null or unit.stats == null:
 		return out
@@ -73,7 +73,7 @@ static func reachable_tiles(grid: GridMap, unit: Unit) -> Dictionary:
 ## IMPORTANT: this ignores the unit's move budget. Use it for path computation
 ## to a tile already known to be in the reachable set; the caller is
 ## responsible for budget-checking via reachable_tiles() first.
-static func find_path(grid: GridMap, unit: Unit, goal: Vector2i) -> Array:
+static func find_path(grid: BattleGrid, unit: Unit, goal: Vector2i) -> Array:
 	if grid == null or unit == null or unit.stats == null:
 		return []
 
@@ -106,7 +106,7 @@ static func find_path(grid: GridMap, unit: Unit, goal: Vector2i) -> Array:
 				continue
 			came_from[neighbor.coord] = current
 			g_score[neighbor.coord] = tentative_g
-			var f: float = tentative_g + float(GridMap.manhattan(neighbor.coord, goal))
+			var f: float = tentative_g + float(BattleGrid.manhattan(neighbor.coord, goal))
 			open_set.append({"coord": neighbor.coord, "f": f})
 
 	return []
@@ -121,7 +121,7 @@ static func find_path(grid: GridMap, unit: Unit, goal: Vector2i) -> Array:
 ## Special case: a tile currently occupied by `unit` itself is passable
 ## (we're the one leaving it).
 static func _can_step_to(
-	grid: GridMap,
+	grid: BattleGrid,
 	unit: Unit,
 	from: Vector2i,
 	to: Vector2i,

@@ -15,7 +15,7 @@ class_name Targeting
 ## Does NOT check line-of-sight (not modeled in Alpha) or MP cost (caller's
 ## job — AbilityBar already filters to castable skills).
 static func valid_anchors(
-	grid: GridMap,
+	grid: BattleGrid,
 	caster: Unit,
 	skill: SkillData,
 	all_units: Array
@@ -27,7 +27,7 @@ static func valid_anchors(
 	# In-range tile set is a cheap manhattan filter; refine below.
 	var candidate_tiles := grid.tiles_in_range(caster.coord, skill.max_range)
 	for tile in candidate_tiles:
-		var dist: int = GridMap.manhattan(caster.coord, tile.coord)
+		var dist: int = BattleGrid.manhattan(caster.coord, tile.coord)
 		if dist < skill.min_range or dist > skill.max_range:
 			continue
 
@@ -57,14 +57,14 @@ static func valid_anchors(
 static func expand_area(
 	skill: SkillData,
 	anchor: Vector2i,
-	grid: GridMap
+	grid: BattleGrid
 ) -> Array:
 	var result: Array = [anchor]
 	match skill.area_shape:
 		SkillEnums.AreaShape.SINGLE:
 			pass
 		SkillEnums.AreaShape.CROSS:
-			for offset in GridMap.NEIGHBOR_OFFSETS:
+			for offset in BattleGrid.NEIGHBOR_OFFSETS:
 				var c: Vector2i = anchor + offset
 				if grid.is_in_bounds(c):
 					result.append(c)

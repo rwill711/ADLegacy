@@ -26,7 +26,7 @@ var _selected_skill: SkillData = null
 var _valid_targets: Array = []  # Array[Vector2i]
 
 ## Refs set via bind()
-var _grid: GridMap = null
+var _grid: BattleGrid = null
 var _visualizer: GridVisualizer = null
 var _turn_manager: TurnManager = null
 var _unit_spawner: UnitSpawner = null
@@ -41,7 +41,7 @@ var _world_root: Node3D = null
 # =============================================================================
 
 func bind(
-	grid: GridMap,
+	grid: BattleGrid,
 	visualizer: GridVisualizer,
 	turn_manager: TurnManager,
 	unit_spawner: UnitSpawner,
@@ -397,10 +397,6 @@ func _spawn_effect_visuals(_caster: Unit, skill: SkillData, result: Dictionary) 
 			continue
 
 		FloatingText.spawn(_world_root, text, color, anchor_pos)
-		# Skill-level context for buff/debuff labels so the player sees what
-		# landed. Not strictly necessary with the skill's own label, but a
-		# future polish pass can add a small caster-side toast.
-		var _ = skill  # reserved for future caster-side feedback
 
 
 # =============================================================================
@@ -486,7 +482,7 @@ func _record_foil_actions(
 				target_job = String(target.job.job_name)
 			targeted_ally = not UnitEnums.teams_are_hostile(caster.team, target.team)
 
-		var engagement: int = GridMap.manhattan(caster.coord, effect["target_coord"])
+		var engagement: int = BattleGrid.manhattan(caster.coord, effect["target_coord"])
 
 		foil.record_action(
 			caster.display_name,
@@ -533,7 +529,7 @@ func _log_result(caster: Unit, skill: SkillData, result: Dictionary) -> void:
 		caster.unit_id, skill.skill_name, result["mp_paid"]
 	])
 	for effect in result["effects"]:
-		var side_label := ["front", "flank", "REAR"][effect["side"]]
+		var side_label: String = ["front", "flank", "REAR"][effect["side"]]
 		var outcome := ""
 		if effect["damage"] > 0:
 			outcome = "dmg=%d%s" % [

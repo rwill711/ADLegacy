@@ -95,7 +95,7 @@ const CONSUMABLE_STAT_BONUSES: Dictionary = {
 ## (via FOILBattleSetup.build_encounter). If null or empty, the default
 ## mirrored roster is used — keeps FOIL optional.
 func spawn_alpha_roster(
-	grid: GridMap,
+	grid: BattleGrid,
 	parent: Node3D,
 	enemy_loadout: Dictionary = {}
 ) -> Array:
@@ -276,7 +276,7 @@ func _spawn_one(
 	team: UnitEnums.Team,
 	unit_id: StringName,
 	coord: Vector2i,
-	grid: GridMap,
+	grid: BattleGrid,
 	parent: Node3D
 ) -> Unit:
 	var job := JobLibrary.get_job(job_name)
@@ -284,7 +284,7 @@ func _spawn_one(
 		push_error("UnitSpawner: no job '%s'" % job_name)
 		return null
 
-	var tile := grid.get_tile(coord)
+	var tile: GridTile = grid.get_tile(coord)
 	if tile == null:
 		push_error("UnitSpawner: spawn coord %s out of bounds" % [coord])
 		return null

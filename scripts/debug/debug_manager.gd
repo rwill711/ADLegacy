@@ -34,7 +34,7 @@ var _log_max: int = 500
 
 
 ## --- Scene refs (re-bound every scene load) ---------------------------------
-var grid: GridMap = null
+var grid: BattleGrid = null
 var unit_spawner: UnitSpawner = null
 var turn_manager: TurnManager = null
 var move_controller: MoveController = null
@@ -51,13 +51,13 @@ var _built_in_registered: bool = false
 
 func _ready() -> void:
 	# Log our own startup so the first overlay open shows something.
-	log(DebugEnums.CATEGORY_SYSTEM, "DebugManager online")
+	self.log(DebugEnums.CATEGORY_SYSTEM, "DebugManager online")
 
 
 ## Called by main.gd._ready after the battle scene is assembled.
 ## Re-call is safe — refs overwrite, built-in command registration is idempotent.
 func bind_scene(
-	p_grid: GridMap,
+	p_grid: BattleGrid,
 	p_spawner: UnitSpawner,
 	p_turn_mgr: TurnManager,
 	p_move_ctrl: MoveController,
@@ -77,7 +77,7 @@ func bind_scene(
 		DebugCommands.register_all(self)
 		_built_in_registered = true
 
-	log(DebugEnums.CATEGORY_SYSTEM, "Scene bound (grid=%dx%d, units=%d)" % [
+	self.log(DebugEnums.CATEGORY_SYSTEM, "Scene bound (grid=%dx%d, units=%d)" % [
 		grid.width if grid != null else 0,
 		grid.height if grid != null else 0,
 		unit_spawner.get_all_units().size() if unit_spawner != null else 0,

@@ -1,4 +1,4 @@
-class_name FOILTracker extends Node
+extends Node
 ## Autoload singleton. Records player actions during battle and manages the
 ## rolling window. Supports MULTIPLE CONCURRENT CHARACTER BATTLES — one
 ## player party can have N units, each tracked independently against the

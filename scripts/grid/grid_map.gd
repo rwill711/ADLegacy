@@ -1,4 +1,4 @@
-class_name GridMap extends Resource
+class_name BattleGrid extends Resource
 ## Container for the tactical grid. Owns the 2D array of GridTile and exposes
 ## queries the pathfinder, battle manager, and visualizer consume.
 ##
@@ -30,8 +30,8 @@ signal occupancy_changed(coord: Vector2i)
 
 ## Build an empty map of the given size, every tile GRASS at height 0.
 ## Call this or pass tiles in manually; do NOT leave tiles empty and query.
-static func create(p_width: int, p_height: int) -> GridMap:
-	var map := GridMap.new()
+static func create(p_width: int, p_height: int) -> BattleGrid:
+	var map := BattleGrid.new()
 	map.width = p_width
 	map.height = p_height
 	map.tiles = []
@@ -59,7 +59,7 @@ func get_tile(coord: Vector2i) -> GridTile:
 
 func set_tile(coord: Vector2i, tile: GridTile) -> void:
 	if not is_in_bounds(coord):
-		push_error("GridMap.set_tile: out of bounds %s" % [coord])
+		push_error("BattleGrid.set_tile: out of bounds %s" % [coord])
 		return
 	tile.coord = coord
 	tiles[coord.y][coord.x] = tile

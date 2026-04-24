@@ -128,7 +128,7 @@ static func _cmd_move(mgr, args: PackedStringArray) -> String:
 	if unit == null:
 		return "no unit matching '%s'" % args[0]
 	var coord := Vector2i(int(args[1]), int(args[2]))
-	var tile := mgr.grid.get_tile(coord)
+	var tile: GridTile = mgr.grid.get_tile(coord)
 	if tile == null:
 		return "coord %s out of bounds" % [coord]
 	mgr.grid.clear_occupant(unit.coord)
@@ -158,7 +158,7 @@ static func _cmd_lose(mgr, _args: PackedStringArray) -> String:
 static func _cmd_next_turn(mgr, _args: PackedStringArray) -> String:
 	if mgr.turn_manager == null:
 		return "no active battle"
-	var active := mgr.turn_manager.get_active_unit()
+	var active: Unit = mgr.turn_manager.get_active_unit()
 	if active == null:
 		return "no active unit"
 	mgr.turn_manager.end_turn_immediate()
@@ -286,7 +286,7 @@ static func _find_unit(mgr, token: String) -> Unit:
 static func _maybe_end_battle_on_lethal_debug(mgr) -> void:
 	if mgr.turn_manager == null:
 		return
-	var outcome := mgr.turn_manager.check_outcome()
+	var outcome: TurnEnums.BattleOutcome = mgr.turn_manager.check_outcome()
 	if outcome != TurnEnums.BattleOutcome.ONGOING:
 		mgr.turn_manager.end_battle(outcome)
 

@@ -21,7 +21,7 @@ class_name MoveController extends Node
 
 
 ## --- Wired refs (set via bind() from main.gd) -------------------------------
-var _grid: GridMap = null
+var _grid: BattleGrid = null
 var _visualizer: GridVisualizer = null
 var _turn_manager: TurnManager = null
 
@@ -37,7 +37,7 @@ var _executing: bool = false
 # WIRING
 # =============================================================================
 
-func bind(grid: GridMap, visualizer: GridVisualizer, turn_manager: TurnManager) -> void:
+func bind(grid: BattleGrid, visualizer: GridVisualizer, turn_manager: TurnManager) -> void:
 	_grid = grid
 	_visualizer = visualizer
 	_turn_manager = turn_manager

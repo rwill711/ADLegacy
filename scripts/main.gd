@@ -22,7 +22,7 @@ extends Node3D
 @onready var _battle_summary: BattleSummary = $BattleSummary
 
 
-var _grid: GridMap = null
+var _grid: BattleGrid = null
 
 ## Cached encounter config from FOILBattleSetup at battle start. Consumed by
 ## the HUD status line and the FOIL debug panel.
@@ -208,9 +208,9 @@ func _closest_reachable_toward_enemy(unit: Unit) -> Vector2i:
 		return unit.coord
 
 	var best_coord: Vector2i = unit.coord
-	var best_dist: int = GridMap.manhattan(unit.coord, nearest_enemy.coord)
+	var best_dist: int = BattleGrid.manhattan(unit.coord, nearest_enemy.coord)
 	for coord in reachable:
-		var dist: int = GridMap.manhattan(coord, nearest_enemy.coord)
+		var dist: int = BattleGrid.manhattan(coord, nearest_enemy.coord)
 		if dist < best_dist:
 			best_dist = dist
 			best_coord = coord
@@ -225,7 +225,7 @@ func _nearest_hostile(unit: Unit) -> Unit:
 			continue
 		if not UnitEnums.teams_are_hostile(unit.team, other.team):
 			continue
-		var d: int = GridMap.manhattan(unit.coord, other.coord)
+		var d: int = BattleGrid.manhattan(unit.coord, other.coord)
 		if d < best_dist:
 			best_dist = d
 			best = other
@@ -276,7 +276,7 @@ func _on_quit_pressed() -> void:
 # TILE INPUT FEEDBACK
 # =============================================================================
 
-func _grid_center_world(map: GridMap) -> Vector3:
+func _grid_center_world(map: BattleGrid) -> Vector3:
 	return Vector3(
 		(float(map.width) - 1.0) * 0.5 * GridEnums.TILE_WORLD_SIZE,
 		0.0,

@@ -14,8 +14,8 @@ const HILL_ELEVATION: int = 1
 
 
 ## Build the standard Alpha test map.
-static func build() -> GridMap:
-	var map := GridMap.create(WIDTH, HEIGHT)
+static func build() -> BattleGrid:
+	var map := BattleGrid.create(WIDTH, HEIGHT)
 
 	# Central 3x3 hill.
 	for dy in HILL_SIZE:
@@ -59,7 +59,7 @@ static func enemy_spawn_points() -> Array:
 	]
 
 
-static func _set_terrain(map: GridMap, coord: Vector2i, terrain: GridEnums.TerrainType) -> void:
+static func _set_terrain(map: BattleGrid, coord: Vector2i, terrain: GridEnums.TerrainType) -> void:
 	var tile := map.get_tile(coord)
 	if tile == null:
 		return
