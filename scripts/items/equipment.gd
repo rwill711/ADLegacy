@@ -188,7 +188,7 @@ func get_loadout_summary() -> String:
 	]
 	for slot in ordered_slots:
 		var item: ItemData = _gear.get(slot, null)
-		var slot_name: String = ItemEnums.slot_display_name(slot)
+		var slot_name: String = ItemEnums.slot_display_name(slot as ItemEnums.EquipSlot)
 		if item != null:
 			lines.append("  %s: %s (%s)" % [slot_name, item.display_name, item.get_modifier_summary()])
 		else:

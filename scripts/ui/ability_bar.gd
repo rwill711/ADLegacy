@@ -45,6 +45,9 @@ var _sub_open: bool = false
 # =============================================================================
 
 func _ready() -> void:
+	if _root == null or _main_list == null or _sub_panel == null or _sub_list == null:
+		push_error("AbilityBar: @onready nodes not found — check unique_name_in_owner on Root, MainList, SubPanel, SubList in ability_bar.tscn")
+		return
 	_root.visible = false
 
 
@@ -59,6 +62,9 @@ func show_for_unit(
 	can_undo_move: bool = false,
 	can_act: bool = true
 ) -> void:
+	if _root == null or _main_list == null or _sub_panel == null or _sub_list == null:
+		push_error("AbilityBar.show_for_unit: nodes not ready")
+		return
 	_current_unit = unit
 	_selected_skill = null
 	_close_sub()
@@ -87,6 +93,8 @@ func show_for_unit(
 
 
 func hide_bar() -> void:
+	if _root == null:
+		return
 	_root.visible = false
 	_current_unit = null
 	_selected_skill = null
@@ -96,6 +104,8 @@ func hide_bar() -> void:
 ## Called by ActionController after a skill is chosen to show targeting hint.
 ## Dims all sub-buttons except the active skill.
 func show_targeting(skill: SkillData) -> void:
+	if _hint_label == null or _sub_list == null:
+		return
 	_selected_skill = skill
 	_hint_label.text = "Targeting %s.  Click highlighted tile.  Right-click to cancel." \
 		% skill.display_name
@@ -162,7 +172,8 @@ func _open_act_submenu(unit: Unit) -> void:
 
 func _close_sub() -> void:
 	_sub_open = false
-	_sub_panel.visible = false
+	if _sub_panel != null:
+		_sub_panel.visible = false
 	_clear_sub()
 
 
@@ -207,10 +218,14 @@ func _add_sub_skill_btn(skill: SkillData, unit: Unit, label_override: String = "
 
 
 func _clear_main() -> void:
+	if _main_list == null:
+		return
 	for c in _main_list.get_children():
 		c.queue_free()
 
 
 func _clear_sub() -> void:
+	if _sub_list == null:
+		return
 	for c in _sub_list.get_children():
 		c.queue_free()
