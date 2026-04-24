@@ -240,7 +240,11 @@ func _on_panel_registered(panel_name: String) -> void:
 
 
 func _add_external_panel(panel_name: String, control: Control) -> void:
-	if control == null:
+	if control == null or not is_instance_valid(control):
+		return
+	# If the control is already parented (e.g., re-register during a live
+	# overlay session), don't try to reparent. Skip silently.
+	if control.get_parent() != null:
 		return
 	# Don't double-add — TabContainer children are keyed by node name.
 	for child in _tabs.get_children():

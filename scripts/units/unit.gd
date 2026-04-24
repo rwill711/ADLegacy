@@ -45,6 +45,16 @@ var kills_scored: int = 0
 var skill_usage_counts: Dictionary = {}  # StringName → int
 
 
+## --- FOIL loadout annotations (Phase 6) -------------------------------------
+## For enemy units only. Set by UnitSpawner from the FOILLoadoutBuilder's
+## output. ActionController reads ai_hints during the enemy turn's scoring
+## pass to respect target_priority ("focus_healer") etc.
+## For player units and in non-FOIL builds these stay at their defaults.
+var ai_hints: Dictionary = {}
+var consumable_tag: String = ""
+var gear_hint: String = ""
+
+
 ## --- Visuals (built in _ready) ----------------------------------------------
 var _body_mesh: MeshInstance3D = null
 var _facing_arrow: MeshInstance3D = null

@@ -8,6 +8,7 @@ class_name TurnHUD extends CanvasLayer
 @onready var _active_name: Label = %ActiveName
 @onready var _active_stats: Label = %ActiveStats
 @onready var _phase_label: Label = %PhaseLabel
+@onready var _foil_label: Label = %FoilLabel
 @onready var _queue_list: VBoxContainer = %QueueList
 @onready var _outcome_banner: Label = %OutcomeBanner
 
@@ -54,6 +55,20 @@ func _on_turn_ended(_unit: Unit) -> void:
 	# Leave the panel showing the unit whose turn just ended until the next
 	# turn_started fires — prevents a visible flash of empty state.
 	pass
+
+
+## Display the current encounter's FOIL level + who's being countered.
+## Called by main.gd once per battle after FOILBattleSetup runs. Blank
+## string hides the label (FOIL 0 with no data, or debug disables).
+func set_foil_status(level: int, dominant_archetype_name: String) -> void:
+	if _foil_label == null:
+		return
+	if level <= 0:
+		_foil_label.text = "FOIL 0 — no adaptation"
+	elif dominant_archetype_name.is_empty() or dominant_archetype_name == "HYBRID":
+		_foil_label.text = "FOIL %d — countering hybrid" % level
+	else:
+		_foil_label.text = "FOIL %d — countering %s" % [level, dominant_archetype_name]
 
 
 func _on_phase_changed(phase: int) -> void:

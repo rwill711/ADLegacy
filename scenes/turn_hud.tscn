@@ -51,11 +51,20 @@ theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 8
 
-[node name="PhaseLabel" type="Label" parent="Root/PhasePanel/PhaseMargin"]
+[node name="PhaseBox" type="VBoxContainer" parent="Root/PhasePanel/PhaseMargin"]
+
+[node name="PhaseLabel" type="Label" parent="Root/PhasePanel/PhaseMargin/PhaseBox"]
 unique_name_in_owner = true
 text = "Ticking…"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 18
+
+[node name="FoilLabel" type="Label" parent="Root/PhasePanel/PhaseMargin/PhaseBox"]
+unique_name_in_owner = true
+text = ""
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+modulate = Color(0.7, 1, 0.7, 0.9)
 
 [node name="QueuePanel" type="PanelContainer" parent="Root"]
 anchor_left = 1.0

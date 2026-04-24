@@ -1271,3 +1271,176 @@ NEXT SESSION: Phase 6 — FOIL Integration Hooks.
     - Register a "FOIL" tab on DebugOverlay showing per-character profile
       + predicted enemy composition preview (leverages the panel-registration
       contract — proves the extensibility design).
+
+
+==========================================================================
+ALPHA BUILD LOG — Session 9 (Phase 6: FOIL Integration Hooks)
+==========================================================================
+
+STATUS: Phase 6 complete. FOIL loop closed end-to-end:
+        record (Phase 3C) → analyze (FOILAnalyzer) → build loadout
+        (FOILLoadoutBuilder) → apply to spawn (UnitSpawner) → respect
+        AI hints (ActionController). HUD shows current level. Debug
+        overlay gains a FOIL tab via register_panel — proves the
+        extensibility contract works.
+
+        🎯 ALPHA IS CODE-COMPLETE. Every Success Criterion in the roadmap
+        is now checked. Row 10 (Tuning Pass) is the remaining roadmap
+        item but it's balance work, not a blocking milestone.
+
+FILES ADDED:
+
+scripts/foil/foil_battle_setup.gd — FOILBattleSetup (static glue layer).
+  build_encounter(player_character_names, base_enemy_pool, party_size, renown)
+  returns:
+    {
+      "level": int 0-4,
+      "level_source": "override" | "renown" | "default",
+      "profile": FOILProfile,              # primary character, never null
+      "primary_character": String,
+      "profiles_by_name": Dictionary,      # every player char's profile
+      "loadout": Dictionary,                # FOILLoadoutBuilder output
+    }
+  Primary-character selection prefers highest confidence (most battles
+  in window), ties broken by party order. Resolves level via
+  DebugManager.get_meta("foil_level_override") → renown → 0.
+
+scripts/debug/foil_debug_panel.gd — FOILDebugPanel (ScrollContainer).
+  Registered by main.gd via DebugManager.register_panel("FOIL", panel).
+  DebugOverlay picks it up automatically via the panel_registered signal.
+  Rebuilds every 0.5s while visible (is_visible_in_tree check):
+    • FOIL level + source banner
+    • Primary profile: dominant archetype, top-3 archetype weights,
+      behavioral stats, confidence, trait tags
+    • Per-character profile table for the full party
+    • Enemy loadout preview (resolved jobs, consumables, AI hints, notes)
+
+FILES MODIFIED:
+
+scripts/units/unit_spawner.gd (substantial rewrite):
+  - spawn_alpha_roster(grid, parent, enemy_loadout={}) now takes an optional
+    loadout Dictionary. Empty loadout → default mirrored roster (no behavior
+    change from Phase 5). Non-empty → role-driven spawn.
+  - ROLE_TO_JOB_NAME: 22-entry map translating FOILLoadoutBuilder's symbolic
+    roles (ranged_kiter, silencer, burst_mage, etc.) to Alpha's three jobs.
+    Every counter role maps to Rogue, Squire, or White Mage — the closest
+    tactical approximation. Post-Alpha's job expansion grows this map
+    without changing the builder.
+  - CONSUMABLE_STAT_BONUSES: 6-entry map for FOIL 1+ consumables:
+      defense_potion       → +5 DEF
+      speed_potion         → +2 SPD
+      magic_resist_potion  → +5 RES
+      armor_pierce_elixir  → +3 ATK
+      generic_elixir       → +10 Max HP (heal to new max)
+      silence_scroll       → no-op (status system post-Alpha)
+      reflect_shield       → no-op (status system post-Alpha)
+      purity_charm         → no-op (status system post-Alpha)
+    elite_<name> prefix (FOIL 4) doubles the bonus.
+  - _resolve_job_name(entry): picks seeded job if present, else role-map
+    lookup, else falls back to squire.
+  - _apply_consumable + _apply_ai_hints attach per-enemy annotations.
+  - default_base_enemy_pool() static — used by main.gd for the setup call
+    and by FOILDebugPanel for its preview.
+
+scripts/units/unit.gd:
+  - Added three FOIL loadout annotation fields: ai_hints, consumable_tag,
+    gear_hint. Empty on player units and when FOIL is off.
+
+scripts/battle/action_controller.gd:
+  - _score_enemy_target now returns base_score + _ai_hint_bonus(unit, skill, target).
+  - _ai_hint_bonus implements the FOIL-3 "target_priority: focus_healer"
+    hint — offensive skills against a healer target get +60 score on top of
+    the existing missing-HP preference. _looks_like_healer checks job name
+    == "white_mage" OR any HEALING skill in the unit's kit, so future
+    healer jobs inherit the behavior without touching this code.
+
+scripts/ui/turn_hud.gd + scenes/turn_hud.tscn:
+  - New FoilLabel under the phase panel. set_foil_status(level, archetype_name)
+    reads: "FOIL N — countering <ARCHETYPE>" (or "FOIL 0 — no adaptation",
+    or "FOIL N — countering hybrid" for HYBRID profiles). Called once per
+    battle from main.gd after FOILBattleSetup runs.
+
+scripts/debug/debug_overlay.gd:
+  - _add_external_panel now is_instance_valid-guards the control and
+    skips already-parented panels. Makes Retry-loop panel re-registration
+    robust: after scene reload, DebugManager's _panels dict still holds
+    the freed previous panel; main.gd overwrites with a fresh instance;
+    overlay adds that.
+
+scripts/main.gd (substantial wiring):
+  - _predict_player_character_names() reads JobLibrary.display_name before
+    spawning so FOIL profile lookups use the same keys the spawner assigns.
+  - _ready now: (1) build encounter via FOILBattleSetup, (2) pass loadout
+    to spawner, (3) stash encounter on _current_encounter, (4) always
+    register a fresh FOILDebugPanel (overwrites any stale ref), (5) call
+    _turn_hud.set_foil_status with the current level + archetype, (6)
+    _log_encounter_summary into DebugEnums.CATEGORY_FOIL for the log panel.
+
+END-TO-END FOIL LOOP (now fully live):
+  BATTLE 1 (cold start, no data):
+    - FOILBattleSetup → level 0 (default), empty profile, HYBRID dominant
+    - LoadoutBuilder → base mirrored roster, no consumables, no hints
+    - Result: classic 3v3 rogue/squire/white_mage mirror match
+
+  Player takes actions throughout Battle 1, FOILTracker records per-unit.
+
+  BATTLE 2 (retry, 1 battle in window):
+    - confidence < MIN_BATTLES_THRESHOLD (3), still treated as level 0
+      BUT the profile now has a dominant_archetype (e.g., MELEE_AGGRO if
+      Rogue's player used Backstab heavily)
+    - Loadout still default because confidence gate
+    - HUD shows "FOIL 0 — no adaptation" but debug panel previews what
+      level 1+ would look like
+
+  BATTLE 3+ (after 3+ battles of data):
+    - Profile confidence climbs, renown still 0 so level is 0 by default
+    - USE `foil_level 2` in console to force adaptation
+    - Loadout swaps half the enemy team to counter-roles
+    - Consumables distributed (+5 DEF if player was melee-heavy, etc.)
+    - Level 3: adds AI hint `focus_healer` → enemies prioritize White Mage
+
+TESTING HARNESS (WHAT A QA PASS LOOKS LIKE):
+  1. Run the game. Confirm "FOIL 0 — no adaptation" in the phase area.
+  2. Open console (backtick), type `foil_level 3`, enter.
+  3. Open overlay (F1), switch to FOIL tab. Check the Enemy loadout
+     preview — should show counter-roles and `target_priority: focus_healer`.
+  4. Click Retry (or just play through). HUD shows "FOIL 3 — countering X"
+     where X is the player's dominant archetype.
+  5. As White Mage takes turn, enemies should prioritize targeting them.
+  6. `foil_profile` in console dumps the analyzed profile for sanity.
+
+DEFERRED ITEMS (POST-ALPHA):
+  - Renown system — currently hardcoded 0. When renown lands, replace
+    the `0` arg in _ready's build_encounter call with the primary character's
+    renown value. FOILBattleSetup already handles renown → level conversion.
+  - Level 4 counter gear — requires equipment system. The gear_hint is
+    stored on Unit.gear_hint for when equipment arrives; UnitSpawner's
+    _apply_consumable is the template for _apply_gear.
+  - Level 3 `formation` hint (spread/bunched) — needs repositioning logic
+    at spawn or during turns. Currently the only level-3 hint wired is
+    target_priority. Others are readable on unit.ai_hints for future AI.
+  - Legacy / death-resets-window behavior — roadmap notes per-character
+    death resets window. When death is wired to trigger a new character
+    (post-Alpha roguelike loop), clear_character_history gets called.
+
+ALPHA CLOSEOUT CHECKLIST (all ✓):
+  ✓ Grid data + rendering (Phase 1A)
+  ✓ FFTA camera rotation (Phase 1B)
+  ✓ Units + Jobs + Skills (Phase 2)
+  ✓ CTR turn system + HUD (Phase 3A)
+  ✓ A* pathfinding + click-to-move (Phase 3B)
+  ✓ Ability resolution + facing modifiers + floating numbers (Phase 3C)
+  ✓ End-game summary + retry + facing picker (Phase 4)
+  ✓ Debug system (console + overlay + log + extensibility) (Phase 5)
+  ✓ FOIL integration (profile → loadout → AI hints) (Phase 6)
+
+NEXT STEPS (POST-ALPHA, PRIORITY-ORDERED BY CD):
+  - Phase 10 tuning pass — playtest the 3v3 battles, retune CTR costs,
+    facing modifiers, skill power values, consumable bonuses. Nothing
+    about the code should need to change, only constants.
+  - Renown system (unlocks real FOIL level progression).
+  - StatusEffect system (Protect, Silence, Poison — lots of existing
+    stubs ready to be activated).
+  - Legacy / roguelike loop: death, retirement, inheritance.
+  - Equipment system (unblocks FOIL level 4 counter-gear).
+  - Art pass: replace capsules/boxes with real sprites/models.
