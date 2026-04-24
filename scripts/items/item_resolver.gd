@@ -162,7 +162,7 @@ static func _apply_restore_mp(item: ItemData, target: Unit, effect: Dictionary) 
 		return false
 
 	var amount: int = int(item.effect_value)
-	var restored: int = target.stats.restore_mp(amount)
+	var restored: int = target.restore_mp(amount)  # wrapper emits mp_changed
 	effect["mp_restored"] = restored
 	effect["message"] = "+%d MP" % restored
 	return true
@@ -173,14 +173,11 @@ static func _apply_revive(item: ItemData, target: Unit, effect: Dictionary) -> b
 		effect["message"] = "Target is not defeated"
 		return false
 
-	# Revive at fraction of max HP
+	# Revive at fraction of max HP — Unit.revive() handles state + visual reset.
 	var revive_hp: int = maxi(1, int(float(target.stats.max_hp) * item.effect_value))
-	target.stats.hp = revive_hp
+	target.revive(revive_hp)
 	effect["heal"] = revive_hp
 	effect["revived"] = true
 	effect["message"] = "Revived with %d HP" % revive_hp
-
-	# Reset unit state from DEFEATED back to IDLE
-	target.set_state(UnitEnums.UnitState.IDLE)
 
 	return true

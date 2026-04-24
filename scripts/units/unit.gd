@@ -463,6 +463,32 @@ func spend_mp(amount: int) -> bool:
 	return paid
 
 
+## Restore MP and emit mp_changed so the UI updates.
+## Use this instead of stats.restore_mp() directly (ADR-005 risk #5).
+func restore_mp(amount: int) -> int:
+	if stats == null:
+		return 0
+	var gained := stats.restore_mp(amount)
+	if gained > 0:
+		mp_changed.emit(stats.mp, stats.max_mp)
+	return gained
+
+
+## Revive this unit after being defeated by a Lazarus Potion.
+## Resets state and upright body orientation so it doesn't stay lying flat.
+func revive(hp_amount: int) -> void:
+	if stats == null:
+		return
+	stats.hp = clampi(hp_amount, 1, stats.max_hp)
+	set_state(UnitEnums.UnitState.IDLE)
+	hp_changed.emit(stats.hp, stats.max_hp)
+	if _body_mesh != null:
+		var t := create_tween()
+		t.set_ease(Tween.EASE_OUT)
+		t.set_trans(Tween.TRANS_CUBIC)
+		t.tween_property(_body_mesh, "rotation_degrees:z", 0.0, 0.3)
+
+
 # =============================================================================
 # QUERIES
 # =============================================================================
