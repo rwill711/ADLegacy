@@ -154,7 +154,7 @@ func _on_tile_changed(coord: Vector2i) -> void:
 	# Full rebuild handles terrain prop changes (tree/rock appear or disappear).
 	var entry = _tile_nodes.get(coord, null)
 	if entry != null:
-		entry["mesh"].free()
+		entry["mesh"].queue_free()  # defer so in-flight mouse_entered signals finish safely
 		_tile_nodes.erase(coord)
 	_build_tile_node(tile)
 

@@ -8,15 +8,6 @@ class_name Unit extends Node3D
 ## ADR-004: Units now carry base_attributes alongside derived stats. The
 ## attribute block is the source of truth; stats are re-derivable at any
 ## time via rederive_stats() (used after level-ups, equipment changes, etc).
-##
-## EQUIPMENT & INVENTORY (Phase 7):
-## Units carry an Equipment loadout (passive gear in 8 slots) and an
-## Inventory (consumable bag, max 6 items). Equipment modifiers are applied
-## during stat derivation via a two-pass process:
-##   1. Attribute modifiers (+1 CON etc.) are added to a temp copy of
-##      base_attributes, then StatFormulas.derive() runs on that.
-##   2. Flat stat modifiers (+2 speed etc.) are added on top of derived stats.
-## This keeps the base_attributes standard-array invariant intact.
 
 
 ## --- Signals ----------------------------------------------------------------
@@ -41,10 +32,6 @@ var job: JobData = null
 var base_attributes: BaseAttributes = null
 var stats: UnitStats = null
 var skills: Array = []
-
-## --- Equipment & Inventory (Phase 7) ----------------------------------------
-var equipment: Equipment = null
-var inventory: Inventory = null
 
 
 ## --- Grid state -------------------------------------------------------------
@@ -116,22 +103,7 @@ func initialize(
 		push_error("Unit.initialize: job '%s' has no base_attributes" % p_job.job_name)
 		base_attributes = BaseAttributes.new()
 
-	# Initialize equipment and inventory
-	equipment = Equipment.new()
-	inventory = Inventory.new()
-
-	# Equip starter gear (body + boots for Alpha, +1 CON each)
-	var starter_gear: Array = ItemLibrary.get_starter_equipment(p_job.job_name)
-	for item in starter_gear:
-		equipment.equip(item)
-
-	# Give starter consumables
-	var starter_consumables: Array = ItemLibrary.get_starter_consumables()
-	for item in starter_consumables:
-		inventory.add_item(item)
-
-	# Derive stats WITH equipment modifiers applied
-	stats = _derive_stats_with_equipment()
+	stats = p_job.instantiate_stats()
 	skills = p_job.get_starting_skills()
 	coord = p_coord
 	facing = p_facing
@@ -141,17 +113,17 @@ func initialize(
 		_apply_visual_state()
 
 
-## Recalculate derived stats from current base_attributes + equipment.
-## Call after level-ups, equipment changes, or any event that modifies
-## attributes. Preserves current HP/MP ratios so a mid-battle re-derive
-## doesn't accidentally full-heal the unit.
+## Recalculate derived stats from current base_attributes. Call after
+## level-ups, equipment changes, or any event that modifies attributes.
+## Preserves current HP/MP ratios so a mid-battle re-derive doesn't
+## accidentally full-heal the unit.
 func rederive_stats() -> void:
 	if base_attributes == null or job == null:
 		return
 	var hp_ratio: float = float(stats.hp) / float(stats.max_hp) if stats.max_hp > 0 else 1.0
 	var mp_ratio: float = float(stats.mp) / float(stats.max_mp) if stats.max_mp > 0 else 1.0
 
-	stats = _derive_stats_with_equipment()
+	stats = StatFormulas.derive(base_attributes, job.base_move_range, job.base_jump)
 
 	# Restore HP/MP to same percentage of new max
 	stats.hp = clampi(int(hp_ratio * float(stats.max_hp)), 1 if hp_ratio > 0.0 else 0, stats.max_hp)
@@ -159,78 +131,6 @@ func rederive_stats() -> void:
 
 	hp_changed.emit(stats.hp, stats.max_hp)
 	mp_changed.emit(stats.mp, stats.max_mp)
-
-
-# =============================================================================
-# EQUIPMENT HELPERS
-# =============================================================================
-
-## Equip an item and re-derive stats. Returns the previously equipped item
-## (or null). This is the main public API for changing gear — always goes
-## through rederive so stats stay consistent.
-func equip_item(item: ItemData) -> ItemData:
-	if equipment == null:
-		equipment = Equipment.new()
-	var old: ItemData = equipment.equip(item)
-	rederive_stats()
-	return old
-
-
-## Unequip from a slot and re-derive stats. Returns the removed item or null.
-func unequip_item(slot: ItemEnums.EquipSlot, ring_index: int = 0) -> ItemData:
-	if equipment == null:
-		return null
-	var old: ItemData = equipment.unequip(slot, ring_index)
-	if old != null:
-		rederive_stats()
-	return old
-
-
-## Two-pass stat derivation with equipment modifiers.
-## Pass 1: apply attribute modifiers to a temp copy, derive via StatFormulas.
-## Pass 2: apply flat stat modifiers on top of derived stats.
-func _derive_stats_with_equipment() -> UnitStats:
-	var attrs: BaseAttributes = base_attributes
-
-	# Pass 1 — attribute modifiers from equipment
-	if equipment != null and not equipment.is_empty():
-		var attr_mods: Dictionary = equipment.get_total_attribute_modifiers()
-		if not attr_mods.is_empty():
-			# Create a temp copy so we don't mutate the real base_attributes
-			attrs = base_attributes.duplicate(true)
-			if attr_mods.has("strength"):
-				attrs.strength = clampi(attrs.strength + int(attr_mods["strength"]), 1, 99)
-			if attr_mods.has("dexterity"):
-				attrs.dexterity = clampi(attrs.dexterity + int(attr_mods["dexterity"]), 1, 99)
-			if attr_mods.has("constitution"):
-				attrs.constitution = clampi(attrs.constitution + int(attr_mods["constitution"]), 1, 99)
-			if attr_mods.has("charisma"):
-				attrs.charisma = clampi(attrs.charisma + int(attr_mods["charisma"]), 1, 99)
-			if attr_mods.has("luck"):
-				attrs.luck = clampi(attrs.luck + int(attr_mods["luck"]), 1, 99)
-			if attr_mods.has("wisdom"):
-				attrs.wisdom = clampi(attrs.wisdom + int(attr_mods["wisdom"]), 1, 99)
-
-	var s: UnitStats = StatFormulas.derive(attrs, job.base_move_range, job.base_jump)
-
-	# Pass 2 — flat stat modifiers from equipment
-	if equipment != null and not equipment.is_empty():
-		var stat_mods: Dictionary = equipment.get_total_stat_modifiers()
-		for stat_name in stat_mods:
-			var delta: int = int(stat_mods[stat_name])
-			match stat_name:
-				"max_hp":     s.max_hp = maxi(1, s.max_hp + delta)
-				"max_mp":     s.max_mp = maxi(0, s.max_mp + delta)
-				"attack":     s.attack = maxi(0, s.attack + delta)
-				"defense":    s.defense = maxi(0, s.defense + delta)
-				"magic":      s.magic = maxi(0, s.magic + delta)
-				"resistance": s.resistance = maxi(0, s.resistance + delta)
-				"speed":      s.speed = maxi(1, s.speed + delta)
-				"move_range": s.move_range = maxi(1, s.move_range + delta)
-				"jump":       s.jump = maxi(0, s.jump + delta)
-
-	s.reset_to_full()
-	return s
 
 
 # =============================================================================
@@ -463,32 +363,6 @@ func spend_mp(amount: int) -> bool:
 	return paid
 
 
-## Restore MP and emit mp_changed so the UI updates.
-## Use this instead of stats.restore_mp() directly (ADR-005 risk #5).
-func restore_mp(amount: int) -> int:
-	if stats == null:
-		return 0
-	var gained := stats.restore_mp(amount)
-	if gained > 0:
-		mp_changed.emit(stats.mp, stats.max_mp)
-	return gained
-
-
-## Revive this unit after being defeated by a Lazarus Potion.
-## Resets state and upright body orientation so it doesn't stay lying flat.
-func revive(hp_amount: int) -> void:
-	if stats == null:
-		return
-	stats.hp = clampi(hp_amount, 1, stats.max_hp)
-	set_state(UnitEnums.UnitState.IDLE)
-	hp_changed.emit(stats.hp, stats.max_hp)
-	if _body_mesh != null:
-		var t := create_tween()
-		t.set_ease(Tween.EASE_OUT)
-		t.set_trans(Tween.TRANS_CUBIC)
-		t.tween_property(_body_mesh, "rotation_degrees:z", 0.0, 0.3)
-
-
 # =============================================================================
 # QUERIES
 # =============================================================================
@@ -512,15 +386,3 @@ func get_castable_skills() -> Array:
 		if stats.mp >= skill.mp_cost:
 			out.append(skill)
 	return out
-
-
-## Consumables this unit can use. Useful for the "Item" menu in battle.
-func get_usable_items() -> Array:
-	if inventory == null:
-		return []
-	return inventory.get_all_items()
-
-
-## Quick check: does this unit have any consumables?
-func has_items() -> bool:
-	return inventory != null and not inventory.is_empty()

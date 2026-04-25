@@ -12,9 +12,8 @@ config_version=5
 
 config/name="Adventure Legacy"
 config/description="A 2.5D tactics game inspired by Final Fantasy Tactics Advance. Features the FOIL adaptive-CPU system."
-run/main_scene="res://scenes/main_menu/main_menu.tscn"
+run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="res://icon.svg"
 
 [autoload]
 
@@ -26,12 +25,9 @@ DebugManager="*res://scripts/debug/debug_manager.gd"
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
-
-[physics]
-
-3d/physics_engine="Jolt Physics"
+window/stretch/aspect="keep"
 
 [rendering]
 
-rendering_device/driver.windows="d3d12"
+renderer/rendering_method="forward_plus"
 anti_aliasing/quality/msaa_3d=2
