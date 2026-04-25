@@ -73,6 +73,7 @@ func _ready() -> void:
 	_facing_picker.bind_grid(_grid)
 
 	_ability_bar.wait_pressed.connect(_turn_manager.wait_and_end_turn)
+	_ability_bar.status_pressed.connect(_show_unit_inspect)
 
 	_battle_summary.retry_pressed.connect(_on_retry_pressed)
 	_battle_summary.quit_pressed.connect(_on_quit_pressed)
@@ -272,10 +273,6 @@ func _on_battle_ended(outcome: int) -> void:
 
 
 func _on_retry_pressed() -> void:
-	# Reload the whole battle scene. Units, stats, turn order — all rebuilt.
-	# The FOIL rolling window persists across reloads because FOILTracker is
-	# an autoload; that's exactly the "3 consecutive battles show FOIL
-	# adaptation" success criterion from the roadmap.
 	_battle_summary.hide_summary()
 	get_tree().reload_current_scene()
 
@@ -379,8 +376,12 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 	if tile == null:
 		return
 
-	# Unit inspect: left-click a tile with a unit when not in move/target mode.
+	# Unit inspect: left-click outside of move/target/ability-bar mode only.
+	# During an active player turn the ability bar owns the screen; inspect
+	# is accessed via the Status button instead.
+	var ability_bar_open: bool = _ability_bar != null and _ability_bar.is_bar_visible()
 	if button_index == MOUSE_BUTTON_LEFT \
+	and not ability_bar_open \
 	and not _move_controller.is_previewing() \
 	and not _action_controller.is_selecting_target() \
 	and not _action_controller.is_executing() \
@@ -421,7 +422,7 @@ func _build_inspect_panel() -> void:
 	add_child(layer)
 
 	_inspect_panel = PanelContainer.new()
-	_inspect_panel.position = Vector2(12, 120)
+	_inspect_panel.position = Vector2(900, 120)
 	_inspect_panel.visible = false
 	layer.add_child(_inspect_panel)
 
@@ -440,18 +441,49 @@ func _build_inspect_panel() -> void:
 func _show_unit_inspect(unit: Unit) -> void:
 	if _inspect_panel == null:
 		return
+
 	var job_name: String = unit.job.display_name if unit.job != null else "—"
+	var team_str: String = "Player" if unit.team == UnitEnums.Team.PLAYER else "Enemy"
+
 	var skill_names: Array = []
 	for s in unit.skills:
 		skill_names.append(s.display_name)
 	var skills_str: String = ", ".join(skill_names) if not skill_names.is_empty() else "none"
-	var team_str: String = "Player" if unit.team == UnitEnums.Team.PLAYER else "Enemy"
-	_inspect_label.text = "%s  [%s]\nHP %d/%d  MP %d/%d\nJob: %s\nSkills: %s" % [
-		unit.display_name, team_str,
-		unit.stats.hp, unit.stats.max_hp,
-		unit.stats.mp, unit.stats.max_mp,
-		job_name, skills_str,
-	]
+
+	# Equipment rows — show slot: item name, or dash if empty
+	var gear_lines: Array = []
+	if unit.equipment != null:
+		var slots: Array = [
+			ItemEnums.EquipSlot.MAIN_HAND,
+			ItemEnums.EquipSlot.OFF_HAND,
+			ItemEnums.EquipSlot.HELM,
+			ItemEnums.EquipSlot.BODY,
+			ItemEnums.EquipSlot.BOOTS,
+			ItemEnums.EquipSlot.CLOAK,
+			ItemEnums.EquipSlot.NECKLACE,
+			ItemEnums.EquipSlot.TRINKET,
+		]
+		for slot in slots:
+			var item: ItemData = unit.equipment.get_item(slot)
+			var slot_label: String = ItemEnums.slot_display_name(slot)
+			var hand_tag: String = ""
+			if item != null and item.weapon_hand != ItemEnums.WeaponHand.NONE:
+				hand_tag = "  [%s]" % ItemEnums.weapon_hand_display_name(item.weapon_hand)
+			gear_lines.append("  %-12s %s%s" % [slot_label + ":", item.display_name if item != null else "—", hand_tag])
+		for i in 2:
+			var ring: ItemData = unit.equipment.get_item(ItemEnums.EquipSlot.RING, i)
+			gear_lines.append("  %-12s %s" % ["Ring %d:" % (i + 1), ring.display_name if ring != null else "—"])
+	var gear_str: String = "\n".join(gear_lines) if not gear_lines.is_empty() else "  none"
+
+	_inspect_label.text = (
+		"%s  [%s]  %s\n" % [unit.display_name, team_str, job_name]
+		+ "HP %d/%d   MP %d/%d\n" % [unit.stats.hp, unit.stats.max_hp, unit.stats.mp, unit.stats.max_mp]
+		+ "ATK %d  DEF %d  MAG %d  RES %d  SPD %d\n" % [
+			unit.stats.attack, unit.stats.defense,
+			unit.stats.magic, unit.stats.resistance, unit.stats.speed]
+		+ "Skills: %s\n" % skills_str
+		+ "Equipment:\n%s" % gear_str
+	)
 	_inspect_panel.visible = true
 
 

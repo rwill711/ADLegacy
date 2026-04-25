@@ -32,7 +32,8 @@ var job: JobData = null
 var base_attributes: BaseAttributes = null
 var stats: UnitStats = null
 var skills: Array = []
-
+var equipment: Equipment = null
+var inventory: Inventory = null
 
 ## --- Grid state -------------------------------------------------------------
 var coord: Vector2i = Vector2i.ZERO
@@ -103,7 +104,14 @@ func initialize(
 		push_error("Unit.initialize: job '%s' has no base_attributes" % p_job.job_name)
 		base_attributes = BaseAttributes.new()
 
-	stats = p_job.instantiate_stats()
+	equipment = Equipment.new()
+	inventory = Inventory.new()
+	for item in ItemLibrary.get_starter_equipment(p_job.job_name):
+		equipment.equip(item)
+	for item in ItemLibrary.get_starter_consumables():
+		inventory.add_item(item)
+
+	stats = _derive_stats_with_equipment()
 	skills = p_job.get_starting_skills()
 	coord = p_coord
 	facing = p_facing
@@ -114,16 +122,15 @@ func initialize(
 
 
 ## Recalculate derived stats from current base_attributes. Call after
-## level-ups, equipment changes, or any event that modifies attributes.
-## Preserves current HP/MP ratios so a mid-battle re-derive doesn't
-## accidentally full-heal the unit.
+## level-ups or any event that modifies attributes. Preserves current
+## HP/MP ratios so a mid-battle re-derive doesn't accidentally full-heal.
 func rederive_stats() -> void:
 	if base_attributes == null or job == null:
 		return
 	var hp_ratio: float = float(stats.hp) / float(stats.max_hp) if stats.max_hp > 0 else 1.0
 	var mp_ratio: float = float(stats.mp) / float(stats.max_mp) if stats.max_mp > 0 else 1.0
 
-	stats = StatFormulas.derive(base_attributes, job.base_move_range, job.base_jump)
+	stats = _derive_stats_with_equipment()
 
 	# Restore HP/MP to same percentage of new max
 	stats.hp = clampi(int(hp_ratio * float(stats.max_hp)), 1 if hp_ratio > 0.0 else 0, stats.max_hp)
@@ -131,6 +138,68 @@ func rederive_stats() -> void:
 
 	hp_changed.emit(stats.hp, stats.max_hp)
 	mp_changed.emit(stats.mp, stats.max_mp)
+
+
+# =============================================================================
+# EQUIPMENT HELPERS
+# =============================================================================
+
+func equip_item(item: ItemData) -> ItemData:
+	if equipment == null:
+		equipment = Equipment.new()
+	var old: ItemData = equipment.equip(item)
+	rederive_stats()
+	return old
+
+
+func unequip_item(slot: ItemEnums.EquipSlot, ring_index: int = 0) -> ItemData:
+	if equipment == null:
+		return null
+	var old: ItemData = equipment.unequip(slot, ring_index)
+	if old != null:
+		rederive_stats()
+	return old
+
+
+func _derive_stats_with_equipment() -> UnitStats:
+	var attrs: BaseAttributes = base_attributes
+
+	if equipment != null and not equipment.is_empty():
+		var attr_mods: Dictionary = equipment.get_total_attribute_modifiers()
+		if not attr_mods.is_empty():
+			attrs = base_attributes.duplicate(true)
+			if attr_mods.has("strength"):
+				attrs.strength    = clampi(attrs.strength    + int(attr_mods["strength"]),    1, 99)
+			if attr_mods.has("dexterity"):
+				attrs.dexterity   = clampi(attrs.dexterity   + int(attr_mods["dexterity"]),   1, 99)
+			if attr_mods.has("constitution"):
+				attrs.constitution = clampi(attrs.constitution + int(attr_mods["constitution"]), 1, 99)
+			if attr_mods.has("charisma"):
+				attrs.charisma    = clampi(attrs.charisma    + int(attr_mods["charisma"]),    1, 99)
+			if attr_mods.has("luck"):
+				attrs.luck        = clampi(attrs.luck        + int(attr_mods["luck"]),        1, 99)
+			if attr_mods.has("wisdom"):
+				attrs.wisdom      = clampi(attrs.wisdom      + int(attr_mods["wisdom"]),      1, 99)
+
+	var s: UnitStats = StatFormulas.derive(attrs, job.base_move_range, job.base_jump)
+
+	if equipment != null and not equipment.is_empty():
+		var stat_mods: Dictionary = equipment.get_total_stat_modifiers()
+		for stat_name in stat_mods:
+			var delta: int = int(stat_mods[stat_name])
+			match stat_name:
+				"max_hp":     s.max_hp     = maxi(1, s.max_hp     + delta)
+				"max_mp":     s.max_mp     = maxi(0, s.max_mp     + delta)
+				"attack":     s.attack     = maxi(0, s.attack     + delta)
+				"defense":    s.defense    = maxi(0, s.defense    + delta)
+				"magic":      s.magic      = maxi(0, s.magic      + delta)
+				"resistance": s.resistance = maxi(0, s.resistance + delta)
+				"speed":      s.speed      = maxi(1, s.speed      + delta)
+				"move_range": s.move_range = maxi(1, s.move_range + delta)
+				"jump":       s.jump       = maxi(0, s.jump       + delta)
+
+	s.reset_to_full()
+	return s
 
 
 # =============================================================================
@@ -386,3 +455,5 @@ func get_castable_skills() -> Array:
 		if stats.mp >= skill.mp_cost:
 			out.append(skill)
 	return out
+
+
