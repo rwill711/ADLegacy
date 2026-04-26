@@ -32,7 +32,7 @@ signal focus_changed(world_position: Vector3)
 @export var rotation_tween_duration: float = 0.22
 
 @export_group("Zoom")
-@export var zoom_min: float = 8.0
+@export var zoom_min: float = 10.0   ## Min ortho size — keeps view wide enough to see context.
 @export var zoom_max: float = 28.0
 @export var zoom_step: float = 1.5
 @export var default_zoom: float = 16.0
@@ -54,6 +54,10 @@ var _target_y_degrees: float = 0.0
 var _rotation_tween: Tween = null
 var _focus_tween: Tween = null
 var _zoom_tween: Tween = null
+
+## World-space point to zoom toward (updated by main.gd from tile_hovered).
+var _zoom_target: Vector3 = Vector3.ZERO
+var _has_zoom_target: bool = false
 
 
 # =============================================================================
@@ -132,6 +136,15 @@ func set_focus(world_position: Vector3, instant: bool = false) -> void:
 # ZOOM
 # =============================================================================
 
+## Call from main.gd when a tile is hovered so zoom tracks the cursor.
+func set_zoom_target(world_pos: Vector3) -> void:
+	_zoom_target = world_pos
+	_has_zoom_target = true
+
+func clear_zoom_target() -> void:
+	_has_zoom_target = false
+
+
 func zoom_in() -> void:
 	_change_zoom(-zoom_step)
 
@@ -143,9 +156,21 @@ func zoom_out() -> void:
 func _change_zoom(delta: float) -> void:
 	if camera == null:
 		return
-	var new_size: float = clampf(camera.size + delta, zoom_min, zoom_max)
-	if is_equal_approx(new_size, camera.size):
+	var old_size: float = camera.size
+	var new_size: float = clampf(old_size + delta, zoom_min, zoom_max)
+	if is_equal_approx(new_size, old_size):
 		return
+
+	# Pan pivot toward (or away from) the hovered tile so the cursor stays
+	# over the same world point. Only XZ — don't drift vertically.
+	if _has_zoom_target:
+		var to_target := Vector3(
+			_zoom_target.x - global_position.x,
+			0.0,
+			_zoom_target.z - global_position.z
+		)
+		# Fraction of the gap to close: (1 - new/old) for zoom-in, negative for zoom-out.
+		global_position += to_target * (1.0 - new_size / old_size)
 
 	if _zoom_tween != null and _zoom_tween.is_running():
 		_zoom_tween.kill()

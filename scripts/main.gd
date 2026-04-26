@@ -313,6 +313,9 @@ func _grid_center_world(map: BattleGrid) -> Vector3:
 func _on_tile_hovered(coord: Vector2i) -> void:
 	if _grid == null:
 		return
+	var tile := _grid.get_tile(coord)
+	if tile != null:
+		_camera_rig.set_zoom_target(tile.top_world_position())
 	if _action_controller.is_target_tile(coord):
 		_grid.set_highlight(coord, GridEnums.HighlightState.TARGET)
 	elif _action_controller.is_range_tile(coord):
@@ -324,6 +327,7 @@ func _on_tile_hovered(coord: Vector2i) -> void:
 
 
 func _on_tile_unhovered(coord: Vector2i) -> void:
+	_camera_rig.clear_zoom_target()
 	if _grid == null:
 		return
 	if _action_controller.is_target_tile(coord):
