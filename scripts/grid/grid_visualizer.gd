@@ -94,9 +94,13 @@ func _build_tile_node(tile: GridTile) -> void:
 	# --- Terrain prop (tree or rock sits on top of tile) ---
 	_add_terrain_prop(mesh_instance, tile.terrain, size_y)
 
-	# --- Chest prop (brown box when tile has a chest) ---
+	# --- Chest prop ---
 	if not tile.chest_loot_tag.is_empty():
 		_add_chest_prop(mesh_instance, size_y)
+
+	# --- Structure wall prop ---
+	if tile.structure_id != &"":
+		_add_structure_prop(mesh_instance, size_y, tile.is_entrance)
 
 	# --- Overlay quad sitting just above the tile's top surface ---
 	var overlay := MeshInstance3D.new()
@@ -220,6 +224,66 @@ func _add_terrain_prop(
 			rock_mat.roughness = 1.0
 			rock.material_override = rock_mat
 			parent.add_child(rock)
+
+
+## Stone wall block rising from the tile, with an arch cut-out on the entrance.
+func _add_structure_prop(parent: MeshInstance3D, size_y: float, is_entrance: bool = false) -> void:
+	var wall_h: float = 2.0
+	var tile_size: float = GridEnums.TILE_WORLD_SIZE * 0.98
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.58, 0.54, 0.48)  # stone grey-beige
+	mat.roughness = 1.0
+
+	if not is_entrance:
+		# Solid wall block
+		var wall := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(tile_size, wall_h, tile_size)
+		wall.mesh = box
+		wall.position = Vector3(0.0, size_y * 0.5 + wall_h * 0.5, 0.0)
+		wall.material_override = mat
+		parent.add_child(wall)
+	else:
+		# Entrance tile: two side pillars + lintel, leaving a gap in the centre.
+		var pillar_w: float = tile_size * 0.25
+		var gap:      float = tile_size * 0.45
+		var lintel_h: float = 0.25
+		var arch_h:   float = wall_h * 0.65
+
+		for side in [-1, 1]:
+			var pillar := MeshInstance3D.new()
+			var pb := BoxMesh.new()
+			pb.size = Vector3(pillar_w, wall_h, tile_size)
+			pillar.mesh = pb
+			pillar.position = Vector3(side * (gap * 0.5 + pillar_w * 0.5),
+				size_y * 0.5 + wall_h * 0.5, 0.0)
+			pillar.material_override = mat
+			parent.add_child(pillar)
+
+		# Lintel above the gap
+		var lintel := MeshInstance3D.new()
+		var lb := BoxMesh.new()
+		lb.size = Vector3(gap, lintel_h, tile_size)
+		lintel.mesh = lb
+		lintel.position = Vector3(0.0, size_y * 0.5 + arch_h + lintel_h * 0.5, 0.0)
+		lintel.material_override = mat
+		parent.add_child(lintel)
+
+		# Gold entrance marker above the door
+		var marker := MeshInstance3D.new()
+		var mb := BoxMesh.new()
+		mb.size = Vector3(gap * 0.6, 0.08, tile_size * 0.15)
+		marker.mesh = mb
+		marker.position = Vector3(0.0, size_y * 0.5 + arch_h + lintel_h + 0.1, 0.0)
+		var mmat := StandardMaterial3D.new()
+		mmat.albedo_color = Color(0.9, 0.72, 0.15)
+		mmat.roughness = 0.3
+		mmat.emission_enabled = true
+		mmat.emission = Color(0.9, 0.72, 0.15) * 0.4
+		marker.material_override = mmat
+		parent.add_child(marker)
+
 
 
 func _add_chest_prop(parent: MeshInstance3D, size_y: float) -> void:

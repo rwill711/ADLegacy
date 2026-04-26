@@ -3,10 +3,13 @@ class_name MapBuilder
 ## Extracted from AlphaTestMap so the same procedural logic works for any
 ## template. AlphaTestMap.build() is kept as a convenience wrapper.
 
+const _StructureLibrary = preload("res://scripts/world/structure_library.gd")
+
 
 ## Build a grid from the given template. Uses a fresh RNG each call.
 ## `intensity` scales tree/rock/water counts (0.5 = sparse, 2.0 = extreme).
-static func build(template: MapTemplate, intensity: float = 1.0) -> BattleGrid:
+## `structure_mgr` is optional — when provided, one structure is placed and registered.
+static func build(template: MapTemplate, intensity: float = 1.0, structure_mgr: StructureManager = null) -> BattleGrid:
 	var map := BattleGrid.create(template.width, template.height)
 
 	# --- Fixed stone hill (optional) ----------------------------------------
@@ -35,6 +38,8 @@ static func build(template: MapTemplate, intensity: float = 1.0) -> BattleGrid:
 
 	_randomize_elevation(map, template, reserved, rng)
 	_place_chests(map, candidates, rng)
+	if structure_mgr != null:
+		_place_structure(map, candidates, rng, structure_mgr)
 
 	return map
 
@@ -146,6 +151,48 @@ static func _place_water_cluster(
 			ntile.terrain = GridEnums.TerrainType.WATER
 		placed.append(nc)
 		frontier.append(nc)
+
+
+## Try to place one random structure on the map. Shuffles candidate origins
+## (top-left corners) until one fits entirely within the grid and doesn't
+## overlap reserved/terrain tiles. Registers with structure_mgr on success.
+static func _place_structure(
+	map: BattleGrid,
+	candidates: Array,
+	rng: RandomNumberGenerator,
+	structure_mgr: StructureManager
+) -> void:
+	var data: StructureData = _StructureLibrary.random_structure(rng)
+
+	# Collect valid origin candidates: top-left such that the whole footprint
+	# and approach tile are in-bounds and on walkable (non-structure) tiles.
+	var origins: Array = []
+	for c in candidates:
+		var ok: bool = true
+		for offset in data.footprint:
+			var coord: Vector2i = c + offset
+			var tile := map.get_tile(coord)
+			if tile == null or tile.structure_id != &"" or tile.terrain == GridEnums.TerrainType.WATER:
+				ok = false
+				break
+		if not ok:
+			continue
+		# Approach tile must also be in bounds and walkable.
+		var approach: Vector2i = data.approach_coord(c)
+		var atile := map.get_tile(approach)
+		if atile == null or atile.structure_id != &"" or not atile.is_terrain_walkable():
+			continue
+		origins.append(c)
+
+	if origins.is_empty():
+		return
+
+	var origin: Vector2i = origins[rng.randi_range(0, origins.size() - 1)]
+	if map.place_structure(data, origin):
+		structure_mgr.register(data, origin)
+		# Remove footprint tiles from candidate pool so chests don't overlap.
+		for offset in data.footprint:
+			candidates.erase(origin + offset)
 
 
 ## Place 1 standard chest + 1 elite chest on random remaining candidates.

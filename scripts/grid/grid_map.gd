@@ -75,6 +75,24 @@ func set_terrain(coord: Vector2i, terrain: GridEnums.TerrainType) -> void:
 	tile_changed.emit(coord)
 
 
+## Stamp a structure's footprint onto the grid. Returns false if any tile is
+## out-of-bounds or already occupied/structured (placement failed).
+func place_structure(data: StructureData, origin: Vector2i) -> bool:
+	for offset in data.footprint:
+		var coord: Vector2i = origin + offset
+		var tile := get_tile(coord)
+		if tile == null or tile.structure_id != &"" or tile.occupant_id != &"":
+			return false
+	var entrance_world: Vector2i = data.entrance_coord(origin)
+	for offset in data.footprint:
+		var coord: Vector2i = origin + offset
+		var tile := get_tile(coord)
+		tile.structure_id = StringName(data.label)
+		tile.is_entrance   = (coord == entrance_world)
+		tile_changed.emit(coord)
+	return true
+
+
 ## Remove a chest from a tile and notify the visualizer so the prop disappears.
 func clear_chest(coord: Vector2i) -> void:
 	var tile := get_tile(coord)

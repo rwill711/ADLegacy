@@ -4,9 +4,10 @@ extends Node3D
 ## controllers. Keeps the scene root thin — each concern (grid, camera,
 ## units, turns, moves, actions) owns its own module.
 
-const _MapLibrary = preload("res://scripts/grid/map_library.gd")
-const _MapBuilder  = preload("res://scripts/grid/map_builder.gd")
-const _LootLibrary = preload("res://scripts/items/loot_library.gd")
+const _MapLibrary      = preload("res://scripts/grid/map_library.gd")
+const _MapBuilder      = preload("res://scripts/grid/map_builder.gd")
+const _LootLibrary     = preload("res://scripts/items/loot_library.gd")
+const _StructureLibrary = preload("res://scripts/world/structure_library.gd")
 
 
 @export var log_tile_events: bool = true
@@ -25,6 +26,7 @@ const _LootLibrary = preload("res://scripts/items/loot_library.gd")
 @onready var _facing_picker: FacingPicker = $FacingPicker
 @onready var _battle_summary: BattleSummary = $BattleSummary
 @onready var _battle_rewards: BattleRewards = $BattleRewards
+@onready var _structure_manager: StructureManager = $StructureManager
 
 
 var _grid: BattleGrid = null
@@ -43,7 +45,7 @@ func _ready() -> void:
 	var map_template = _MapLibrary.get_template(map_template_name) \
 		if not map_template_name.is_empty() else _MapLibrary.open_field()
 	var terrain_intensity: float = SceneManager.consume_terrain_intensity()
-	_grid = _MapBuilder.build(map_template, terrain_intensity)
+	_grid = _MapBuilder.build(map_template, terrain_intensity, _structure_manager)
 	_visualizer.set_grid(_grid)
 
 	_visualizer.tile_hovered.connect(_on_tile_hovered)
@@ -80,17 +82,20 @@ func _ready() -> void:
 
 	_turn_hud.bind_turn_manager(_turn_manager)
 	_battle_rewards.clear()
+	_structure_manager.clear()
 	_move_controller.bind(_grid, _visualizer, _turn_manager, _unit_spawner, _battle_rewards)
 	_action_controller.bind(
 		_grid, _visualizer, _turn_manager, _unit_spawner,
 		_move_controller, _ability_bar, self, _battle_rewards
 	)
+	_action_controller.set_structure_manager(_structure_manager)
 	_facing_picker.bind_turn_manager(_turn_manager)
 	_facing_picker.bind_visualizer(_visualizer)
 	_facing_picker.bind_grid(_grid)
 
 	_ability_bar.wait_pressed.connect(_turn_manager.wait_and_end_turn)
 	_ability_bar.status_pressed.connect(_show_unit_inspect)
+	_ability_bar.enter_pressed.connect(_on_enter_structure)
 
 	_battle_summary.retry_pressed.connect(_on_retry_pressed)
 	_battle_summary.quit_pressed.connect(_on_quit_pressed)
@@ -297,6 +302,91 @@ func _on_retry_pressed() -> void:
 
 func _on_quit_pressed() -> void:
 	get_tree().quit()
+
+
+# =============================================================================
+# STRUCTURE ENTER
+# =============================================================================
+
+func _on_enter_structure(unit: Unit) -> void:
+	var entry: Dictionary = _structure_manager.entry_at_approach(unit.coord)
+	if entry.is_empty():
+		return
+	var data: StructureData = entry["data"]
+	_ability_bar.hide_bar()
+	_show_interior_panel(unit, data, entry)
+
+
+func _show_interior_panel(unit: Unit, data: StructureData, entry: Dictionary) -> void:
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(340, 240)
+
+	var margin := MarginContainer.new()
+	for s in ["left","right","top","bottom"]:
+		margin.add_theme_constant_override("margin_" + s, 16)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = data.label
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color(0.95, 0.85, 0.45))
+	vbox.add_child(title)
+
+	var desc := Label.new()
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	if entry["looted"]:
+		desc.text = "The interior has already been searched."
+	else:
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		var loot_tag: String = data.interior_loot
+		var table = LootLibrary.elite_chest() if loot_tag == "elite" else LootLibrary.standard_chest()
+		var drops: Array = LootResolver.roll(table, rng)
+		if drops.is_empty():
+			desc.text = "You search inside but find nothing of value."
+		else:
+			var lines: Array = ["Inside you find:"]
+			var tally: Dictionary = {}
+			for tag in drops:
+				tally[tag] = tally.get(tag, 0) + 1
+			for tag in tally:
+				lines.append("  %s × %d" % [LootLibrary.display_name(tag), tally[tag]])
+				if _battle_rewards != null:
+					for _i in tally[tag]:
+						_battle_rewards.add_drop(tag, data.label)
+			desc.text = "\n".join(lines)
+		_structure_manager.mark_looted(entry)
+	desc.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(desc)
+
+	var exit_btn := Button.new()
+	exit_btn.text = "Exit"
+	exit_btn.custom_minimum_size = Vector2(120, 38)
+	exit_btn.add_theme_font_size_override("font_size", 15)
+	vbox.add_child(exit_btn)
+
+	var canvas := CanvasLayer.new()
+	canvas.layer = 10
+	add_child(canvas)
+	canvas.add_child(panel)
+
+	exit_btn.pressed.connect(func():
+		canvas.queue_free()
+		# Resume the turn — re-show ability bar without Enter (now looted).
+		if unit != null and unit.is_alive() and _turn_manager.get_active_unit() == unit:
+			_ability_bar.show_for_unit(unit,
+				not _turn_manager.has_moved(),
+				_turn_manager.has_moved() and not _turn_manager.has_acted(),
+				not _turn_manager.has_acted(),
+				false
+			)
+	)
 
 
 # =============================================================================

@@ -40,6 +40,7 @@ var _move_controller: MoveController = null
 var _ability_bar: AbilityBar = null
 var _world_root: Node3D = null
 var _battle_rewards: BattleRewards = null
+var _structure_manager: StructureManager = null
 
 
 # =============================================================================
@@ -64,6 +65,10 @@ func bind(
 	_ability_bar = ability_bar
 	_world_root = world_root
 	_battle_rewards = battle_rewards
+
+
+func set_structure_manager(mgr: StructureManager) -> void:
+	_structure_manager = mgr
 
 	_turn_manager.turn_started.connect(_on_turn_started)
 	_turn_manager.turn_ended.connect(_on_turn_ended)
@@ -117,7 +122,7 @@ func cancel_targeting() -> void:
 	if _active_unit != null and _active_unit.team == UnitEnums.Team.PLAYER:
 		var can_move: bool = not _turn_manager.has_moved()
 		var can_undo: bool = _turn_manager.has_moved() and not _turn_manager.has_acted()
-		_ability_bar.show_for_unit(_active_unit, can_move, can_undo)
+		_ability_bar.show_for_unit(_active_unit, can_move, can_undo, true, _at_approach(_active_unit))
 
 
 # =============================================================================
@@ -138,8 +143,7 @@ func _on_turn_started(unit: Unit) -> void:
 
 	if unit.team == UnitEnums.Team.PLAYER:
 		_state = ActionState.SELECTING_SKILL
-		# No auto-move-preview — player chooses Move or a skill from the bar.
-		_ability_bar.show_for_unit(unit, true, false, true)
+		_ability_bar.show_for_unit(unit, true, false, true, _at_approach(unit))
 		_ensure_foil_battle_started(unit)
 	else:
 		_state = ActionState.IDLE
@@ -180,7 +184,7 @@ func _on_move_completed() -> void:
 		return
 	# Unit just moved. Show skill buttons + Undo Move (if they haven't acted).
 	var can_undo: bool = not _turn_manager.has_acted()
-	_ability_bar.show_for_unit(_active_unit, false, can_undo, not _turn_manager.has_acted())
+	_ability_bar.show_for_unit(_active_unit, false, can_undo, not _turn_manager.has_acted(), _at_approach(_active_unit))
 	_state = ActionState.SELECTING_SKILL
 
 
@@ -188,8 +192,7 @@ func _on_undo_move_requested() -> void:
 	if _active_unit == null:
 		return
 	_move_controller.undo_move()
-	# After undo, restore the full turn-start layout (can move, no undo).
-	_ability_bar.show_for_unit(_active_unit, true, false, not _turn_manager.has_acted())
+	_ability_bar.show_for_unit(_active_unit, true, false, not _turn_manager.has_acted(), _at_approach(_active_unit))
 	_state = ActionState.SELECTING_SKILL
 
 
@@ -296,7 +299,7 @@ func _execute_skill(anchor: Vector2i) -> void:
 	and not _turn_manager.has_moved() \
 	and caster.is_alive() \
 	and _turn_manager.get_active_unit() == caster:
-		_ability_bar.show_for_unit(caster, true, false, false)
+		_ability_bar.show_for_unit(caster, true, false, false, _at_approach(caster))
 		_state = ActionState.SELECTING_SKILL
 
 
@@ -384,6 +387,12 @@ static func _looks_like_healer(target: Unit) -> bool:
 		if skill.skill_type == SkillEnums.SkillType.HEALING:
 			return true
 	return false
+
+
+func _at_approach(unit: Unit) -> bool:
+	if unit == null or _structure_manager == null:
+		return false
+	return not _structure_manager.entry_at_approach(unit.coord).is_empty()
 
 
 static func _find_unit_at(all_units: Array, coord: Vector2i) -> Unit:

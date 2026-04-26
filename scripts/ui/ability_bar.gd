@@ -14,6 +14,7 @@ signal move_requested
 signal undo_move_requested
 signal wait_pressed
 signal status_pressed(unit: Unit)
+signal enter_pressed(unit: Unit)
 
 
 ## Skill names treated as the basic attack — shown as "Attack" and placed first.
@@ -61,7 +62,8 @@ func show_for_unit(
 	unit: Unit,
 	can_move: bool = true,
 	can_undo_move: bool = false,
-	can_act: bool = true
+	can_act: bool = true,
+	can_enter: bool = false
 ) -> void:
 	if _root == null or _main_list == null or _sub_panel == null or _sub_list == null:
 		push_error("AbilityBar.show_for_unit: nodes not ready")
@@ -86,6 +88,9 @@ func show_for_unit(
 
 	_act_btn = _add_main_btn("Act", func(): _on_act_pressed(unit, can_act))
 	_act_btn.disabled = not can_act
+
+	if can_enter:
+		_add_main_btn("Enter", func(): enter_pressed.emit(_current_unit))
 
 	_add_main_btn("Wait", func(): wait_pressed.emit())
 	_add_main_btn("Status", func(): _on_status_pressed())

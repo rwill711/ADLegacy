@@ -32,6 +32,13 @@ class_name GridTile extends Resource
 ## For obstacles/objects that aren't units (chests, decorations, props).
 @export var object_id: StringName = &""
 
+## Non-empty = this tile is part of a structure's footprint.
+## Value is the structure label (e.g. "Cabin"). Blocks movement.
+@export var structure_id: StringName = &""
+
+## True when this structure tile is the entrance (gets arch visual).
+@export var is_entrance: bool = false
+
 ## Non-empty = a chest is present on this tile. Value is the loot table key
 ## ("standard" or "elite"). Cleared to "" after the chest is opened.
 @export var chest_loot_tag: String = ""
@@ -47,12 +54,14 @@ class_name GridTile extends Resource
 # =============================================================================
 
 func is_walkable() -> bool:
-	## Tile can accept a unit right now: terrain walkable, not occupied, no object.
+	## Tile can accept a unit right now: terrain walkable, not occupied, no object/structure.
 	if not is_terrain_walkable():
 		return false
 	if occupant_id != &"":
 		return false
 	if object_id != &"":
+		return false
+	if structure_id != &"":
 		return false
 	return true
 
