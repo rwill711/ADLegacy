@@ -60,9 +60,9 @@ func _ready() -> void:
 	var enemy_jobs: Array   = SceneManager.consume_enemy_jobs()
 	var player_names: Array = SceneManager.consume_player_names()
 	var enemy_names: Array  = SceneManager.consume_enemy_names()
-	var player_names: Array = _predict_player_character_names(player_jobs)
+	var foil_names: Array   = _predict_player_character_names(player_jobs)
 	var encounter: Dictionary = FOILBattleSetup.build_encounter(
-		player_names,
+		foil_names,
 		UnitSpawner.default_base_enemy_pool(),
 		3,
 	)
