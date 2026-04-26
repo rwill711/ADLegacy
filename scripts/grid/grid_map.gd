@@ -75,6 +75,15 @@ func set_terrain(coord: Vector2i, terrain: GridEnums.TerrainType) -> void:
 	tile_changed.emit(coord)
 
 
+## Remove a chest from a tile and notify the visualizer so the prop disappears.
+func clear_chest(coord: Vector2i) -> void:
+	var tile := get_tile(coord)
+	if tile == null:
+		return
+	tile.chest_loot_tag = ""
+	tile_changed.emit(coord)
+
+
 ## Iterate every tile once. Order: row-major (y then x).
 func iter_tiles() -> Array:
 	var out: Array = []

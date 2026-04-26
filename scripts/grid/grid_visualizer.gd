@@ -94,6 +94,10 @@ func _build_tile_node(tile: GridTile) -> void:
 	# --- Terrain prop (tree or rock sits on top of tile) ---
 	_add_terrain_prop(mesh_instance, tile.terrain, size_y)
 
+	# --- Chest prop (brown box when tile has a chest) ---
+	if not tile.chest_loot_tag.is_empty():
+		_add_chest_prop(mesh_instance, size_y)
+
 	# --- Overlay quad sitting just above the tile's top surface ---
 	var overlay := MeshInstance3D.new()
 	overlay.name = "Overlay"
@@ -216,6 +220,32 @@ func _add_terrain_prop(
 			rock_mat.roughness = 1.0
 			rock.material_override = rock_mat
 			parent.add_child(rock)
+
+
+func _add_chest_prop(parent: MeshInstance3D, size_y: float) -> void:
+	var chest := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.38, 0.28, 0.30)
+	chest.mesh = box
+	chest.position = Vector3(0.0, size_y * 0.5 + 0.14, 0.0)
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.45, 0.25, 0.08)  # brown
+	mat.roughness = 0.85
+	chest.material_override = mat
+	parent.add_child(chest)
+
+	# Thin gold band across the lid
+	var band := MeshInstance3D.new()
+	var band_box := BoxMesh.new()
+	band_box.size = Vector3(0.40, 0.035, 0.32)
+	band.mesh = band_box
+	band.position = Vector3(0.0, size_y * 0.5 + 0.255, 0.0)
+	var band_mat := StandardMaterial3D.new()
+	band_mat.albedo_color = Color(0.85, 0.68, 0.15)
+	band_mat.roughness = 0.4
+	band.material_override = band_mat
+	parent.add_child(band)
 
 
 # =============================================================================

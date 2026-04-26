@@ -266,7 +266,7 @@ func _try_collect_chest(unit: Unit, coord: Vector2i) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var drops: Array = LootResolver.roll(table, rng)
-	tile.chest_loot_tag = ""  # chest consumed
+	_grid.clear_chest(coord)  # clears flag and emits tile_changed → prop removed
 	if _battle_rewards != null:
 		for tag in drops:
 			_battle_rewards.add_drop(tag, "chest")
