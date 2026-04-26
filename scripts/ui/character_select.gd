@@ -7,8 +7,10 @@ const _MapLibrary  = preload("res://scripts/grid/map_library.gd")
 const _MapTemplate = preload("res://scripts/grid/map_template.gd")
 
 const PARTY_SIZE: int = 3
+const EMPTY_LABEL: String = "— Empty —"
 
 ## Ordered list of all selectable jobs — drives every OptionButton.
+## Index 0 is always the EMPTY sentinel; actual jobs start at index 1.
 var _job_names: Array = []   # Array[StringName]
 var _player_dropdowns: Array = []  # Array[OptionButton]
 var _enemy_dropdowns: Array  = []  # Array[OptionButton]
@@ -26,7 +28,8 @@ func _ready() -> void:
 	_back_btn.pressed.connect(_on_back)
 	_start_btn.pressed.connect(_on_start)
 
-	# Build ordered job list from library
+	# Index 0 = empty sentinel; jobs start at 1.
+	_job_names.append(&"")
 	for job in JobLibrary.all_alpha_jobs():
 		_job_names.append(job.job_name)
 
@@ -56,13 +59,16 @@ func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName) 
 	var opt := OptionButton.new()
 	opt.custom_minimum_size = Vector2(160, 36)
 	opt.add_theme_font_size_override("font_size", 14)
-	for job_name in _job_names:
-		var job := JobLibrary.get_job(job_name)
-		opt.add_item(job.display_name if job != null else String(job_name))
-	# Select default
+	for idx in _job_names.size():
+		var job_name: StringName = _job_names[idx]
+		if job_name == &"":
+			opt.add_item(EMPTY_LABEL)
+		else:
+			var job := JobLibrary.get_job(job_name)
+			opt.add_item(job.display_name if job != null else String(job_name))
+	# Select default (or 0/empty if not found)
 	var default_idx: int = _job_names.find(default_job)
-	if default_idx >= 0:
-		opt.select(default_idx)
+	opt.select(default_idx if default_idx >= 0 else 0)
 	row.add_child(opt)
 	return opt
 
@@ -96,9 +102,13 @@ func _on_start() -> void:
 	var player_jobs: Array = []
 	var enemy_jobs: Array  = []
 	for opt in _player_dropdowns:
-		player_jobs.append(_job_names[opt.selected])
+		var job: StringName = _job_names[opt.selected]
+		if job != &"":
+			player_jobs.append(job)
 	for opt in _enemy_dropdowns:
-		enemy_jobs.append(_job_names[opt.selected])
+		var job: StringName = _job_names[opt.selected]
+		if job != &"":
+			enemy_jobs.append(job)
 
 	SceneManager.set_player_jobs(player_jobs)
 	SceneManager.set_enemy_jobs(enemy_jobs)
