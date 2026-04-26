@@ -121,7 +121,7 @@ const TERRAIN_COLORS: Dictionary = {
 const HIGHLIGHT_COLORS: Dictionary = {
 	HighlightState.NONE:         Color(0, 0, 0, 0),
 	HighlightState.HOVER:        Color(1.0, 1.0, 0.5, 0.55),
-	HighlightState.MOVE_RANGE:   Color(0.4, 0.5, 1.0, 0.55),
+	HighlightState.MOVE_RANGE:   Color(1.0, 0.55, 0.1, 0.75),
 	HighlightState.ATTACK_RANGE: Color(1.0, 0.4, 0.4, 0.55),
 	HighlightState.PATH:         Color(0.3, 1.0, 0.3, 0.7),
 	HighlightState.TARGET:       Color(1.0, 0.2, 0.2, 0.75),

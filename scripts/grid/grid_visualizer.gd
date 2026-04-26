@@ -107,7 +107,7 @@ func _build_tile_node(tile: GridTile) -> void:
 	overlay_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	overlay_mat.albedo_color = Color(0, 0, 0, 0)
 	overlay_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	overlay_mat.no_depth_test = false
+	overlay_mat.no_depth_test = true
 	overlay.material_override = overlay_mat
 	overlay.visible = false
 	mesh_instance.add_child(overlay)
