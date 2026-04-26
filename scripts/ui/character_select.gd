@@ -10,6 +10,8 @@ const PARTY_SIZE: int = 3
 var _job_names: Array = []   # Array[StringName]
 var _player_dropdowns: Array = []  # Array[OptionButton]
 var _enemy_dropdowns: Array  = []  # Array[OptionButton]
+var _map_dropdown: OptionButton = null
+var _map_templates: Array = []  # Array[MapTemplate]
 
 
 @onready var _player_col: VBoxContainer = %PlayerCol
@@ -34,6 +36,8 @@ func _ready() -> void:
 	for i in PARTY_SIZE:
 		_player_dropdowns.append(_add_slot(_player_col, "Slot %d" % (i + 1), player_defaults[i]))
 		_enemy_dropdowns.append(_add_slot(_enemy_col,  "Slot %d" % (i + 1), enemy_defaults[i]))
+
+	_build_map_row()
 
 
 func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName) -> OptionButton:
@@ -61,6 +65,31 @@ func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName) 
 	return opt
 
 
+func _build_map_row() -> void:
+	_map_templates = MapLibrary.all_templates()
+
+	var layout: VBoxContainer = _player_col.get_parent().get_parent()
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	layout.add_child(row)
+	layout.move_child(row, layout.get_child_count() - 3)  # above Buttons
+
+	var lbl := Label.new()
+	lbl.text = "Terrain:"
+	lbl.add_theme_font_size_override("font_size", 15)
+	lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.6, 1.0))
+	row.add_child(lbl)
+
+	_map_dropdown = OptionButton.new()
+	_map_dropdown.custom_minimum_size = Vector2(200, 36)
+	_map_dropdown.add_theme_font_size_override("font_size", 14)
+	for t in _map_templates:
+		_map_dropdown.add_item(t.template_name)
+	row.add_child(_map_dropdown)
+
+
 func _on_start() -> void:
 	var player_jobs: Array = []
 	var enemy_jobs: Array  = []
@@ -71,6 +100,12 @@ func _on_start() -> void:
 
 	SceneManager.set_player_jobs(player_jobs)
 	SceneManager.set_enemy_jobs(enemy_jobs)
+
+	var selected_template: String = ""
+	if _map_dropdown != null and _map_templates.size() > 0:
+		selected_template = _map_templates[_map_dropdown.selected].template_name
+	SceneManager.set_map_template(selected_template)
+
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 

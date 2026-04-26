@@ -34,7 +34,10 @@ var _current_encounter: Dictionary = {}
 func _ready() -> void:
 	_register_battle_input_actions()
 
-	_grid = AlphaTestMap.build()
+	var map_template_name: String = SceneManager.consume_map_template()
+	var map_template: MapTemplate = MapLibrary.get_template(map_template_name) \
+		if not map_template_name.is_empty() else MapLibrary.open_field()
+	_grid = MapBuilder.build(map_template)
 	_visualizer.set_grid(_grid)
 
 	_visualizer.tile_hovered.connect(_on_tile_hovered)

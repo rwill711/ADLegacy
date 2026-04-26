@@ -5,6 +5,7 @@ extends Node
 
 var _player_jobs: Array = []
 var _enemy_jobs: Array  = []
+var _map_template_name: String = ""
 
 
 func set_player_jobs(jobs: Array) -> void:
@@ -22,4 +23,13 @@ func set_enemy_jobs(jobs: Array) -> void:
 func consume_enemy_jobs() -> Array:
 	var out := _enemy_jobs.duplicate()
 	_enemy_jobs.clear()
+	return out
+
+
+func set_map_template(name: String) -> void:
+	_map_template_name = name
+
+func consume_map_template() -> String:
+	var out := _map_template_name
+	_map_template_name = ""
 	return out
