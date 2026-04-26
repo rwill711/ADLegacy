@@ -52,8 +52,11 @@ func _ready() -> void:
 		_manager.scene_bound.connect(_on_scene_bound)
 		_manager.panel_registered.connect(_on_panel_registered)
 		# Pick up any panels registered before we wired up.
-		for panel_name in _manager.get_panels().keys():
-			_add_external_panel(panel_name, _manager.get_panels()[panel_name])
+		var panels: Dictionary = _manager.get_panels()
+		for panel_name in panels.keys():
+			var ctrl = panels[panel_name]
+			if is_instance_valid(ctrl):
+				_add_external_panel(panel_name, ctrl)
 
 
 func _input(event: InputEvent) -> void:

@@ -73,6 +73,11 @@ func bind_scene(
 	camera_rig = p_camera_rig
 	main_scene = p_main
 
+	# Purge any panels whose Control nodes were freed when the old scene unloaded.
+	for key in _panels.keys():
+		if not is_instance_valid(_panels[key]):
+			_panels.erase(key)
+
 	if not _built_in_registered:
 		DebugCommands.register_all(self)
 		_built_in_registered = true
