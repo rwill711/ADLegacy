@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/grid/grid_visualizer.gd" id="2_grid_viz"]
@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://scenes/battle_summary.tscn" id="11_bs"]
 [ext_resource type="PackedScene" path="res://scenes/debug_overlay.tscn" id="12_do"]
 [ext_resource type="PackedScene" path="res://scenes/debug_console.tscn" id="13_dc"]
+[ext_resource type="Script" path="res://scripts/battle/battle_rewards.gd" id="14_rewards"]
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
@@ -66,6 +67,9 @@ script = ExtResource("8_act_ctrl")
 [node name="AbilityBar" parent="." instance=ExtResource("9_ability_bar")]
 
 [node name="FacingPicker" parent="." instance=ExtResource("10_fp")]
+
+[node name="BattleRewards" type="Node" parent="."]
+script = ExtResource("14_rewards")
 
 [node name="BattleSummary" parent="." instance=ExtResource("11_bs")]
 

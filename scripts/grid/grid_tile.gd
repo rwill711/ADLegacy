@@ -32,6 +32,10 @@ class_name GridTile extends Resource
 ## For obstacles/objects that aren't units (chests, decorations, props).
 @export var object_id: StringName = &""
 
+## Non-empty = a chest is present on this tile. Value is the loot table key
+## ("standard" or "elite"). Cleared to "" after the chest is opened.
+@export var chest_loot_tag: String = ""
+
 
 ## --- Presentation state -----------------------------------------------------
 ## Not persisted. Runtime-only. The visualizer watches this.

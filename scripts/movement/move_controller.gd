@@ -26,6 +26,7 @@ var _grid: BattleGrid = null
 var _visualizer: GridVisualizer = null
 var _turn_manager: TurnManager = null
 var _spawner = null  # UnitSpawner — typed as Variant to avoid circular ref
+var _battle_rewards: BattleRewards = null  # optional; set via bind()
 
 
 ## --- State ------------------------------------------------------------------
@@ -43,11 +44,12 @@ var _pre_move_coord: Vector2i = Vector2i(-1, -1)
 # WIRING
 # =============================================================================
 
-func bind(grid: BattleGrid, visualizer: GridVisualizer, turn_manager: TurnManager, spawner = null) -> void:
+func bind(grid: BattleGrid, visualizer: GridVisualizer, turn_manager: TurnManager, spawner = null, rewards: BattleRewards = null) -> void:
 	_grid = grid
 	_visualizer = visualizer
 	_turn_manager = turn_manager
 	_spawner = spawner
+	_battle_rewards = rewards
 
 	_turn_manager.turn_started.connect(_on_turn_started)
 	_turn_manager.turn_ended.connect(_on_turn_ended)
@@ -243,12 +245,32 @@ func _execute_path(unit: Unit, path: Array) -> void:
 	unit.coord = final_coord
 	_grid.set_occupant(final_coord, unit.unit_id)
 
+	# Collect chest if player lands on one.
+	if unit.team == UnitEnums.Team.PLAYER:
+		_try_collect_chest(unit, final_coord)
+
 	unit.set_state(UnitEnums.UnitState.IDLE)
 	_executing = false
 
 	if _turn_manager != null and _turn_manager.get_active_unit() == unit:
 		_turn_manager.declare_moved()
 		move_completed.emit()
+
+
+func _try_collect_chest(unit: Unit, coord: Vector2i) -> void:
+	var tile := _grid.get_tile(coord)
+	if tile == null or tile.chest_loot_tag.is_empty():
+		return
+	var table: LootTable = LootLibrary.elite_chest() \
+		if tile.chest_loot_tag == "elite" else LootLibrary.standard_chest()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var drops: Array = LootResolver.roll(table, rng)
+	tile.chest_loot_tag = ""  # chest consumed
+	if _battle_rewards != null:
+		for tag in drops:
+			_battle_rewards.add_drop(tag, "chest")
+	print("[chest] %s opened at %s — got: %s" % [unit.unit_id, coord, drops])
 
 
 func _animate_along_path(unit: Unit, path: Array) -> void:

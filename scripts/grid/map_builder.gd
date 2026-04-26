@@ -30,6 +30,7 @@ static func build(template: MapTemplate) -> BattleGrid:
 	_place_terrain(map, candidates, rng, GridEnums.TerrainType.MOUNTAIN, template.rock_count)
 
 	_randomize_elevation(map, template, reserved, rng)
+	_place_chests(map, candidates, rng)
 
 	return map
 
@@ -141,6 +142,28 @@ static func _place_water_cluster(
 			ntile.terrain = GridEnums.TerrainType.WATER
 		placed.append(nc)
 		frontier.append(nc)
+
+
+## Place 1 standard chest + 1 elite chest on random remaining candidates.
+static func _place_chests(
+	map: BattleGrid,
+	candidates: Array,
+	rng: RandomNumberGenerator
+) -> void:
+	var chest_defs: Array = [
+		{"tag": "standard", "count": 1},
+		{"tag": "elite",    "count": 1},
+	]
+	for def in chest_defs:
+		for _i in def["count"]:
+			if candidates.is_empty():
+				return
+			var idx: int = rng.randi_range(0, candidates.size() - 1)
+			var coord: Vector2i = candidates[idx]
+			candidates.remove_at(idx)
+			var tile := map.get_tile(coord)
+			if tile != null:
+				tile.chest_loot_tag = def["tag"]
 
 
 static func _randomize_elevation(

@@ -6,6 +6,8 @@ class_name BattleSummary extends CanvasLayer
 ## Pulls data from Unit instances directly — the ActionController already
 ## aggregates stats there via record_action_stats().
 
+const _LootLibrary = preload("res://scripts/items/loot_library.gd")
+
 
 signal retry_pressed()
 signal quit_pressed()
@@ -28,10 +30,12 @@ func _ready() -> void:
 
 ## Populate and show the summary for a finished battle.
 ## `units` is every unit that participated (alive or dead).
+## `rewards` is optional — shown only on victory.
 func show_summary(
 	outcome: TurnEnums.BattleOutcome,
 	turn_count: int,
-	units: Array
+	units: Array,
+	rewards: BattleRewards = null
 ) -> void:
 	_outcome_label.text = _outcome_text(outcome)
 	_outcome_label.modulate = _outcome_color(outcome)
@@ -48,6 +52,8 @@ func show_summary(
 			_player_stats_box.add_child(row)
 		elif unit.team == UnitEnums.Team.ENEMY:
 			_enemy_stats_box.add_child(row)
+
+	_build_rewards_section(outcome, rewards)
 
 	_root.visible = true
 
@@ -139,6 +145,41 @@ static func _outcome_color(outcome: TurnEnums.BattleOutcome) -> Color:
 		TurnEnums.BattleOutcome.PLAYER_DEFEAT:  return Color(1.0, 0.55, 0.55)
 		TurnEnums.BattleOutcome.DRAW:           return Color(1.0, 1.0, 0.75)
 	return Color.WHITE
+
+
+func _build_rewards_section(outcome: TurnEnums.BattleOutcome, rewards: BattleRewards) -> void:
+	# Remove any previous rewards section.
+	var existing := _root.find_child("RewardsSection", true, false)
+	if existing != null:
+		existing.queue_free()
+
+	if outcome != TurnEnums.BattleOutcome.PLAYER_VICTORY:
+		return
+	if rewards == null or rewards.is_empty():
+		return
+
+	var section := VBoxContainer.new()
+	section.name = "RewardsSection"
+	section.add_theme_constant_override("separation", 4)
+
+	var header := Label.new()
+	header.text = "— Loot —"
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	header.add_theme_font_size_override("font_size", 15)
+	header.modulate = Color(1.0, 0.85, 0.4)
+	section.add_child(header)
+
+	var summary: Dictionary = rewards.get_summary()
+	for tag in summary:
+		var count: int = summary[tag]
+		var lbl := Label.new()
+		lbl.text = "  %s × %d" % [_LootLibrary.display_name(tag), count]
+		lbl.add_theme_font_size_override("font_size", 13)
+		section.add_child(lbl)
+
+	# Insert above the buttons (last child).
+	_root.add_child(section)
+	_root.move_child(section, _root.get_child_count() - 2)
 
 
 func _clear_box(box: VBoxContainer) -> void:

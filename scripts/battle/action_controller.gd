@@ -39,6 +39,7 @@ var _unit_spawner: UnitSpawner = null
 var _move_controller: MoveController = null
 var _ability_bar: AbilityBar = null
 var _world_root: Node3D = null
+var _battle_rewards: BattleRewards = null
 
 
 # =============================================================================
@@ -52,7 +53,8 @@ func bind(
 	unit_spawner: UnitSpawner,
 	move_controller: MoveController,
 	ability_bar: AbilityBar,
-	world_root: Node3D
+	world_root: Node3D,
+	battle_rewards: BattleRewards = null
 ) -> void:
 	_grid = grid
 	_visualizer = visualizer
@@ -61,6 +63,7 @@ func bind(
 	_move_controller = move_controller
 	_ability_bar = ability_bar
 	_world_root = world_root
+	_battle_rewards = battle_rewards
 
 	_turn_manager.turn_started.connect(_on_turn_started)
 	_turn_manager.turn_ended.connect(_on_turn_ended)
@@ -272,6 +275,7 @@ func _execute_skill(anchor: Vector2i) -> void:
 	if skill.skill_type == SkillEnums.SkillType.TERRAIN_MODIFY:
 		_apply_terrain_skill(caster, skill, anchor)
 	_record_caster_stats(caster, skill, result)
+	_collect_enemy_drops(result)
 
 	if caster.team == UnitEnums.Team.PLAYER:
 		_record_foil_actions(caster, skill, result, turn_number)
@@ -486,6 +490,23 @@ func _push_to_debug_log(caster: Unit, skill: SkillData, result: Dictionary) -> v
 # =============================================================================
 # BATTLE STATS AGGREGATION
 # =============================================================================
+
+func _collect_enemy_drops(result: Dictionary) -> void:
+	if _battle_rewards == null:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for effect in result["effects"]:
+		if not effect["was_kill"]:
+			continue
+		var dead_unit := _unit_spawner.get_unit(StringName(effect["target_id"]))
+		if dead_unit == null or dead_unit.team != UnitEnums.Team.ENEMY:
+			continue
+		var job_name: StringName = dead_unit.job.job_name if dead_unit.job != null else &""
+		var table: LootTable = LootLibrary.enemy_drops(job_name)
+		for tag in LootResolver.roll(table, rng):
+			_battle_rewards.add_drop(tag, String(dead_unit.unit_id))
+
 
 static func _record_caster_stats(caster: Unit, skill: SkillData, result: Dictionary) -> void:
 	if caster == null or skill == null:

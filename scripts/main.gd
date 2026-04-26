@@ -6,6 +6,7 @@ extends Node3D
 
 const _MapLibrary = preload("res://scripts/grid/map_library.gd")
 const _MapBuilder  = preload("res://scripts/grid/map_builder.gd")
+const _LootLibrary = preload("res://scripts/items/loot_library.gd")
 
 
 @export var log_tile_events: bool = true
@@ -23,6 +24,7 @@ const _MapBuilder  = preload("res://scripts/grid/map_builder.gd")
 @onready var _ability_bar: AbilityBar = $AbilityBar
 @onready var _facing_picker: FacingPicker = $FacingPicker
 @onready var _battle_summary: BattleSummary = $BattleSummary
+@onready var _battle_rewards: BattleRewards = $BattleRewards
 
 
 var _grid: BattleGrid = null
@@ -73,10 +75,11 @@ func _ready() -> void:
 	_turn_manager.battle_ended.connect(_on_battle_ended)
 
 	_turn_hud.bind_turn_manager(_turn_manager)
-	_move_controller.bind(_grid, _visualizer, _turn_manager, _unit_spawner)
+	_battle_rewards.clear()
+	_move_controller.bind(_grid, _visualizer, _turn_manager, _unit_spawner, _battle_rewards)
 	_action_controller.bind(
 		_grid, _visualizer, _turn_manager, _unit_spawner,
-		_move_controller, _ability_bar, self
+		_move_controller, _ability_bar, self, _battle_rewards
 	)
 	_facing_picker.bind_turn_manager(_turn_manager)
 	_facing_picker.bind_visualizer(_visualizer)
@@ -279,6 +282,7 @@ func _on_battle_ended(outcome: int) -> void:
 		outcome as TurnEnums.BattleOutcome,
 		turn_count,
 		_unit_spawner.get_all_units(),
+		_battle_rewards,
 	)
 
 
