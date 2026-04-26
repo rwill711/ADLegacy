@@ -70,7 +70,7 @@ func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName) 
 func _build_map_row() -> void:
 	_map_templates = _MapLibrary.all_templates()
 
-	var layout: VBoxContainer = _player_col.get_parent().get_parent()
+	var layout: VBoxContainer = _player_col.get_parent().get_parent().get_parent()
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
