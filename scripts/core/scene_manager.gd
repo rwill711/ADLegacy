@@ -3,8 +3,10 @@ extends Node
 ## consume_* methods clear after reading so stale data never bleeds.
 
 
-var _player_jobs: Array = []
-var _enemy_jobs: Array  = []
+var _player_jobs: Array  = []
+var _enemy_jobs: Array   = []
+var _player_names: Array = []
+var _enemy_names: Array  = []
 var _map_template_name: String = ""
 
 
@@ -23,6 +25,24 @@ func set_enemy_jobs(jobs: Array) -> void:
 func consume_enemy_jobs() -> Array:
 	var out := _enemy_jobs.duplicate()
 	_enemy_jobs.clear()
+	return out
+
+
+func set_player_names(names: Array) -> void:
+	_player_names = names.duplicate()
+
+func consume_player_names() -> Array:
+	var out := _player_names.duplicate()
+	_player_names.clear()
+	return out
+
+
+func set_enemy_names(names: Array) -> void:
+	_enemy_names = names.duplicate()
+
+func consume_enemy_names() -> Array:
+	var out := _enemy_names.duplicate()
+	_enemy_names.clear()
 	return out
 
 

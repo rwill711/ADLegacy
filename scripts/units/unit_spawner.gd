@@ -105,7 +105,9 @@ func spawn_alpha_roster(
 	parent: Node3D,
 	enemy_loadout: Dictionary = {},
 	player_jobs: Array = [],
-	enemy_jobs: Array = []
+	enemy_jobs: Array = [],
+	player_names: Array = [],
+	enemy_names: Array = []
 ) -> Array:
 	_units.clear()
 
@@ -119,10 +121,12 @@ func spawn_alpha_roster(
 		var coord: Vector2i = player_spawns[i]
 		var unit := _spawn_one(
 			job_name, UnitEnums.Team.PLAYER,
-			"player_%s" % job_name, coord,
+			"player_%d_%s" % [i, job_name], coord,
 			grid, parent
 		)
 		if unit != null:
+			if i < player_names.size() and player_names[i] != "":
+				unit.display_name = player_names[i]
 			_units.append(unit)
 
 	# --- Enemy side — explicit selection overrides FOIL loadout --------------
@@ -138,6 +142,8 @@ func spawn_alpha_roster(
 				grid, parent
 			)
 			if unit != null:
+				if i < enemy_names.size() and enemy_names[i] != "":
+					unit.display_name = enemy_names[i]
 				_units.append(unit)
 		return _units
 

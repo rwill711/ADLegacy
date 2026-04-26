@@ -12,8 +12,9 @@ const EMPTY_LABEL: String = "— Empty —"
 ## Ordered list of all selectable jobs — drives every OptionButton.
 ## Index 0 is always the EMPTY sentinel; actual jobs start at index 1.
 var _job_names: Array = []   # Array[StringName]
-var _player_dropdowns: Array = []  # Array[OptionButton]
-var _enemy_dropdowns: Array  = []  # Array[OptionButton]
+var _player_dropdowns: Array  = []  # Array[OptionButton]
+var _enemy_dropdowns: Array   = []  # Array[OptionButton]
+var _player_name_edits: Array = []  # Array[LineEdit]
 var _map_dropdown: OptionButton = null
 var _map_templates: Array = []  # Array[MapTemplate]
 
@@ -39,13 +40,16 @@ func _ready() -> void:
 	var enemy_defaults: Array  = [&"squire", &"rogue", &"white_mage"]
 
 	for i in PARTY_SIZE:
-		_player_dropdowns.append(_add_slot(_player_col, "Slot %d" % (i + 1), player_defaults[i]))
-		_enemy_dropdowns.append(_add_slot(_enemy_col,  "Slot %d" % (i + 1), enemy_defaults[i]))
+		var player_result := _add_slot(_player_col, "Slot %d" % (i + 1), player_defaults[i], true)
+		_player_dropdowns.append(player_result[0])
+		_player_name_edits.append(player_result[1])
+		_enemy_dropdowns.append(_add_slot(_enemy_col, "Slot %d" % (i + 1), enemy_defaults[i], false)[0])
 
 	_build_map_row()
 
 
-func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName) -> OptionButton:
+## Returns [OptionButton, LineEdit]. LineEdit is null when show_name is false.
+func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName, show_name: bool) -> Array:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	col.add_child(row)
@@ -57,7 +61,7 @@ func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName) 
 	row.add_child(lbl)
 
 	var opt := OptionButton.new()
-	opt.custom_minimum_size = Vector2(160, 36)
+	opt.custom_minimum_size = Vector2(140, 36)
 	opt.add_theme_font_size_override("font_size", 14)
 	for idx in _job_names.size():
 		var job_name: StringName = _job_names[idx]
@@ -66,11 +70,19 @@ func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName) 
 		else:
 			var job := JobLibrary.get_job(job_name)
 			opt.add_item(job.display_name if job != null else String(job_name))
-	# Select default (or 0/empty if not found)
 	var default_idx: int = _job_names.find(default_job)
 	opt.select(default_idx if default_idx >= 0 else 0)
 	row.add_child(opt)
-	return opt
+
+	var name_edit: LineEdit = null
+	if show_name:
+		name_edit = LineEdit.new()
+		name_edit.placeholder_text = "Name…"
+		name_edit.custom_minimum_size = Vector2(100, 36)
+		name_edit.add_theme_font_size_override("font_size", 13)
+		row.add_child(name_edit)
+
+	return [opt, name_edit]
 
 
 func _build_map_row() -> void:
@@ -99,18 +111,26 @@ func _build_map_row() -> void:
 
 
 func _on_start() -> void:
-	var player_jobs: Array = []
-	var enemy_jobs: Array  = []
-	for opt in _player_dropdowns:
-		var job: StringName = _job_names[opt.selected]
-		if job != &"":
-			player_jobs.append(job)
+	var player_jobs: Array  = []
+	var player_names: Array = []
+	var enemy_jobs: Array   = []
+
+	for i in _player_dropdowns.size():
+		var job: StringName = _job_names[_player_dropdowns[i].selected]
+		if job == &"":
+			continue
+		player_jobs.append(job)
+		var edit: LineEdit = _player_name_edits[i]
+		var entered: String = edit.text.strip_edges() if edit != null else ""
+		player_names.append(entered)  # blank = spawner keeps job name
+
 	for opt in _enemy_dropdowns:
 		var job: StringName = _job_names[opt.selected]
 		if job != &"":
 			enemy_jobs.append(job)
 
 	SceneManager.set_player_jobs(player_jobs)
+	SceneManager.set_player_names(player_names)
 	SceneManager.set_enemy_jobs(enemy_jobs)
 
 	var selected_template: String = ""
