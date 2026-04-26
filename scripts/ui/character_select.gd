@@ -115,7 +115,7 @@ func _build_job_card(job: JobData) -> PanelContainer:
 	card.add_child(margin)
 
 	var box := VBoxContainer.new()
-	box.theme_override_constants/separation = 6
+	box.add_theme_constant_override("separation", 6)
 	margin.add_child(box)
 
 	# Job name
