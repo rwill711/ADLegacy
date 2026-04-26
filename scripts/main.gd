@@ -46,14 +46,17 @@ func _ready() -> void:
 	# The player character list comes from PLAYER_JOB_ORDER (parallel with
 	# the display names the spawner will assign). We derive display names
 	# from JobLibrary the same way the spawner does, so FOIL keys match.
-	var player_names: Array = _predict_player_character_names()
+	# Read player job selection passed from CharacterSelect via SceneManager.
+	# Falls back to the default hardcoded order if launching directly.
+	var player_jobs: Array = SceneManager.consume_player_jobs()
+	var player_names: Array = _predict_player_character_names(player_jobs)
 	var encounter: Dictionary = FOILBattleSetup.build_encounter(
 		player_names,
 		UnitSpawner.default_base_enemy_pool(),
 		3,
 	)
 	var units: Array = _unit_spawner.spawn_alpha_roster(
-		_grid, _units_root, encounter["loadout"]
+		_grid, _units_root, encounter["loadout"], player_jobs
 	)
 	_current_encounter = encounter
 
@@ -328,9 +331,10 @@ func _on_tile_unhovered(coord: Vector2i) -> void:
 ## those will be so we can pull FOIL profiles for those exact keys BEFORE
 ## the units are instantiated. If JobLibrary.get_job returns null for some
 ## reason, fall back to a title-cased job-name string.
-func _predict_player_character_names() -> Array:
+func _predict_player_character_names(player_jobs: Array = []) -> Array:
+	var jobs: Array = player_jobs if not player_jobs.is_empty() else UnitSpawner.PLAYER_JOB_ORDER
 	var names: Array = []
-	for job_name in UnitSpawner.PLAYER_JOB_ORDER:
+	for job_name in jobs:
 		var job := JobLibrary.get_job(job_name)
 		if job != null and not job.display_name.is_empty():
 			names.append(job.display_name)

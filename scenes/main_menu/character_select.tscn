@@ -1,0 +1,70 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/character_select.gd" id="1_cs"]
+
+[node name="CharacterSelect" type="Control"]
+script = ExtResource("1_cs")
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="BG" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.06, 0.06, 0.1, 1.0)
+
+[node name="Layout" type="VBoxContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/separation = 16
+offset_left = 32.0
+offset_top = 24.0
+offset_right = -32.0
+offset_bottom = -24.0
+
+[node name="Title" type="Label" parent="Layout"]
+text = "Choose Your Party"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1.0)
+
+[node name="Hint" type="Label" parent="Layout"]
+text = "Select 3 jobs. Click a party slot to remove it."
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 13
+modulate = Color(1, 1, 1, 0.6)
+
+[node name="CardsRow" type="HBoxContainer" parent="Layout"]
+unique_name_in_owner = true
+size_flags_vertical = 3
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="Divider" type="HSeparator" parent="Layout"]
+modulate = Color(1, 1, 1, 0.2)
+
+[node name="PartyLabel" type="Label" parent="Layout"]
+unique_name_in_owner = true
+text = "Party  0 / 3"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 15
+
+[node name="PartyRow" type="HBoxContainer" parent="Layout"]
+unique_name_in_owner = true
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="Buttons" type="HBoxContainer" parent="Layout"]
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="BackBtn" type="Button" parent="Layout/Buttons"]
+unique_name_in_owner = true
+text = "Back"
+custom_minimum_size = Vector2(140, 48)
+theme_override_font_sizes/font_size = 18
+
+[node name="ConfirmBtn" type="Button" parent="Layout/Buttons"]
+unique_name_in_owner = true
+text = "Start Battle"
+custom_minimum_size = Vector2(180, 48)
+theme_override_font_sizes/font_size = 18

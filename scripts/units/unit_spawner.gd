@@ -103,16 +103,18 @@ const CONSUMABLE_STAT_BONUSES: Dictionary = {
 func spawn_alpha_roster(
 	grid: BattleGrid,
 	parent: Node3D,
-	enemy_loadout: Dictionary = {}
+	enemy_loadout: Dictionary = {},
+	player_jobs: Array = []
 ) -> Array:
 	_units.clear()
 
 	var player_spawns: Array = AlphaTestMap.player_spawn_points()
 	var enemy_spawns: Array = AlphaTestMap.enemy_spawn_points()
 
-	# --- Player side (unchanged) -----------------------------------------
-	for i in PLAYER_JOB_ORDER.size():
-		var job_name: StringName = PLAYER_JOB_ORDER[i]
+	# --- Player side ---------------------------------------------------------
+	var jobs: Array = player_jobs if not player_jobs.is_empty() else PLAYER_JOB_ORDER
+	for i in jobs.size():
+		var job_name: StringName = jobs[i]
 		var coord: Vector2i = player_spawns[i]
 		var unit := _spawn_one(
 			job_name, UnitEnums.Team.PLAYER,
