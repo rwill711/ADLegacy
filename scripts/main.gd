@@ -49,6 +49,7 @@ func _ready() -> void:
 	# Read player job selection passed from CharacterSelect via SceneManager.
 	# Falls back to the default hardcoded order if launching directly.
 	var player_jobs: Array = SceneManager.consume_player_jobs()
+	var enemy_jobs: Array  = SceneManager.consume_enemy_jobs()
 	var player_names: Array = _predict_player_character_names(player_jobs)
 	var encounter: Dictionary = FOILBattleSetup.build_encounter(
 		player_names,
@@ -56,7 +57,7 @@ func _ready() -> void:
 		3,
 	)
 	var units: Array = _unit_spawner.spawn_alpha_roster(
-		_grid, _units_root, encounter["loadout"], player_jobs
+		_grid, _units_root, encounter["loadout"], player_jobs, enemy_jobs
 	)
 	_current_encounter = encounter
 

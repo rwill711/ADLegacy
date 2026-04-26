@@ -13,45 +13,55 @@ anchor_bottom = 1.0
 color = Color(0.06, 0.06, 0.1, 1.0)
 
 [node name="Layout" type="VBoxContainer" parent="."]
-anchor_right = 1.0
-anchor_bottom = 1.0
-theme_override_constants/separation = 16
-offset_left = 32.0
-offset_top = 24.0
-offset_right = -32.0
-offset_bottom = -24.0
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -200.0
+offset_right = 260.0
+offset_bottom = 200.0
+theme_override_constants/separation = 20
+alignment = 1
 
 [node name="Title" type="Label" parent="Layout"]
-text = "Choose Your Party"
+text = "Configure Battle"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1.0)
 
-[node name="Hint" type="Label" parent="Layout"]
-text = "Select 3 jobs. Click a party slot to remove it."
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 13
-modulate = Color(1, 1, 1, 0.6)
-
-[node name="CardsRow" type="HBoxContainer" parent="Layout"]
-unique_name_in_owner = true
-size_flags_vertical = 3
+[node name="TeamsRow" type="HBoxContainer" parent="Layout"]
 alignment = 1
-theme_override_constants/separation = 16
+theme_override_constants/separation = 40
 
-[node name="Divider" type="HSeparator" parent="Layout"]
+[node name="PlayerSide" type="VBoxContainer" parent="Layout/TeamsRow"]
+theme_override_constants/separation = 10
+
+[node name="PlayerHeader" type="Label" parent="Layout/TeamsRow/PlayerSide"]
+text = "Your Party"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.5, 0.8, 1.0, 1.0)
+
+[node name="PlayerCol" type="VBoxContainer" parent="Layout/TeamsRow/PlayerSide"]
+unique_name_in_owner = true
+theme_override_constants/separation = 8
+
+[node name="VSep" type="VSeparator" parent="Layout/TeamsRow"]
 modulate = Color(1, 1, 1, 0.2)
 
-[node name="PartyLabel" type="Label" parent="Layout"]
-unique_name_in_owner = true
-text = "Party  0 / 3"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 15
+[node name="EnemySide" type="VBoxContainer" parent="Layout/TeamsRow"]
+theme_override_constants/separation = 10
 
-[node name="PartyRow" type="HBoxContainer" parent="Layout"]
+[node name="EnemyHeader" type="Label" parent="Layout/TeamsRow/EnemySide"]
+text = "Enemy Party"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(1.0, 0.5, 0.5, 1.0)
+
+[node name="EnemyCol" type="VBoxContainer" parent="Layout/TeamsRow/EnemySide"]
 unique_name_in_owner = true
-alignment = 1
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="Buttons" type="HBoxContainer" parent="Layout"]
 alignment = 1
@@ -60,11 +70,11 @@ theme_override_constants/separation = 16
 [node name="BackBtn" type="Button" parent="Layout/Buttons"]
 unique_name_in_owner = true
 text = "Back"
-custom_minimum_size = Vector2(140, 48)
-theme_override_font_sizes/font_size = 18
+custom_minimum_size = Vector2(130, 44)
+theme_override_font_sizes/font_size = 17
 
-[node name="ConfirmBtn" type="Button" parent="Layout/Buttons"]
+[node name="StartBtn" type="Button" parent="Layout/Buttons"]
 unique_name_in_owner = true
 text = "Start Battle"
-custom_minimum_size = Vector2(180, 48)
-theme_override_font_sizes/font_size = 18
+custom_minimum_size = Vector2(160, 44)
+theme_override_font_sizes/font_size = 17

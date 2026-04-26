@@ -104,7 +104,8 @@ func spawn_alpha_roster(
 	grid: BattleGrid,
 	parent: Node3D,
 	enemy_loadout: Dictionary = {},
-	player_jobs: Array = []
+	player_jobs: Array = [],
+	enemy_jobs: Array = []
 ) -> Array:
 	_units.clear()
 
@@ -124,7 +125,22 @@ func spawn_alpha_roster(
 		if unit != null:
 			_units.append(unit)
 
-	# --- Enemy side (FOIL-aware) -----------------------------------------
+	# --- Enemy side — explicit selection overrides FOIL loadout --------------
+	# When enemy_jobs is set from the select screen, bypass the FOIL builder
+	# entirely and spawn exactly those jobs with no AI hints.
+	if not enemy_jobs.is_empty():
+		for i in enemy_jobs.size():
+			if i >= enemy_spawns.size():
+				break
+			var unit := _spawn_one(
+				enemy_jobs[i], UnitEnums.Team.ENEMY,
+				"enemy_%d_%s" % [i, enemy_jobs[i]], enemy_spawns[i],
+				grid, parent
+			)
+			if unit != null:
+				_units.append(unit)
+		return _units
+
 	var enemy_entries: Array = _resolve_enemy_entries(enemy_loadout)
 	var ai_hints: Dictionary = enemy_loadout.get("ai_hints", {})
 
