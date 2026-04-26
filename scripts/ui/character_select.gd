@@ -17,6 +17,15 @@ var _enemy_dropdowns: Array   = []  # Array[OptionButton]
 var _player_name_edits: Array = []  # Array[LineEdit]
 var _map_dropdown: OptionButton = null
 var _map_templates: Array = []  # Array[MapTemplate]
+var _intensity_dropdown: OptionButton = null
+
+const INTENSITY_LEVELS: Array = [
+	{"label": "Sparse",  "value": 0.5},
+	{"label": "Normal",  "value": 1.0},
+	{"label": "Dense",   "value": 1.5},
+	{"label": "Extreme", "value": 2.0},
+]
+const INTENSITY_DEFAULT: int = 1  # index into INTENSITY_LEVELS (Normal)
 
 
 @onready var _player_col: VBoxContainer = %PlayerCol
@@ -103,11 +112,25 @@ func _build_map_row() -> void:
 	row.add_child(lbl)
 
 	_map_dropdown = OptionButton.new()
-	_map_dropdown.custom_minimum_size = Vector2(200, 36)
+	_map_dropdown.custom_minimum_size = Vector2(180, 36)
 	_map_dropdown.add_theme_font_size_override("font_size", 14)
 	for t in _map_templates:
 		_map_dropdown.add_item(t.template_name)
 	row.add_child(_map_dropdown)
+
+	var int_lbl := Label.new()
+	int_lbl.text = "Intensity:"
+	int_lbl.add_theme_font_size_override("font_size", 15)
+	int_lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.6, 1.0))
+	row.add_child(int_lbl)
+
+	_intensity_dropdown = OptionButton.new()
+	_intensity_dropdown.custom_minimum_size = Vector2(110, 36)
+	_intensity_dropdown.add_theme_font_size_override("font_size", 14)
+	for level in INTENSITY_LEVELS:
+		_intensity_dropdown.add_item(level["label"])
+	_intensity_dropdown.select(INTENSITY_DEFAULT)
+	row.add_child(_intensity_dropdown)
 
 
 func _on_start() -> void:
@@ -137,6 +160,11 @@ func _on_start() -> void:
 	if _map_dropdown != null and _map_templates.size() > 0:
 		selected_template = _map_templates[_map_dropdown.selected].template_name
 	SceneManager.set_map_template(selected_template)
+
+	var intensity: float = 1.0
+	if _intensity_dropdown != null:
+		intensity = float(INTENSITY_LEVELS[_intensity_dropdown.selected]["value"])
+	SceneManager.set_terrain_intensity(intensity)
 
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 

@@ -5,7 +5,8 @@ class_name MapBuilder
 
 
 ## Build a grid from the given template. Uses a fresh RNG each call.
-static func build(template: MapTemplate) -> BattleGrid:
+## `intensity` scales tree/rock/water counts (0.5 = sparse, 2.0 = extreme).
+static func build(template: MapTemplate, intensity: float = 1.0) -> BattleGrid:
 	var map := BattleGrid.create(template.width, template.height)
 
 	# --- Fixed stone hill (optional) ----------------------------------------
@@ -25,9 +26,12 @@ static func build(template: MapTemplate) -> BattleGrid:
 
 	var candidates := _candidate_coords(map, reserved)
 
-	_place_water_cluster(map, candidates, rng, template.water_count)
-	_place_terrain(map, candidates, rng, GridEnums.TerrainType.FOREST,   template.tree_count)
-	_place_terrain(map, candidates, rng, GridEnums.TerrainType.MOUNTAIN, template.rock_count)
+	var i_trees: int = roundi(template.tree_count  * intensity)
+	var i_rocks: int = roundi(template.rock_count  * intensity)
+	var i_water: int = roundi(template.water_count * intensity)
+	_place_water_cluster(map, candidates, rng, i_water)
+	_place_terrain(map, candidates, rng, GridEnums.TerrainType.FOREST,   i_trees)
+	_place_terrain(map, candidates, rng, GridEnums.TerrainType.MOUNTAIN, i_rocks)
 
 	_randomize_elevation(map, template, reserved, rng)
 	_place_chests(map, candidates, rng)

@@ -42,7 +42,8 @@ func _ready() -> void:
 	var map_template_name: String = SceneManager.consume_map_template()
 	var map_template = _MapLibrary.get_template(map_template_name) \
 		if not map_template_name.is_empty() else _MapLibrary.open_field()
-	_grid = _MapBuilder.build(map_template)
+	var terrain_intensity: float = SceneManager.consume_terrain_intensity()
+	_grid = _MapBuilder.build(map_template, terrain_intensity)
 	_visualizer.set_grid(_grid)
 
 	_visualizer.tile_hovered.connect(_on_tile_hovered)

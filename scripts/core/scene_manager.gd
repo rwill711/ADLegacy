@@ -8,6 +8,7 @@ var _enemy_jobs: Array   = []
 var _player_names: Array = []
 var _enemy_names: Array  = []
 var _map_template_name: String = ""
+var _terrain_intensity: float = 1.0
 
 
 func set_player_jobs(jobs: Array) -> void:
@@ -52,4 +53,13 @@ func set_map_template(name: String) -> void:
 func consume_map_template() -> String:
 	var out := _map_template_name
 	_map_template_name = ""
+	return out
+
+
+func set_terrain_intensity(value: float) -> void:
+	_terrain_intensity = value
+
+func consume_terrain_intensity() -> float:
+	var out := _terrain_intensity
+	_terrain_intensity = 1.0
 	return out

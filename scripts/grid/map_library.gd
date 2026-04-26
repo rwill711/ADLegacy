@@ -31,9 +31,9 @@ static func open_field() -> MapTemplate:
 	return MapTemplate.create(
 		"Open Field",
 		"Sparse terrain — ideal for straightforward skirmishes.",
-		3,   # trees
-		2,   # rocks
-		6,   # water
+		6,   # trees  (doubled baseline)
+		4,   # rocks
+		12,  # water
 		3,   # hill_size
 		0.70, 0.25
 	)
@@ -43,9 +43,9 @@ static func forest() -> MapTemplate:
 	return MapTemplate.create(
 		"Forest",
 		"Dense tree cover limits sightlines and mobility.",
-		10,  # trees
-		2,   # rocks
-		5,   # water
+		20,  # trees  (doubled baseline)
+		4,   # rocks
+		10,  # water
 		0,   # no stone hill — trees dominate
 		0.60, 0.30
 	)
@@ -55,11 +55,11 @@ static func highland() -> MapTemplate:
 	return MapTemplate.create(
 		"Highland",
 		"Rocky, elevated terrain rewards high-ground positioning.",
-		3,   # trees
-		8,   # rocks
-		4,   # water
+		6,   # trees  (doubled baseline)
+		16,  # rocks
+		8,   # water
 		3,   # hill_size
-		0.40, 0.40  # more elevated tiles overall
+		0.40, 0.40
 	)
 
 
@@ -67,9 +67,9 @@ static func wetlands() -> MapTemplate:
 	return MapTemplate.create(
 		"Wetlands",
 		"Extensive water hazards slow movement and split the field.",
-		4,   # trees
-		2,   # rocks
-		16,  # water — large connected marsh
+		8,   # trees  (doubled baseline)
+		4,   # rocks
+		28,  # water — large connected marsh
 		0,   # no hill
 		0.75, 0.20
 	)
@@ -79,9 +79,9 @@ static func ruins() -> MapTemplate:
 	return MapTemplate.create(
 		"Ruins",
 		"Crumbling stone structures — heavy rock cover, uneven ground.",
-		2,   # trees
-		10,  # rocks
-		3,   # water
+		4,   # trees  (doubled baseline)
+		20,  # rocks
+		6,   # water
 		3,   # hill_size
 		0.50, 0.35
 	)
