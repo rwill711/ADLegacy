@@ -3,6 +3,8 @@ class_name CharacterSelect extends Control
 ## Eventually becomes the Practice Arena setup screen.
 ## SceneManager carries selections into main.gd.
 
+const _MapLibrary  = preload("res://scripts/grid/map_library.gd")
+const _MapTemplate = preload("res://scripts/grid/map_template.gd")
 
 const PARTY_SIZE: int = 3
 
@@ -66,7 +68,7 @@ func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName) 
 
 
 func _build_map_row() -> void:
-	_map_templates = MapLibrary.all_templates()
+	_map_templates = _MapLibrary.all_templates()
 
 	var layout: VBoxContainer = _player_col.get_parent().get_parent()
 

@@ -4,6 +4,9 @@ extends Node3D
 ## controllers. Keeps the scene root thin — each concern (grid, camera,
 ## units, turns, moves, actions) owns its own module.
 
+const _MapLibrary = preload("res://scripts/grid/map_library.gd")
+const _MapBuilder  = preload("res://scripts/grid/map_builder.gd")
+
 
 @export var log_tile_events: bool = true
 @export var enemy_think_delay: float = 0.4  # "thinking" pause before enemy acts
@@ -35,9 +38,9 @@ func _ready() -> void:
 	_register_battle_input_actions()
 
 	var map_template_name: String = SceneManager.consume_map_template()
-	var map_template: MapTemplate = MapLibrary.get_template(map_template_name) \
-		if not map_template_name.is_empty() else MapLibrary.open_field()
-	_grid = MapBuilder.build(map_template)
+	var map_template = _MapLibrary.get_template(map_template_name) \
+		if not map_template_name.is_empty() else _MapLibrary.open_field()
+	_grid = _MapBuilder.build(map_template)
 	_visualizer.set_grid(_grid)
 
 	_visualizer.tile_hovered.connect(_on_tile_hovered)
