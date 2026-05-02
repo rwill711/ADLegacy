@@ -3,6 +3,8 @@ class_name SkillData extends Resource
 ## Per Creative Director: "Every skill we add later should just be data, not new code."
 ## This resource IS the full contract — targeting, resolution, UI, and FOIL
 ## tracking all read from these fields.
+##
+## ADR-006 addition: ap_cost field for job progression mastery.
 
 
 ## --- Identity ---------------------------------------------------------------
@@ -20,6 +22,14 @@ class_name SkillData extends Resource
 
 ## MP cost. 0 = free action.
 @export var mp_cost: int = 0
+
+
+## --- Progression (ADR-006) --------------------------------------------------
+## AP required to master this skill. Once a unit accumulates this much AP
+## while their current job lists this skill as learnable, the skill is
+## permanently mastered.
+## 0 = innate / always known (e.g., basic Attack on every job).
+@export var ap_cost: int = 0
 
 
 ## --- Targeting --------------------------------------------------------------
@@ -81,6 +91,11 @@ func is_area() -> bool:
 	return area_shape != SkillEnums.AreaShape.SINGLE or area_size > 0
 
 
+## Whether this skill is innate (no AP cost, always available).
+func is_innate() -> bool:
+	return ap_cost <= 0
+
+
 ## Can this skill legally target `target_unit` given the caster's team?
 ## Teams are compared to determine hostile-vs-friendly.
 ## Same-tile targeting (SELF) requires caster == target.
@@ -120,7 +135,8 @@ static func create(
 	p_max_range: int,
 	p_power: float = 1.0,
 	p_mp_cost: int = 0,
-	p_description: String = ""
+	p_description: String = "",
+	p_ap_cost: int = 0
 ) -> SkillData:
 	var s := SkillData.new()
 	s.skill_name = p_skill_name
@@ -132,4 +148,5 @@ static func create(
 	s.power = p_power
 	s.mp_cost = p_mp_cost
 	s.description = p_description
+	s.ap_cost = p_ap_cost
 	return s
