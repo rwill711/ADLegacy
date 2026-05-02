@@ -8,6 +8,11 @@ class_name Unit extends Node3D
 ## ADR-004: Units now carry base_attributes alongside derived stats. The
 ## attribute block is the source of truth; stats are re-derivable at any
 ## time via rederive_stats() (used after level-ups, equipment changes, etc).
+##
+## ADR-006: Units carry a JobProgression resource that tracks AP, mastery,
+## unlocked jobs, and secondary ability sets. The progression drives which
+## skills are available via build_active_skill_list(). change_job() is the
+## main API for switching a unit's active class.
 
 
 ## --- Signals ----------------------------------------------------------------
@@ -16,6 +21,7 @@ signal mp_changed(new_mp: int, max_mp: int)
 signal facing_changed(new_facing: UnitEnums.Facing)
 signal state_changed(new_state: UnitEnums.UnitState)
 signal defeated()
+signal job_changed(new_job_name: StringName)
 
 
 ## --- Identity ---------------------------------------------------------------
@@ -34,6 +40,12 @@ var stats: UnitStats = null
 var skills: Array = []
 var equipment: Equipment = null
 var inventory: Inventory = null
+
+## --- Job progression (ADR-006) ----------------------------------------------
+## Per-unit progression tracker. Tracks AP, skill mastery, unlocked jobs,
+## secondary ability set. Created in initialize(), persists across battles
+## once save/load is built.
+var progression: JobProgression = null
 
 ## --- Grid state -------------------------------------------------------------
 var coord: Vector2i = Vector2i.ZERO
@@ -111,8 +123,13 @@ func initialize(
 	for item in ItemLibrary.get_starter_consumables():
 		inventory.add_item(item)
 
+	# ADR-006: Set up job progression. All starter jobs are unlocked from the
+	# start (FFTA model). The starting job is set as the current/active job.
+	progression = JobProgression.new()
+	progression.initialize_starters(p_job.job_name)
+
 	stats = _derive_stats_with_equipment()
-	skills = p_job.get_starting_skills()
+	_refresh_skills()
 	coord = p_coord
 	facing = p_facing
 
@@ -138,6 +155,111 @@ func rederive_stats() -> void:
 
 	hp_changed.emit(stats.hp, stats.max_hp)
 	mp_changed.emit(stats.mp, stats.max_mp)
+
+
+# =============================================================================
+# JOB SWITCHING (ADR-006)
+# =============================================================================
+
+## Switch this unit's primary job. Resets base attributes to the new job's
+## array, re-derives stats (preserving HP/MP ratios), and rebuilds the
+## skill list from progression.
+##
+## Returns true on success, false if the job isn't unlocked or unknown.
+##
+## STAT FLOW (from ADR-006):
+##   Unit.change_job(new_job_name)
+##     → job = JobLibrary.get_job(new_job_name)
+##     → base_attributes = job.base_attributes.duplicate()
+##     → stats = StatFormulas.derive(base_attributes, job.move_range, job.jump)
+##     → skills = merge(primary_job_skills, secondary_job_mastered_skills)
+##
+## Equipment stays equipped — attribute/stat mods layer on top as before.
+## This means a unit that switches from Squire to Rogue keeps their sword
+## even if it's "wrong" for the class. Equip restrictions are a future system.
+func change_job(new_job_name: StringName) -> bool:
+	if progression == null:
+		push_error("Unit.change_job: no progression on unit '%s'" % unit_id)
+		return false
+
+	# Check if the job is unlocked in progression
+	if not progression.can_switch_to(new_job_name):
+		push_warning("Unit.change_job: '%s' not unlocked for unit '%s'" % [new_job_name, unit_id])
+		return false
+
+	# Fetch the new job data
+	var new_job: JobData = JobLibrary.get_job(new_job_name)
+	if new_job == null:
+		push_error("Unit.change_job: unknown job '%s'" % new_job_name)
+		return false
+
+	# Update progression's current job (for AP tracking)
+	progression.set_current_job(new_job_name)
+
+	# Swap job reference
+	job = new_job
+
+	# Reset base attributes to the new job's array (FFTA model: your stats
+	# change when you change class). This is a fresh duplicate — the job
+	# template is never mutated.
+	if new_job.base_attributes != null:
+		base_attributes = new_job.base_attributes.duplicate(true)
+	else:
+		push_error("Unit.change_job: job '%s' has no base_attributes" % new_job_name)
+
+	# Re-derive stats with equipment, preserving HP/MP ratios
+	rederive_stats()
+
+	# Rebuild skill list from progression (primary + secondary mastered)
+	_refresh_skills()
+
+	# Update visuals (tint changes with job color)
+	if is_inside_tree() and _body_mesh != null:
+		_apply_visual_state()
+
+	job_changed.emit(new_job_name)
+	return true
+
+
+## Set or clear the secondary ability set. Pass &"" to clear.
+## Rebuilds the skill list so secondary mastered skills become available.
+func set_secondary_job(job_name: StringName) -> bool:
+	if progression == null:
+		push_error("Unit.set_secondary_job: no progression on unit '%s'" % unit_id)
+		return false
+
+	if not progression.set_secondary_job(job_name):
+		return false
+
+	_refresh_skills()
+	return true
+
+
+## Award battle-end AP to this unit. Convenience wrapper that delegates to
+## progression and returns the result dict.
+## Returns { "ap_total": int, "newly_mastered": Array, "newly_unlocked_jobs": Array }
+func award_battle_ap(is_victory: bool, is_mvp: bool) -> Dictionary:
+	if progression == null:
+		return { "ap_total": 0, "newly_mastered": [], "newly_unlocked_jobs": [] }
+	var result: Dictionary = progression.award_battle_ap(is_victory, is_mvp)
+	# Refresh skills in case newly mastered skills affect the secondary set
+	_refresh_skills()
+	return result
+
+
+# =============================================================================
+# SKILL MANAGEMENT
+# =============================================================================
+
+## Rebuild the skills array from progression state. If progression is null
+## (legacy/test paths), falls back to the job's starting skills.
+func _refresh_skills() -> void:
+	if progression != null:
+		skills = progression.build_active_skill_list()
+	elif job != null:
+		skills = job.get_starting_skills()
+	else:
+		skills = []
 
 
 # =============================================================================
@@ -455,5 +577,3 @@ func get_castable_skills() -> Array:
 		if stats.mp >= skill.mp_cost:
 			out.append(skill)
 	return out
-
-
