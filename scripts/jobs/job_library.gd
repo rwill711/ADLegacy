@@ -1,10 +1,17 @@
 class_name JobLibrary
-## Factory for Alpha's 3 jobs: Rogue, Squire, White Mage.
+## Factory for all jobs. Started with Alpha's 3 starters; advanced jobs are
+## added one at a time as ADR-006 rolls out.
 ##
 ## ADR-004 STAT REWORK:
 ## Stats are now derived from a 6-attribute standard array (30 points,
 ## each 1–10) via StatFormulas. Movement stats (move_range, jump) are
 ## job-level identity, not attribute-derived.
+##
+## ADR-006 JOB PROGRESSION:
+## Each job now carries:
+##   - learnable_skill_names: full set of skills this job can teach
+##   - prerequisites: { job_name → mastered_count } to unlock this job
+## Starter jobs have empty prerequisites (always available).
 ##
 ## ATTRIBUTE SPREADS — designed so each job has a clear identity:
 ##   Rogue:      fast and lucky, physically fragile
@@ -30,9 +37,37 @@ class_name JobLibrary
 
 
 ## --- Job name constants -----------------------------------------------------
+## Starter jobs
 const ROGUE       := &"rogue"
 const SQUIRE      := &"squire"
 const WHITE_MAGE  := &"white_mage"
+
+## Advanced jobs (added one at a time — constants defined up front so
+## prerequisites can reference them before the job factory is wired up)
+const SOLDIER     := &"soldier"
+const KNIGHT      := &"knight"
+const PALADIN     := &"paladin"
+const ASSASSIN    := &"assassin"
+const NINJA       := &"ninja"
+const SHADOW      := &"shadow"
+const BISHOP      := &"bishop"
+const TIME_MAGE   := &"time_mage"
+const SAGE        := &"sage"
+
+
+## --- Master registry --------------------------------------------------------
+## Returns all job name constants. Used by JobProgression.get_unlockable_jobs()
+## to iterate the full tree without hardcoding names outside this file.
+## ADD new jobs here as they're implemented.
+static func all_job_names() -> Array:
+	return [
+		# Starters
+		ROGUE, SQUIRE, WHITE_MAGE,
+		# Advanced — uncomment as each job is implemented:
+		# SOLDIER, KNIGHT, PALADIN,
+		# ASSASSIN, NINJA, SHADOW,
+		# BISHOP, TIME_MAGE, SAGE,
+	]
 
 
 ## --- Lookup -----------------------------------------------------------------
@@ -50,7 +85,7 @@ static func all_alpha_jobs() -> Array:
 
 
 # =============================================================================
-# JOB DEFINITIONS
+# STARTER JOB DEFINITIONS
 # =============================================================================
 
 static func _rogue() -> JobData:
@@ -62,7 +97,11 @@ static func _rogue() -> JobData:
 		2,  # JUMP — moderate, can handle elevation
 		[SkillLibrary.BASIC_ATTACK, SkillLibrary.BACKSTAB, SkillLibrary.STEAL],
 		Color(0.75, 0.55, 0.95),  # purple-ish accent
-		"Fast and fragile. Rewards flanking and rear attacks."
+		"Fast and fragile. Rewards flanking and rear attacks.",
+		# learnable_skill_names — same as starting for now; advanced Rogue
+		# skills added when Assassin/Ninja are implemented
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.BACKSTAB, SkillLibrary.STEAL],
+		{}  # no prerequisites — starter job
 	)
 
 
@@ -76,7 +115,11 @@ static func _squire() -> JobData:
 		[SkillLibrary.BASIC_ATTACK, SkillLibrary.FIRST_AID, SkillLibrary.STONE_THROW,
 		 SkillLibrary.CHOP, SkillLibrary.PUSH_ROCK],
 		Color(0.9, 0.85, 0.55),  # warm tan
-		"Balanced frontliner. Reliable melee with ranged and self-heal options."
+		"Balanced frontliner. Reliable melee with ranged and self-heal options.",
+		# learnable_skill_names
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.FIRST_AID, SkillLibrary.STONE_THROW,
+		 SkillLibrary.CHOP, SkillLibrary.PUSH_ROCK],
+		{}  # no prerequisites — starter job
 	)
 
 
@@ -90,5 +133,8 @@ static func _white_mage() -> JobData:
 		1,  # JUMP — fragile, not agile
 		[SkillLibrary.STAFF_BONK, SkillLibrary.CURE, SkillLibrary.PROTECT],
 		Color(0.95, 0.95, 0.95),  # near-white
-		"Backline healer and buffer. Keep them out of melee."
+		"Backline healer and buffer. Keep them out of melee.",
+		# learnable_skill_names
+		[SkillLibrary.STAFF_BONK, SkillLibrary.CURE, SkillLibrary.PROTECT],
+		{}  # no prerequisites — starter job
 	)
