@@ -9,7 +9,7 @@ const _StructureLibrary = preload("res://scripts/world/structure_library.gd")
 ## Build a grid from the given template. Uses a fresh RNG each call.
 ## `intensity` scales tree/rock/water counts (0.5 = sparse, 2.0 = extreme).
 ## `structure_mgr` is optional — when provided, one structure is placed and registered.
-static func build(template: MapTemplate, intensity: float = 1.0, structure_mgr: StructureManager = null) -> BattleGrid:
+static func build(template: MapTemplate, intensity: float = 1.0, structure_mgr = null) -> BattleGrid:
 	var map := BattleGrid.create(template.width, template.height)
 
 	# --- Fixed stone hill (optional) ----------------------------------------
@@ -37,9 +37,9 @@ static func build(template: MapTemplate, intensity: float = 1.0, structure_mgr: 
 	_place_terrain(map, candidates, rng, GridEnums.TerrainType.MOUNTAIN, i_rocks)
 
 	_randomize_elevation(map, template, reserved, rng)
-	_place_chests(map, candidates, rng)
 	if structure_mgr != null:
 		_place_structure(map, candidates, rng, structure_mgr)
+	_place_chests(map, candidates, rng)
 
 	return map
 
@@ -160,9 +160,9 @@ static func _place_structure(
 	map: BattleGrid,
 	candidates: Array,
 	rng: RandomNumberGenerator,
-	structure_mgr: StructureManager
+	structure_mgr
 ) -> void:
-	var data: StructureData = _StructureLibrary.random_structure(rng)
+	var data = _StructureLibrary.random_structure(rng)
 
 	# Collect valid origin candidates: top-left such that the whole footprint
 	# and approach tile are in-bounds and on walkable (non-structure) tiles.
@@ -172,7 +172,8 @@ static func _place_structure(
 		for offset in data.footprint:
 			var coord: Vector2i = c + offset
 			var tile := map.get_tile(coord)
-			if tile == null or tile.structure_id != &"" or tile.terrain == GridEnums.TerrainType.WATER:
+			if tile == null or tile.structure_id != &"" \
+			or not GridEnums.is_terrain_walkable(tile.terrain):
 				ok = false
 				break
 		if not ok:

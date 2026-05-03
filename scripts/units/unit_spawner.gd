@@ -112,7 +112,7 @@ func spawn_alpha_roster(
 	_units.clear()
 
 	var player_spawns: Array = AlphaTestMap.player_spawn_points()
-	var enemy_spawns: Array = AlphaTestMap.enemy_spawn_points()
+	var enemy_spawns: Array = _pick_enemy_spawn_coords(grid, 3)
 
 	# --- Player side ---------------------------------------------------------
 	var jobs: Array = player_jobs if not player_jobs.is_empty() else PLAYER_JOB_ORDER
@@ -359,6 +359,32 @@ func _centroid_of_team(units: Array, team: UnitEnums.Team) -> Vector2i:
 	if count == 0:
 		return Vector2i.ZERO
 	return Vector2i(sum.x / count, sum.y / count)
+
+
+## Pick `count` random walkable tiles from the enemy spawn zone (top-right
+## quadrant). Tiles must not be occupied or impassable. Falls back to the
+## fixed AlphaTestMap points if the zone yields too few candidates.
+static func _pick_enemy_spawn_coords(grid: BattleGrid, count: int) -> Array:
+	var fallback: Array = AlphaTestMap.enemy_spawn_points()
+	if grid == null:
+		return fallback
+
+	# Zone: right 40% columns, top 40% rows — scales with any map size.
+	var zone_x_start: int = int(grid.width * 0.6)
+	var zone_y_end: int   = int(grid.height * 0.4)
+
+	var candidates: Array = []
+	for y in zone_y_end:
+		for x in range(zone_x_start, grid.width):
+			var tile := grid.get_tile(Vector2i(x, y))
+			if tile != null and tile.is_walkable() and not tile.is_occupied():
+				candidates.append(Vector2i(x, y))
+
+	if candidates.size() < count:
+		return fallback
+
+	candidates.shuffle()
+	return candidates.slice(0, count)
 
 
 static func _team_label(team: UnitEnums.Team) -> String:

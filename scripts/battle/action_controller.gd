@@ -27,6 +27,8 @@ enum ActionState { IDLE, SELECTING_SKILL, SELECTING_TARGET, EXECUTING }
 var _state: ActionState = ActionState.IDLE
 var _active_unit: Unit = null
 var _selected_skill: SkillData = null
+var _selected_item: ItemData = null   # set when targeting with an item
+var _item_mode: bool = false          # true while targeting with an item
 var _valid_targets: Array = []   # Array[Vector2i] — tiles with alive units
 var _range_tiles: Array = []     # Array[Vector2i] — all tiles in skill range
 var _move_mode: bool = false     # true while move-preview is showing
@@ -40,7 +42,8 @@ var _move_controller: MoveController = null
 var _ability_bar: AbilityBar = null
 var _world_root: Node3D = null
 var _battle_rewards: BattleRewards = null
-var _structure_manager: StructureManager = null
+var _structure_manager = null
+var _combat_log = null  # CombatLog
 
 
 # =============================================================================
@@ -67,14 +70,19 @@ func bind(
 	_battle_rewards = battle_rewards
 
 
-func set_structure_manager(mgr: StructureManager) -> void:
+func set_structure_manager(mgr) -> void:
 	_structure_manager = mgr
+
+
+func set_combat_log(log) -> void:
+	_combat_log = log
 
 	_turn_manager.turn_started.connect(_on_turn_started)
 	_turn_manager.turn_ended.connect(_on_turn_ended)
 	_turn_manager.battle_ended.connect(_on_battle_ended)
 	_visualizer.tile_clicked.connect(_on_tile_clicked)
 	_ability_bar.skill_selected.connect(_on_skill_selected)
+	_ability_bar.item_selected.connect(_on_item_selected)
 	_ability_bar.move_requested.connect(_on_move_requested)
 	_ability_bar.undo_move_requested.connect(_on_undo_move_requested)
 	_move_controller.move_completed.connect(_on_move_completed)
@@ -118,6 +126,8 @@ func cancel_targeting() -> void:
 	if _state != ActionState.SELECTING_TARGET:
 		return
 	_clear_target_highlights()
+	_item_mode = false
+	_selected_item = null
 	_state = ActionState.SELECTING_SKILL
 	if _active_unit != null and _active_unit.team == UnitEnums.Team.PLAYER:
 		var can_move: bool = not _turn_manager.has_moved()
@@ -230,6 +240,87 @@ func _on_skill_selected(skill: SkillData) -> void:
 		print("[action] %s — range shown, no valid targets yet" % skill.skill_name)
 
 
+func _on_item_selected(item: ItemData) -> void:
+	if _state != ActionState.SELECTING_SKILL or _active_unit == null:
+		return
+
+	_selected_item = item
+	_item_mode = true
+	_valid_targets.clear()
+	_range_tiles.clear()
+
+	for u in _unit_spawner.get_all_units():
+		if u == null or UnitEnums.teams_are_hostile(_active_unit.team, u.team):
+			continue
+		_range_tiles.append(u.coord)
+		if ItemResolver.can_use_on(item, u):
+			_valid_targets.append(u.coord)
+
+	if _valid_targets.is_empty():
+		_item_mode = false
+		_selected_item = null
+		return
+
+	for coord in _range_tiles:
+		_grid.set_highlight(coord, GridEnums.HighlightState.ATTACK_RANGE)
+	_state = ActionState.SELECTING_TARGET
+	_ability_bar.show_item_targeting(item)
+
+
+func _execute_item(anchor: Vector2i) -> void:
+	_state = ActionState.EXECUTING
+	_clear_target_highlights()
+	_ability_bar.hide_bar()
+
+	var caster: Unit = _active_unit
+	var item: ItemData = _selected_item
+	_item_mode = false
+	_selected_item = null
+
+	var target: Unit = _find_unit_at(_unit_spawner.get_all_units(), anchor)
+	if target == null or caster == null or caster.inventory == null:
+		_state = ActionState.IDLE
+		return
+
+	caster.face_toward(anchor)
+	var result := ItemResolver.resolve(caster.inventory, item, target)
+	_spawn_item_visuals(result)
+	_push_combat_log_item(caster, item, target, result)
+
+	_state = ActionState.IDLE
+
+	var outcome := _turn_manager.check_outcome()
+	if outcome != TurnEnums.BattleOutcome.ONGOING:
+		_turn_manager.end_battle(outcome)
+		return
+
+	if _turn_manager.get_active_unit() == caster:
+		_turn_manager.declare_acted()
+
+	if caster.team == UnitEnums.Team.PLAYER \
+	and not _turn_manager.has_moved() \
+	and caster.is_alive() \
+	and _turn_manager.get_active_unit() == caster:
+		_ability_bar.show_for_unit(caster, true, false, false, _at_approach(caster))
+		_state = ActionState.SELECTING_SKILL
+
+
+func _spawn_item_visuals(result: Dictionary) -> void:
+	if _world_root == null:
+		return
+	for effect in result["effects"]:
+		var unit := _unit_spawner.get_unit(StringName(effect["target_id"]))
+		if unit == null:
+			continue
+		var text: String = effect["message"]
+		if text.is_empty():
+			continue
+		var color: Color = heal_text_color
+		if effect.get("revived", false):
+			color = Color(0.85, 0.6, 1.0)
+		FloatingText.spawn(_world_root, text, color, unit.global_position + Vector3(0, 1.4, 0))
+
+
 func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 	if button_index == MOUSE_BUTTON_RIGHT:
 		if _state == ActionState.SELECTING_TARGET:
@@ -249,7 +340,10 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 		return
 	if not _valid_targets.has(coord):
 		return
-	_execute_skill(coord)
+	if _item_mode:
+		_execute_item(coord)
+	else:
+		_execute_skill(coord)
 
 
 # =============================================================================
@@ -275,6 +369,7 @@ func _execute_skill(anchor: Vector2i) -> void:
 		_log_result(caster, skill, result)
 	_push_to_debug_log(caster, skill, result)
 	_spawn_effect_visuals(caster, skill, result)
+	_push_combat_log_skill(caster, skill, result)
 	if skill.skill_type == SkillEnums.SkillType.TERRAIN_MODIFY:
 		_apply_terrain_skill(caster, skill, anchor)
 	_record_caster_stats(caster, skill, result)
@@ -596,6 +691,46 @@ func _get_foil() -> Node:
 # =============================================================================
 # HELPERS
 # =============================================================================
+
+# =============================================================================
+# COMBAT LOG TEXT
+# =============================================================================
+
+func _push_combat_log_skill(caster: Unit, skill: SkillData, result: Dictionary) -> void:
+	if _combat_log == null:
+		return
+	var job_str: String = "(%s)" % caster.job.display_name if caster.job != null else ""
+	for effect in result["effects"]:
+		var target := _unit_spawner.get_unit(effect["target_id"])
+		var tname: String = target.display_name if target != null else String(effect["target_id"])
+		var text: String = ""
+		if effect["damage"] > 0:
+			if effect["was_kill"]:
+				text = "%s %s defeated %s for %d damage!" % [caster.display_name, job_str, tname, effect["damage"]]
+			else:
+				text = "%s %s attacked %s for %d damage!" % [caster.display_name, job_str, tname, effect["damage"]]
+		elif effect["heal"] > 0:
+			text = "%s %s healed %s for %d HP!" % [caster.display_name, job_str, tname, effect["heal"]]
+		elif effect["buff_label"] != "":
+			text = "%s %s used %s on %s!" % [caster.display_name, job_str, skill.display_name, tname]
+		if not text.is_empty():
+			_combat_log.push(text)
+
+
+func _push_combat_log_item(caster: Unit, item: ItemData, target: Unit, result: Dictionary) -> void:
+	if _combat_log == null:
+		return
+	var job_str: String = "(%s)" % caster.job.display_name if caster.job != null else ""
+	var tname: String = target.display_name if target != null else "?"
+	for effect in result["effects"]:
+		var msg: String = effect.get("message", "")
+		var text: String
+		if msg.is_empty():
+			text = "%s %s used %s on %s!" % [caster.display_name, job_str, item.display_name, tname]
+		else:
+			text = "%s %s used %s on %s! %s" % [caster.display_name, job_str, item.display_name, tname, msg]
+		_combat_log.push(text)
+
 
 func _clear_target_highlights() -> void:
 	for coord in _range_tiles:

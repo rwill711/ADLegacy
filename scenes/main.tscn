@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/grid/grid_visualizer.gd" id="2_grid_viz"]
@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://scenes/debug_console.tscn" id="13_dc"]
 [ext_resource type="Script" path="res://scripts/battle/battle_rewards.gd" id="14_rewards"]
 [ext_resource type="Script" path="res://scripts/world/structure_manager.gd" id="15_struct_mgr"]
+[ext_resource type="PackedScene" path="res://scenes/combat_log.tscn" id="16_clog"]
 
 [sub_resource type="Environment" id="Env_1"]
 background_mode = 1
@@ -76,6 +77,8 @@ script = ExtResource("14_rewards")
 script = ExtResource("15_struct_mgr")
 
 [node name="BattleSummary" parent="." instance=ExtResource("11_bs")]
+
+[node name="CombatLog" parent="." instance=ExtResource("16_clog")]
 
 [node name="DebugOverlay" parent="." instance=ExtResource("12_do")]
 

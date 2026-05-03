@@ -61,7 +61,7 @@ func is_walkable() -> bool:
 		return false
 	if object_id != &"":
 		return false
-	if structure_id != &"":
+	if structure_id != &"" and not is_entrance:
 		return false
 	return true
 

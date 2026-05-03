@@ -11,6 +11,7 @@ const _LootLibrary = preload("res://scripts/items/loot_library.gd")
 
 signal retry_pressed()
 signal quit_pressed()
+signal continue_pressed()
 
 
 @onready var _root: Control = %Root
@@ -20,6 +21,9 @@ signal quit_pressed()
 @onready var _enemy_stats_box: VBoxContainer = %EnemyStatsBox
 @onready var _retry_button: Button = %RetryButton
 @onready var _quit_button: Button = %QuitButton
+
+var _round_label: Label = null    # injected lazily for endless mode
+var _continue_button: Button = null  # injected lazily for endless mode
 
 
 func _ready() -> void:
@@ -31,11 +35,13 @@ func _ready() -> void:
 ## Populate and show the summary for a finished battle.
 ## `units` is every unit that participated (alive or dead).
 ## `rewards` is optional — shown only on victory.
+## `endless_round` > 0 shows the round counter and a Next Battle button on victory.
 func show_summary(
 	outcome: TurnEnums.BattleOutcome,
 	turn_count: int,
 	units: Array,
-	rewards: BattleRewards = null
+	rewards: BattleRewards = null,
+	endless_round: int = 0
 ) -> void:
 	_outcome_label.text = _outcome_text(outcome)
 	_outcome_label.modulate = _outcome_color(outcome)
@@ -54,6 +60,7 @@ func show_summary(
 			_enemy_stats_box.add_child(row)
 
 	_build_rewards_section(outcome, rewards)
+	_update_endless_ui(outcome, endless_round)
 
 	_root.visible = true
 
@@ -180,6 +187,37 @@ func _build_rewards_section(outcome: TurnEnums.BattleOutcome, rewards: BattleRew
 	# Insert above the buttons (last child).
 	_root.add_child(section)
 	_root.move_child(section, _root.get_child_count() - 2)
+
+
+func _update_endless_ui(outcome: TurnEnums.BattleOutcome, endless_round: int) -> void:
+	var victory: bool = outcome == TurnEnums.BattleOutcome.PLAYER_VICTORY
+
+	# Round label — sits just below the turn count.
+	if endless_round > 0:
+		if _round_label == null:
+			_round_label = Label.new()
+			_round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_round_label.add_theme_font_size_override("font_size", 16)
+			_round_label.modulate = Color(0.75, 0.9, 1.0)
+			var box: VBoxContainer = _turns_label.get_parent()
+			box.add_child(_round_label)
+			box.move_child(_round_label, _turns_label.get_index() + 1)
+		_round_label.text = "Endless Run  ·  Round %d" % endless_round
+		_round_label.visible = true
+	elif _round_label != null:
+		_round_label.visible = false
+
+	# Next Battle button — prepended to the buttons row, visible on endless victory only.
+	if _continue_button == null:
+		_continue_button = Button.new()
+		_continue_button.custom_minimum_size = Vector2(160, 44)
+		_continue_button.add_theme_font_size_override("font_size", 18)
+		_continue_button.text = "Next Battle →"
+		_continue_button.pressed.connect(func(): continue_pressed.emit())
+		var buttons_row: HBoxContainer = _retry_button.get_parent()
+		buttons_row.add_child(_continue_button)
+		buttons_row.move_child(_continue_button, 0)
+	_continue_button.visible = endless_round > 0 and victory
 
 
 func _clear_box(box: VBoxContainer) -> void:

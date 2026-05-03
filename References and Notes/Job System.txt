@@ -1,0 +1,18 @@
+Lets PUSH now and FORK this update to prevent any issues. Here is a map of implementation I had him working on, it got caught up a little bit so I'm not entirely sure where he got to. But see this summary, compare to whats in the git and begin work on more jobs. We are going to implement them one at a time. 
+
+
+## Roll-out Plan (one bite at a time)
+
+| Bite | What | Why First |
+|---|---|---|
+| **1** | Add `ap_cost` to existing SkillLibrary skills + `all_job_names()` to JobLibrary | Foundation — nothing breaks, just data enrichment |
+| **2** | Wire `JobProgression` into `unit.gd` + `change_job()` API | The engine that drives everything |
+| **3** | Soldier (unlocks from Squire) | First advanced job — proves the unlock tree works |
+| **4** | Knight (unlocks from Squire) | Second branch off Squire |
+| **5** | Assassin (unlocks from Rogue) | First Rogue branch |
+| **6** | Ninja (unlocks from Rogue) | Second Rogue branch |
+| **7** | Bishop (unlocks from White Mage) | First WM branch |
+| **8** | Time Mage (unlocks from White Mage) | Second WM branch |
+| **9** | Paladin (unlocks from Knight + WM) | First cross-tree job — proves multi-prereq |
+| **10** | Shadow (unlocks from Assassin + Ninja) | Second cross-tree |
+| **11** | Sage (unlocks from WM + Time Mage) | Third cross-tree |

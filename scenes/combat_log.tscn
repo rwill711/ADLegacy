@@ -1,0 +1,36 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/combat_log.gd" id="1_log"]
+
+[node name="CombatLog" type="CanvasLayer"]
+script = ExtResource("1_log")
+
+[node name="Root" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Root"]
+anchor_left = 0.0
+anchor_right = 1.0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -130.0
+offset_right = -8.0
+offset_bottom = -8.0
+
+[node name="Margin" type="MarginContainer" parent="Root/Panel"]
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="Scroll" type="ScrollContainer" parent="Root/Panel/Margin"]
+unique_name_in_owner = true
+horizontal_scroll_mode = 0
+
+[node name="LogList" type="VBoxContainer" parent="Root/Panel/Margin/Scroll"]
+unique_name_in_owner = true
+size_flags_horizontal = 3
+theme_override_constants/separation = 2

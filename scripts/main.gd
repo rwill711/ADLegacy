@@ -1,4 +1,4 @@
-extends Node3D
+﻿extends Node3D
 ## Alpha entry scene. Builds the grid, spawns the roster, starts the battle,
 ## and orchestrates the player vs enemy turn loop via the subsystem
 ## controllers. Keeps the scene root thin — each concern (grid, camera,
@@ -26,7 +26,8 @@ const _StructureLibrary = preload("res://scripts/world/structure_library.gd")
 @onready var _facing_picker: FacingPicker = $FacingPicker
 @onready var _battle_summary: BattleSummary = $BattleSummary
 @onready var _battle_rewards: BattleRewards = $BattleRewards
-@onready var _structure_manager: StructureManager = $StructureManager
+@onready var _structure_manager = $StructureManager
+@onready var _combat_log: CombatLog = $CombatLog
 
 
 var _grid: BattleGrid = null
@@ -37,6 +38,12 @@ var _inspect_label: Label = null
 ## the HUD status line and the FOIL debug panel.
 var _current_encounter: Dictionary = {}
 
+## Deployment phase state (before battle starts).
+var _deploying: bool = false
+var _deploy_zone: Array = []         # Array[Vector2i]
+var _deploy_selected: Unit = null
+var _deploy_panel: CanvasLayer = null
+
 
 func _ready() -> void:
 	_register_battle_input_actions()
@@ -45,7 +52,7 @@ func _ready() -> void:
 	var map_template = _MapLibrary.get_template(map_template_name) \
 		if not map_template_name.is_empty() else _MapLibrary.open_field()
 	var terrain_intensity: float = SceneManager.consume_terrain_intensity()
-	_grid = _MapBuilder.build(map_template, terrain_intensity, _structure_manager)
+	_grid = _MapBuilder.build(map_template, terrain_intensity)
 	_visualizer.set_grid(_grid)
 
 	_visualizer.tile_hovered.connect(_on_tile_hovered)
@@ -64,9 +71,12 @@ func _ready() -> void:
 	var player_names: Array = SceneManager.consume_player_names()
 	var enemy_names: Array  = SceneManager.consume_enemy_names()
 	var foil_names: Array   = _predict_player_character_names(player_jobs)
+	var enemy_pool: Array = UnitSpawner.default_base_enemy_pool()
+	if SceneManager.is_endless_mode():
+		enemy_pool = _random_enemy_pool()
 	var encounter: Dictionary = FOILBattleSetup.build_encounter(
 		foil_names,
-		UnitSpawner.default_base_enemy_pool(),
+		enemy_pool,
 		3,
 	)
 	var units: Array = _unit_spawner.spawn_alpha_roster(
@@ -89,6 +99,7 @@ func _ready() -> void:
 		_move_controller, _ability_bar, self, _battle_rewards
 	)
 	_action_controller.set_structure_manager(_structure_manager)
+	_action_controller.set_combat_log(_combat_log)
 	_facing_picker.bind_turn_manager(_turn_manager)
 	_facing_picker.bind_visualizer(_visualizer)
 	_facing_picker.bind_grid(_grid)
@@ -99,6 +110,7 @@ func _ready() -> void:
 
 	_battle_summary.retry_pressed.connect(_on_retry_pressed)
 	_battle_summary.quit_pressed.connect(_on_quit_pressed)
+	_battle_summary.continue_pressed.connect(_on_continue_pressed)
 
 	_build_inspect_panel()
 
@@ -137,7 +149,7 @@ func _ready() -> void:
 				var job_name: String = String(unit.job.job_name) if unit.job != null else ""
 				foil.begin_battle(unit.display_name, job_name, 0)
 
-	_turn_manager.begin_battle(units)
+	_start_deployment(units)
 
 
 # =============================================================================
@@ -292,16 +304,41 @@ func _on_battle_ended(outcome: int) -> void:
 		turn_count,
 		_unit_spawner.get_all_units(),
 		_battle_rewards,
+		SceneManager.get_endless_round(),
 	)
 
 
 func _on_retry_pressed() -> void:
+	SceneManager.end_endless_run()
 	_battle_summary.hide_summary()
 	get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
 
 
 func _on_quit_pressed() -> void:
+	SceneManager.end_endless_run()
 	get_tree().quit()
+
+
+static func _random_enemy_pool() -> Array:
+	var all_jobs: Array = JobLibrary.all_alpha_jobs()
+	all_jobs.shuffle()
+	var pool: Array = []
+	for i in mini(3, all_jobs.size()):
+		pool.append({"job": String(all_jobs[i].job_name), "role": "default"})
+	return pool
+
+
+func _on_continue_pressed() -> void:
+	SceneManager.advance_endless_round()
+	SceneManager.set_player_jobs(SceneManager.get_endless_player_jobs())
+	SceneManager.set_player_names(SceneManager.get_endless_player_names())
+	var templates: Array = _MapLibrary.all_templates()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var next_template: MapTemplate = templates[rng.randi_range(0, templates.size() - 1)]
+	SceneManager.set_map_template(next_template.template_name)
+	SceneManager.set_terrain_intensity(randf_range(0.8, 1.4))
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
 # =============================================================================
@@ -312,7 +349,7 @@ func _on_enter_structure(unit: Unit) -> void:
 	var entry: Dictionary = _structure_manager.entry_at_approach(unit.coord)
 	if entry.is_empty():
 		return
-	var data: StructureData = entry["data"]
+	var data = entry["data"]
 	_ability_bar.hide_bar()
 	_show_interior_panel(unit, data, entry)
 
@@ -350,6 +387,9 @@ func _show_interior_panel(unit: Unit, data: StructureData, entry: Dictionary) ->
 		var drops: Array = LootResolver.roll(table, rng)
 		if drops.is_empty():
 			desc.text = "You search inside but find nothing of value."
+			if _combat_log != null and unit != null:
+				var jstr: String = "(%s)" % unit.job.display_name if unit.job != null else ""
+				_combat_log.push("%s %s searched but found nothing." % [unit.display_name, jstr])
 		else:
 			var lines: Array = ["Inside you find:"]
 			var tally: Dictionary = {}
@@ -360,7 +400,21 @@ func _show_interior_panel(unit: Unit, data: StructureData, entry: Dictionary) ->
 				if _battle_rewards != null:
 					for _i in tally[tag]:
 						_battle_rewards.add_drop(tag, data.label)
+				var loot_item := ItemLibrary.get_item(StringName(tag))
+				if loot_item != null and loot_item.is_consumable() \
+				and unit != null and unit.inventory != null:
+					for _i in tally[tag]:
+						if not unit.inventory.is_full():
+							unit.inventory.add_item(loot_item)
 			desc.text = "\n".join(lines)
+			if _combat_log != null and unit != null:
+				var jstr: String = "(%s)" % unit.job.display_name if unit.job != null else ""
+				var found_parts: Array = []
+				for tag in tally:
+					found_parts.append("%s x%d" % [LootLibrary.display_name(tag), tally[tag]])
+				_combat_log.push("%s %s opened a Treasure Chest! They found: %s." % [
+					unit.display_name, jstr, ", ".join(found_parts)
+				])
 		_structure_manager.mark_looted(entry)
 	desc.add_theme_font_size_override("font_size", 14)
 	vbox.add_child(desc)
@@ -407,6 +461,11 @@ func _on_tile_hovered(coord: Vector2i) -> void:
 	var tile := _grid.get_tile(coord)
 	if tile != null:
 		_camera_rig.set_zoom_target(tile.top_world_position())
+	# During deployment or CHOOSING_FACING, those systems own highlights.
+	if _deploying:
+		return
+	if _turn_manager.get_phase() == TurnEnums.TurnPhase.CHOOSING_FACING:
+		return
 	if _action_controller.is_target_tile(coord):
 		_grid.set_highlight(coord, GridEnums.HighlightState.TARGET)
 	elif _action_controller.is_range_tile(coord):
@@ -420,6 +479,11 @@ func _on_tile_hovered(coord: Vector2i) -> void:
 func _on_tile_unhovered(coord: Vector2i) -> void:
 	_camera_rig.clear_zoom_target()
 	if _grid == null:
+		return
+	# During deployment or CHOOSING_FACING, those systems own highlights.
+	if _deploying:
+		return
+	if _turn_manager.get_phase() == TurnEnums.TurnPhase.CHOOSING_FACING:
 		return
 	if _action_controller.is_target_tile(coord):
 		_grid.set_highlight(coord, GridEnums.HighlightState.ATTACK_RANGE)
@@ -485,6 +549,10 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 	if _grid == null:
 		return
 
+	if _deploying:
+		_on_deploy_tile_clicked(coord, button_index)
+		return
+
 	var tile := _grid.get_tile(coord)
 	if tile == null:
 		return
@@ -523,6 +591,156 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 		coord, int(tile.terrain), tile.height, tile.is_walkable(),
 		button_index, occupant_info
 	])
+
+
+# =============================================================================
+# DEPLOYMENT PHASE
+# =============================================================================
+
+## Enter deployment: highlight the zone, show the panel, let the player
+## rearrange units before the battle begins.
+func _start_deployment(units: Array) -> void:
+	_deploying = true
+	_deploy_selected = null
+	_deploy_zone = _compute_deploy_zone()
+
+	for coord in _deploy_zone:
+		var tile := _grid.get_tile(coord)
+		if tile != null and tile.is_walkable() and tile.structure_id == &"":
+			_grid.set_highlight(coord, GridEnums.HighlightState.DEPLOY_ZONE)
+
+	_build_deploy_panel(units)
+
+
+## Zone: bottom 4 rows × left 6 columns, so all default spawn points fit.
+func _compute_deploy_zone() -> Array:
+	var zone: Array = []
+	var x_max: int = 6
+	var y_start: int = maxi(0, _grid.height - 4)
+	for y in range(y_start, _grid.height):
+		for x in range(0, x_max):
+			zone.append(Vector2i(x, y))
+	return zone
+
+
+func _build_deploy_panel(units: Array) -> void:
+	var canvas := CanvasLayer.new()
+	canvas.layer = 5
+	add_child(canvas)
+	_deploy_panel = canvas
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panel.position = Vector2(16, 16)
+	panel.custom_minimum_size = Vector2(200, 0)
+	canvas.add_child(panel)
+
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 12)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "Deploy Units"
+	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
+	vbox.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "Click a unit, then click\na blue tile to place it."
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(hint)
+
+	# Unit buttons — click to select.
+	for unit in units:
+		if unit.team != UnitEnums.Team.PLAYER:
+			continue
+		var btn := Button.new()
+		btn.text = unit.display_name
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var u: Unit = unit
+		btn.pressed.connect(func(): _deploy_select(u))
+		vbox.add_child(btn)
+
+	var sep := HSeparator.new()
+	vbox.add_child(sep)
+
+	var confirm := Button.new()
+	confirm.text = "Confirm"
+	confirm.add_theme_font_size_override("font_size", 15)
+	confirm.pressed.connect(_confirm_deployment)
+	vbox.add_child(confirm)
+
+
+func _on_deploy_tile_clicked(coord: Vector2i, button_index: int) -> void:
+	if button_index == MOUSE_BUTTON_RIGHT:
+		_deploy_deselect()
+		return
+
+	var tile := _grid.get_tile(coord)
+	if tile == null:
+		return
+
+	# Clicking a tile that has a player unit → select it.
+	if tile.occupant_id != &"":
+		var unit := _unit_spawner.get_unit(tile.occupant_id)
+		if unit != null and unit.team == UnitEnums.Team.PLAYER:
+			_deploy_select(unit)
+			return
+
+	# Clicking an empty deploy zone tile with a selected unit → move there.
+	if _deploy_selected != null \
+	and coord in _deploy_zone \
+	and tile.is_walkable() \
+	and tile.structure_id == &"" \
+	and not tile.is_occupied():
+		_deploy_move_unit(_deploy_selected, coord)
+
+
+func _deploy_select(unit: Unit) -> void:
+	# Restore previous selection's tile to DEPLOY_ZONE.
+	if _deploy_selected != null:
+		var prev := _deploy_selected.coord
+		if prev in _deploy_zone:
+			_grid.set_highlight(prev, GridEnums.HighlightState.DEPLOY_ZONE)
+	_deploy_selected = unit
+	_grid.set_highlight(unit.coord, GridEnums.HighlightState.HOVER)
+
+
+func _deploy_deselect() -> void:
+	if _deploy_selected != null:
+		var prev := _deploy_selected.coord
+		if prev in _deploy_zone:
+			_grid.set_highlight(prev, GridEnums.HighlightState.DEPLOY_ZONE)
+	_deploy_selected = null
+
+
+func _deploy_move_unit(unit: Unit, to: Vector2i) -> void:
+	var from: Vector2i = unit.coord
+	_grid.clear_occupant(from)
+	unit.place_on_tile(_grid.get_tile(to), true)
+	_grid.set_occupant(to, unit.unit_id)
+	# Keep the unit selected at its new tile.
+	if from in _deploy_zone:
+		_grid.set_highlight(from, GridEnums.HighlightState.DEPLOY_ZONE)
+	_grid.set_highlight(to, GridEnums.HighlightState.HOVER)
+
+
+func _confirm_deployment() -> void:
+	_deploying = false
+	_deploy_selected = null
+	for coord in _deploy_zone:
+		_grid.set_highlight(coord, GridEnums.HighlightState.NONE)
+	_deploy_zone.clear()
+	if _deploy_panel != null:
+		_deploy_panel.queue_free()
+		_deploy_panel = null
+	_turn_manager.begin_battle(_unit_spawner.get_all_units())
 
 
 # =============================================================================

@@ -34,6 +34,9 @@ var _outcome: TurnEnums.BattleOutcome = TurnEnums.BattleOutcome.ONGOING
 ## Turn-scoped flags that reset on TURN_START.
 var _moved_this_turn: bool = false
 var _acted_this_turn: bool = false
+## Set when the player presses Wait — survives cancel_end_turn so ESC on the
+## facing picker can't undo a committed Wait and grant a free full turn.
+var _wait_pending: bool = false
 
 ## Monotonic turn counter. Increments each time _advance_to_next_turn hands
 ## control to a new unit. Used by FOIL and the debug log to sequence events
@@ -62,6 +65,7 @@ func begin_battle(units: Array) -> void:
 	_active_unit = null
 	_moved_this_turn = false
 	_acted_this_turn = false
+	_wait_pending = false
 	_turn_number = 0
 
 	battle_started.emit(_units)
@@ -123,12 +127,12 @@ func end_turn() -> void:
 
 
 ## Skip remaining actions and transition to CHOOSING_FACING with Wait CT cost.
-## Clears move/act flags so _ct_cost_for_turn returns CT_COST_WAIT.
+## Sets _wait_pending instead of clearing move/act flags — this way ESC on the
+## facing picker restores the original action state rather than granting a free turn.
 func wait_and_end_turn() -> void:
 	if _phase != TurnEnums.TurnPhase.AWAITING_ACTION:
 		return
-	_moved_this_turn = false
-	_acted_this_turn = false
+	_wait_pending = true
 	_set_phase(TurnEnums.TurnPhase.CHOOSING_FACING)
 
 
@@ -153,10 +157,12 @@ func undeclare_moved() -> void:
 
 ## Cancel a pending end-turn. Returns the unit to AWAITING_ACTION so they
 ## can still move/act. Useful for ESC on the facing picker — player changed
-## their mind.
+## their mind. Clears _wait_pending so a cancelled Wait does not lock the
+## move/act flags at zero.
 func cancel_end_turn() -> void:
 	if _phase != TurnEnums.TurnPhase.CHOOSING_FACING:
 		return
+	_wait_pending = false
 	_set_phase(TurnEnums.TurnPhase.AWAITING_ACTION)
 
 
@@ -290,6 +296,7 @@ func _advance_to_next_turn() -> void:
 	_active_unit = next_unit
 	_moved_this_turn = false
 	_acted_this_turn = false
+	_wait_pending = false
 	_turn_number += 1
 
 	_set_phase(TurnEnums.TurnPhase.TURN_START)
@@ -348,6 +355,8 @@ static func _select_next_turn_taker(alive: Array, ct_source: Dictionary) -> Unit
 # =============================================================================
 
 func _ct_cost_for_turn() -> int:
+	if _wait_pending:
+		return TurnEnums.CT_COST_WAIT
 	if _moved_this_turn and _acted_this_turn:
 		return TurnEnums.CT_COST_FULL_TURN
 	if _moved_this_turn:

@@ -10,6 +10,7 @@ class_name AbilityBar extends CanvasLayer
 
 
 signal skill_selected(skill: SkillData)
+signal item_selected(item: ItemData)
 signal move_requested
 signal undo_move_requested
 signal wait_pressed
@@ -89,6 +90,10 @@ func show_for_unit(
 	_act_btn = _add_main_btn("Act", func(): _on_act_pressed(unit, can_act))
 	_act_btn.disabled = not can_act
 
+	var items_empty: bool = unit.inventory == null or unit.inventory.is_empty()
+	var items_btn := _add_main_btn("Items", func(): _on_items_pressed(unit, can_act))
+	items_btn.disabled = not can_act or items_empty
+
 	if can_enter:
 		_add_main_btn("Enter", func(): enter_pressed.emit(_current_unit))
 
@@ -151,6 +156,15 @@ func _on_status_pressed() -> void:
 	status_pressed.emit(_current_unit)
 
 
+func _on_items_pressed(unit: Unit, can_act: bool) -> void:
+	if not can_act or unit.inventory == null or unit.inventory.is_empty():
+		return
+	if _sub_open:
+		_close_sub()
+	else:
+		_open_items_submenu(unit)
+
+
 # =============================================================================
 # ACT SUBMENU
 # =============================================================================
@@ -185,6 +199,43 @@ func _close_sub() -> void:
 	if _sub_panel != null:
 		_sub_panel.visible = false
 	_clear_sub()
+
+
+# =============================================================================
+# ITEMS SUBMENU
+# =============================================================================
+
+func _open_items_submenu(unit: Unit) -> void:
+	_clear_sub()
+	_sub_open = true
+	_sub_panel.visible = true
+	_hint_label.text = "Select an item.  Right-click to go back."
+
+	var stacks: Array = unit.inventory.get_stacked_summary()
+	for stack in stacks:
+		_add_sub_item_btn(stack["item"] as ItemData, stack["count"])
+
+
+func _add_sub_item_btn(item: ItemData, count: int) -> void:
+	var btn := Button.new()
+	var label: String = item.display_name
+	if count > 1:
+		label += "  × %d" % count
+	btn.text = label
+	btn.custom_minimum_size = Vector2(170, 38)
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.tooltip_text = item.description
+	btn.pressed.connect(func(): item_selected.emit(item))
+	_sub_list.add_child(btn)
+
+
+## Show item-targeting hint and collapse the submenu. Called by ActionController
+## after item_selected fires so the UI matches the targeting state.
+func show_item_targeting(item: ItemData) -> void:
+	if _hint_label == null:
+		return
+	_hint_label.text = "Using %s.  Click a target.  Right-click to cancel." % item.display_name
+	_close_sub()
 
 
 # =============================================================================

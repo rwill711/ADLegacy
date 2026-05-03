@@ -19,7 +19,7 @@ func register(data: StructureData, origin: Vector2i) -> void:
 func entry_at_approach(coord: Vector2i) -> Dictionary:
 	for entry in _placed:
 		var data: StructureData = entry["data"]
-		if data.approach_coord(entry["origin"]) == coord:
+		if data.entrance_coord(entry["origin"]) == coord:
 			return entry
 	return {}
 

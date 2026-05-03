@@ -43,9 +43,7 @@ func _ready() -> void:
 	for job in JobLibrary.all_alpha_jobs():
 		_job_names.append(job.job_name)
 
-	# Default player roster
 	var player_defaults: Array = [&"rogue", &"squire", &"white_mage"]
-	# Default enemy roster mirrors player
 	var enemy_defaults: Array  = [&"squire", &"rogue", &"white_mage"]
 
 	for i in PARTY_SIZE:
@@ -55,6 +53,15 @@ func _ready() -> void:
 		_enemy_dropdowns.append(_add_slot(_enemy_col, "Slot %d" % (i + 1), enemy_defaults[i], false)[0])
 
 	_build_map_row()
+
+	if SceneManager.get_pending_mode() == "endless":
+		_configure_for_endless()
+
+
+func _configure_for_endless() -> void:
+	get_node("Layout/Title").text = "Assemble Your Party"
+	get_node("Layout/TeamsRow/EnemySide").visible = false
+	get_node("Layout/TeamsRow/VSep").visible = false
 
 
 ## Returns [OptionButton, LineEdit]. LineEdit is null when show_name is false.
@@ -134,9 +141,11 @@ func _build_map_row() -> void:
 
 
 func _on_start() -> void:
+	var mode := SceneManager.consume_pending_mode()
+	var endless: bool = mode == "endless"
+
 	var player_jobs: Array  = []
 	var player_names: Array = []
-	var enemy_jobs: Array   = []
 
 	for i in _player_dropdowns.size():
 		var job: StringName = _job_names[_player_dropdowns[i].selected]
@@ -145,16 +154,21 @@ func _on_start() -> void:
 		player_jobs.append(job)
 		var edit: LineEdit = _player_name_edits[i]
 		var entered: String = edit.text.strip_edges() if edit != null else ""
-		player_names.append(entered)  # blank = spawner keeps job name
-
-	for opt in _enemy_dropdowns:
-		var job: StringName = _job_names[opt.selected]
-		if job != &"":
-			enemy_jobs.append(job)
+		player_names.append(entered)
 
 	SceneManager.set_player_jobs(player_jobs)
 	SceneManager.set_player_names(player_names)
-	SceneManager.set_enemy_jobs(enemy_jobs)
+
+	if not endless:
+		var enemy_jobs: Array = []
+		for opt in _enemy_dropdowns:
+			var job: StringName = _job_names[opt.selected]
+			if job != &"":
+				enemy_jobs.append(job)
+		SceneManager.set_enemy_jobs(enemy_jobs)
+
+	if endless:
+		SceneManager.start_endless_run(player_jobs, player_names)
 
 	var selected_template: String = ""
 	if _map_dropdown != null and _map_templates.size() > 0:

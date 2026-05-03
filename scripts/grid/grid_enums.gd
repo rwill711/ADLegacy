@@ -32,6 +32,7 @@ enum HighlightState {
 	ATTACK_RANGE,
 	PATH,
 	TARGET,
+	DEPLOY_ZONE,
 }
 
 
@@ -125,6 +126,7 @@ const HIGHLIGHT_COLORS: Dictionary = {
 	HighlightState.ATTACK_RANGE: Color(1.0, 0.4, 0.4, 0.55),
 	HighlightState.PATH:         Color(0.3, 1.0, 0.3, 0.7),
 	HighlightState.TARGET:       Color(1.0, 0.2, 0.2, 0.75),
+	HighlightState.DEPLOY_ZONE:  Color(0.3, 0.6, 1.0, 0.45),
 }
 
 

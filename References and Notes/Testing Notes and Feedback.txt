@@ -1,0 +1,8 @@
+*** To avoid previous issues of over-coding, we will tackle these issues one at a time and pause between for confirmation. ***
+Bugs and feedback:
+1. Got stuck in a bug/loop where the wait function would just reset the turn for squire but would not let me actually wait. It would just allow you to move and act again. 
+
+2. A log that records the relevant action for the turn would be very helpful. Bottom of the screen, "Name (Job) attacked for X damage!" "Name (Job) Opened a Treasure Chest!. They Found X" Should Always stay the same size but be able to scroll thru.
+
+
+

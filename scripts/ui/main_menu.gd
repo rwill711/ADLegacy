@@ -6,10 +6,17 @@ class_name MainMenu extends Control
 
 func _ready() -> void:
 	$VBox/NewGameBtn.pressed.connect(_on_new_game)
+	$VBox/EndlessModeBtn.pressed.connect(_on_endless_mode)
 	$VBox/ExitBtn.pressed.connect(_on_exit)
 
 
 func _on_new_game() -> void:
+	SceneManager.set_pending_mode("single")
+	get_tree().change_scene_to_file("res://scenes/main_menu/character_select.tscn")
+
+
+func _on_endless_mode() -> void:
+	SceneManager.set_pending_mode("endless")
 	get_tree().change_scene_to_file("res://scenes/main_menu/character_select.tscn")
 
 
