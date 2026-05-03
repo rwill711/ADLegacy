@@ -26,6 +26,17 @@ const JOB_SKILL_HEADERS: Dictionary = {
 	&"rogue":      "Thief Skills",
 	&"squire":     "Squire Skills",
 	&"white_mage": "White Magic",
+	&"dark_mage":  "Dark Magic",
+	&"archer":     "Archer Skills",
+	&"soldier":    "Soldier Skills",
+	&"knight":     "Knight Skills",
+	&"assassin":   "Assassin Skills",
+	&"ninja":      "Ninja Arts",
+	&"bishop":     "Bishop Spells",
+	&"time_mage":  "Time Magic",
+	&"paladin":    "Holy Arts",
+	&"shadow":     "Shadow Arts",
+	&"sage":       "Arcane Spells",
 }
 
 

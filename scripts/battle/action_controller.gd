@@ -20,6 +20,10 @@ class_name ActionController extends Node
 @export var kill_text_color: Color = Color(1, 0.9, 0.4)
 @export var buff_text_color: Color = Color(0.7, 0.85, 1)
 
+## AP earned per skill use and per kill. Tuning pass in Phase 10.
+const AP_PER_SKILL_USE: int = 50
+const AP_KILL_BONUS: int = 25
+
 
 ## --- State ------------------------------------------------------------------
 enum ActionState { IDLE, SELECTING_SKILL, SELECTING_TARGET, EXECUTING }
@@ -376,6 +380,7 @@ func _execute_skill(anchor: Vector2i) -> void:
 	_collect_enemy_drops(result)
 
 	if caster.team == UnitEnums.Team.PLAYER:
+		_award_ap_for_skill(caster, result)
 		_record_foil_actions(caster, skill, result, turn_number)
 
 	caster.set_state(UnitEnums.UnitState.IDLE)
@@ -622,6 +627,16 @@ static func _record_caster_stats(caster: Unit, skill: SkillData, result: Diction
 		if effect["was_kill"]:
 			any_kill = true
 	caster.record_action_stats(skill.skill_name, total_damage, any_kill)
+
+
+func _award_ap_for_skill(caster: Unit, result: Dictionary) -> void:
+	if caster == null or caster.job == null:
+		return
+	var earned: int = AP_PER_SKILL_USE
+	for effect in result["effects"]:
+		if effect["was_kill"]:
+			earned += AP_KILL_BONUS
+	caster.award_ap(caster.job.job_name, earned)
 
 
 # =============================================================================
