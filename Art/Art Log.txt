@@ -1,0 +1,52 @@
+================================================================================
+ART DIRECTOR LOG — Adventure Legacy
+================================================================================
+
+==========================================================================
+Session 1 — Sprite Prompt Document
+==========================================================================
+
+STATUS: ChatGPT_Image_Sprite_Prompts.txt committed to Art/ folder.
+
+WHAT WAS DONE:
+  - Full audit of the codebase to inventory all 14 job classes
+  - Read Creative Director notes, Technical Director logs, Job Library,
+    Skill Library, and all design docs to establish visual tone
+  - Created comprehensive ChatGPT Image generation document covering:
+      • Global style guide (FFTA HD pixel art, chibi proportions, palette rules)
+      • Technical specs (64x64, transparent PNG, limited palette)
+      • Individual prompts for all 14 jobs with signature colors, silhouette
+        callouts, and pose direction
+      • Sprite sheet layout notes for future animation phases
+      • Naming conventions (spr_[job]_idle_s.png)
+      • Recommended batch generation order (anchors first, then branches)
+      • Job tree visual reference for evolutionary coherence
+
+JOB INVENTORY (14 total):
+  Starters (5):   Squire, Rogue, White Mage, Dark Mage, Archer
+  Advanced (6):   Soldier, Knight, Assassin, Ninja, Bishop, Time Mage
+  Cross-tree (3): Paladin, Shadow, Sage
+
+VISUAL STYLE LOCKED IN:
+  - HD pixel art, FFTA-inspired, 3-head-tall chibi proportions
+  - Reference: FFTA + Fell Seal + Octopath Traveler + Tactics Ogre Reborn
+  - Each job has a signature color pulled from the job_color in job_library.gd
+  - Team tinting applied in-engine (sprites are neutral/NPC base)
+  - Top-left directional lighting, 1-2px dark outlines, 12-16 color palette
+
+NEXT STEPS:
+  - Generate Round 1 idle sprites (Squire, White Mage, Rogue) for style approval
+  - Once style is locked, generate remaining 11 jobs
+  - After idle approval: expand to animation frames (walk, attack, cast, hit, death)
+  - Coordinate with Programming Lead on Sprite3D billboard vs AnimatedSprite2D
+    import pipeline decision (depends on 2.5D rendering approach)
+  - Coordinate with UI Developer on portrait/icon crops for HUD elements
+
+OPEN QUESTIONS:
+  - Sprite3D (billboard in 3D space) or 2D overlay layer? Need Technical Director input.
+  - Do we want separate portrait art for the turn order HUD, or crop from sprite?
+  - Enemy team tint color: pure red, or a different hostile indicator?
+
+DEPENDENCIES:
+  - No blockers on prompt document — ready for generation immediately
+  - Sprite import pipeline needs Tech Director ruling before assets go into Godot
