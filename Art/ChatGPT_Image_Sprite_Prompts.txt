@@ -1,0 +1,598 @@
+================================================================================
+ADVENTURE LEGACY — CHARACTER SPRITE GENERATION PROMPTS
+ChatGPT Image (DALL·E) Instructions
+Art Director | RBW Studios
+================================================================================
+
+DATE: 2025
+STATUS: Ready for generation — 14 job classes, all directions documented.
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+  1. GLOBAL STYLE GUIDE (read this first — applies to EVERY sprite)
+  2. TECHNICAL SPECIFICATIONS
+  3. JOB CLASS PROMPTS (14 total)
+     A. STARTER JOBS (5): Squire, Rogue, White Mage, Dark Mage, Archer
+     B. ADVANCED JOBS (6): Soldier, Knight, Assassin, Ninja, Bishop, Time Mage
+     C. CROSS-TREE JOBS (3): Paladin, Shadow, Sage
+  4. SPRITE SHEET LAYOUT NOTES
+  5. NAMING CONVENTIONS
+
+================================================================================
+1. GLOBAL STYLE GUIDE — READ BEFORE GENERATING ANY SPRITE
+================================================================================
+
+GAME CONTEXT:
+Adventure Legacy is an isometric 2.5D tactics RPG in the style of Final
+Fantasy Tactics Advance (FFTA). The game features a rogue-like legacy system
+where characters die and leave behind legacies for the next generation. The
+world is medieval-fantasy with magic, guild factions, and a living world that
+evolves as the player progresses. The tone is serious but not grimdark —
+think FFTA meets Tactics Ogre with a touch of roguelike grit.
+
+VISUAL STYLE:
+- PIXEL ART, high-detail "HD pixel" style (think Octopath Traveler sprites
+  or modern FFTA fan art at higher resolution)
+- Characters should feel like they belong on an isometric tile grid
+- Rich color with strong silhouette readability — every job must be instantly
+  distinguishable from every other job at small scale
+- Slightly stylized proportions: ~3-head-tall chibi-esque (like FFTA sprites),
+  NOT realistic proportions. Heads are large relative to body. Hands and feet
+  are simplified but expressive.
+- Clean outlines: 1-2px dark outline on all sprites for grid readability
+- Characters should convey personality through POSE and GEAR, not facial
+  detail (faces are small at game scale)
+
+COLOR PHILOSOPHY:
+- Each job has a SIGNATURE COLOR (listed per job below). This color should
+  dominate 40-60% of the character's palette.
+- Secondary colors should complement, not compete. Use desaturated neutrals
+  (leather browns, steel greys, off-whites) as supporting tones.
+- Avoid neon/oversaturated colors. The palette should feel grounded and
+  painterly, like watercolor over ink — even in pixel art.
+- Team tinting will be applied in-engine (blue for player, red for enemy),
+  so the base sprite should work as a neutral/NPC version. Design around
+  the job color, not the team color.
+
+LIGHTING:
+- Top-down directional light from the upper-left (northwest), consistent
+  with the isometric camera angle.
+- Simple two-tone shading: base color + one shadow tone + one highlight tone.
+  No complex gradients. This is pixel art, not painted illustration.
+
+ANIMATION CONSIDERATION:
+- For initial generation, create STATIC IDLE POSES only.
+- Design the pose so it can be broken into animatable parts later
+  (head, torso, arms, legs, weapon as separate conceptual layers).
+- Facing: Generate the SOUTH-FACING (toward camera) version. The game
+  uses 4 cardinal directions; we will mirror/redraw the other 3 later.
+
+MOOD / REFERENCE BOARD:
+- Final Fantasy Tactics Advance (GBA) — proportions, silhouette language
+- Fell Seal: Arbiter's Mark — color richness, detail level
+- Octopath Traveler — HD pixel art quality bar
+- Tactics Ogre: Reborn — tone, grounded fantasy feel
+- Fire Emblem (GBA era) — battle sprite expressiveness
+
+DO NOT:
+- Do not use anime face detail (eyes, nose, mouth should be minimal pixels)
+- Do not make characters look like modern/sci-fi — strictly medieval fantasy
+- Do not add background or environment — sprites on TRANSPARENT BACKGROUND
+- Do not use gradients or soft shading — hard pixel edges only
+- Do not generate real-world weapons (guns, etc.) — swords, staffs, bows only
+
+================================================================================
+2. TECHNICAL SPECIFICATIONS
+================================================================================
+
+FORMAT:        PNG with transparent background
+RESOLUTION:    64x64 pixels per frame (can generate at 256x256 and downscale)
+               If generating at higher res for detail, maintain the pixel art
+               aesthetic — do NOT smooth/anti-alias edges during downscale.
+CANVAS:        Single character centered on canvas, feet near bottom edge,
+               ~4-8px padding on all sides for animation breathing room
+COLOR DEPTH:   Limited palette per character — aim for 12-16 colors max per
+               sprite (forces the pixel art discipline)
+OUTLINE:       1-2px dark outline (near-black, not pure #000000 — use a
+               darkened version of the dominant color for more life)
+
+WHAT TO GENERATE PER JOB (Phase 1 — idle sprites):
+  1. IDLE POSE — south-facing, neutral/ready stance, weapon visible
+  2. (Future) Attack frame, Cast frame, Hit frame, Death frame, Walk cycle
+
+FOR THIS DOCUMENT: Generate idle poses only. One image per job.
+
+================================================================================
+3. JOB CLASS PROMPTS
+================================================================================
+
+------------------------------------------------------------------------
+GENERAL PROMPT PREFIX (prepend to EVERY job prompt below):
+------------------------------------------------------------------------
+"Pixel art character sprite, 64x64, transparent background, isometric
+tactics RPG style similar to Final Fantasy Tactics Advance. HD pixel art,
+3-head-tall chibi proportions, clean dark outlines, top-left lighting,
+limited color palette (12-16 colors), medieval fantasy setting. South-facing
+idle pose. No background."
+
+------------------------------------------------------------------------
+A. STARTER JOBS — Available from the beginning of the game
+------------------------------------------------------------------------
+
+[1] SQUIRE
+    Role: Balanced frontliner, the "tutorial" job — reliable and versatile
+    Signature Color: Warm Tan / Wheat Gold — Color(0.9, 0.85, 0.55)
+    Stats: Balanced across the board, best Jump stat, moderate everything
+
+    PROMPT:
+    "[General prefix] A young squire in simple padded leather armor with
+    metal studs. Wheat-gold and warm tan color scheme. Wears a basic
+    iron short sword at the hip and a small round wooden shield on the
+    back. Simple brown leather boots and bracers. A cloth hood or
+    half-cape draped over one shoulder in a dusty gold color. Stance is
+    confident but not cocky — feet shoulder-width, one hand resting on
+    the sword hilt. Expression is determined. The 'everyman' starter
+    class — should look like someone who just enlisted. No heavy armor,
+    no flash. Practical and grounded."
+
+    KEY SILHOUETTE ELEMENTS: Short sword, round shield on back, half-cape
+    AVOID: Full plate armor, ornate weapons, magical effects
+
+------------------------------------------------------------------------
+
+[2] ROGUE
+    Role: Fast, fragile, positional — rewards flanking and backstabs
+    Signature Color: Dusty Purple — Color(0.75, 0.55, 0.95)
+    Stats: Highest Speed and Move, lowest HP and Defense
+
+    PROMPT:
+    "[General prefix] A lithe, quick-looking rogue in fitted dark leather
+    armor with purple-tinted cloth wrappings. Dusty purple and charcoal
+    color scheme. Dual-wielding short daggers held in a reverse grip.
+    Dark leather hood pulled up, face mostly in shadow with just a glint
+    of eyes visible. Wrapped forearms and lightweight boots designed for
+    silent movement. A small pouch or satchel on the belt (for stolen
+    goods). Stance is coiled and ready — weight on the balls of the feet,
+    leaning slightly forward like they're about to sprint. Thin and agile
+    build. Should read as 'fast and dangerous' even at small scale."
+
+    KEY SILHOUETTE ELEMENTS: Dual daggers (reverse grip), hood up, coiled stance
+    AVOID: Heavy cloaks, bulky armor, two-handed weapons
+
+------------------------------------------------------------------------
+
+[3] WHITE MAGE
+    Role: Backline healer and support — fragile but essential
+    Signature Color: Near-White / Ivory — Color(0.95, 0.95, 0.95)
+    Stats: Highest MP and Magic, lowest Attack and Speed
+
+    PROMPT:
+    "[General prefix] A serene white mage in flowing ivory-white robes
+    with pale blue trim and gold thread accents. Carries a tall wooden
+    staff topped with a simple glowing crystal (soft white/pale blue
+    glow). White hooded robe falls to the ankles, cinched at the waist
+    with a braided gold cord. Soft leather sandals. One hand holds the
+    staff upright, the other rests gently at the side or holds a small
+    prayer book. Gentle, composed stance — upright posture, calm and
+    still. Should feel like a sanctuary in a battle — peaceful amid chaos.
+    The crystal atop the staff is the brightest element on the sprite."
+
+    KEY SILHOUETTE ELEMENTS: Tall staff with glowing crystal, flowing robes, hood
+    AVOID: Dark colors, weapons, aggressive poses
+
+------------------------------------------------------------------------
+
+[4] DARK MAGE
+    Role: Offensive spellcaster — attacks from range, limited by MP
+    Signature Color: Deep Indigo-Purple — Color(0.4, 0.1, 0.6)
+    Stats: Highest Charisma, high Magic, very low physical stats
+
+    PROMPT:
+    "[General prefix] A menacing dark mage in deep indigo-purple robes
+    with black trim and subtle dark red rune markings along the hems.
+    Carries a twisted dark wood staff topped with a smoky black/purple
+    orb that seems to absorb light. Heavy hooded robe with the hood
+    casting deep shadows over the face — only a faint glow of purple
+    from the eyes visible. Tattered hem and edges suggest the robes are
+    ancient or corrupted. One hand extends slightly with wisps of dark
+    energy curling around the fingers. Stance is commanding and slightly
+    hunched forward — radiating menace. Should contrast sharply with the
+    White Mage in every way — where the WM is light and still, the Dark
+    Mage is dark and restless."
+
+    KEY SILHOUETTE ELEMENTS: Twisted staff with dark orb, tattered robes, glowing eyes
+    AVOID: Bright colors, clean/pristine clothing, friendly body language
+
+------------------------------------------------------------------------
+
+[5] ARCHER
+    Role: Ranged specialist — cannot attack adjacent, must maintain distance
+    Signature Color: Forest Green — Color(0.3, 0.7, 0.3)
+    Stats: Highest Speed (tied), good HP, no melee capability
+
+    PROMPT:
+    "[General prefix] A sharp-eyed archer in fitted forest-green leather
+    armor with brown accents and a leaf-patterned cloak pinned at one
+    shoulder. Carries a medium-length recurve bow in one hand, an arrow
+    nocked but not drawn. A quiver of arrows strapped diagonally across
+    the back. Brown leather bracers, fingerless gloves for bowstring
+    grip, and knee-high ranger boots. Hair visible (no full hood — maybe
+    a leather headband or partial hood pushed back). Athletic, lean
+    build — like a woodlands ranger. Stance is watchful and alert — one
+    foot slightly back, bow held at a relaxed ready position. Should
+    convey 'I see you before you see me.'"
+
+    KEY SILHOUETTE ELEMENTS: Bow with nocked arrow, quiver on back, ranger cloak
+    AVOID: Heavy armor, melee weapons, bulky build
+
+------------------------------------------------------------------------
+B. ADVANCED JOBS — Unlocked by earning AP in prerequisite starter jobs
+------------------------------------------------------------------------
+
+[6] SOLDIER (unlocks from Squire at 1500 AP)
+    Role: Heavy frontliner — high damage, AoE melee sweeps
+    Signature Color: Warm Brown/Tan — Color(0.7, 0.6, 0.4)
+    Stats: Highest STR and CON alongside Knight, slow Speed
+
+    PROMPT:
+    "[General prefix] A hardened soldier in practical plate-and-chain
+    armor — breastplate over chainmail with pauldrons on both shoulders.
+    Warm brown and burnished bronze color scheme. Wields a large
+    two-handed longsword or bastard sword resting blade-down with both
+    hands on the pommel. No shield — the Soldier is about offense. Worn
+    leather straps and a utilitarian belt with no ornamentation. A short
+    military-style half-cape in faded tan. Battle-scarred and weathered
+    appearance — dents in the armor, nicked blade. Broad-shouldered,
+    powerful build. Stance is planted and imposing — the veteran who's
+    seen real combat. Reads as 'upgraded Squire who chose the sword.'"
+
+    KEY SILHOUETTE ELEMENTS: Two-handed sword, plate armor, military half-cape
+    AVOID: Shields, magical effects, ornate/decorative armor
+
+------------------------------------------------------------------------
+
+[7] KNIGHT (unlocks from Squire at 1500 AP)
+    Role: Maximum tank — highest HP and DEF, slowest unit
+    Signature Color: Steel Blue — Color(0.55, 0.65, 0.85)
+    Stats: Highest HP (65) and DEF (13), lowest Speed (6)
+
+    PROMPT:
+    "[General prefix] A stalwart knight in full heavy plate armor —
+    steel blue with silver highlights. Large kite shield held in the
+    left hand bearing a simple heraldic crest (a basic chevron or
+    cross — nothing too detailed at pixel scale). One-handed arming
+    sword in the right hand. Full enclosed helmet with a T-shaped visor
+    slit — no face visible, just the dark visor. The heaviest armor of
+    any class — full greaves, gauntlets, pauldrons, gorget. A short
+    blue-grey surcoat over the breastplate. Should look like an
+    immovable wall — wide stance, shield forward, sword at guard
+    position. The 'I'm not going anywhere and neither are you' class.
+    Must visually contrast with the Soldier: Knight = shield + defense,
+    Soldier = big sword + offense."
+
+    KEY SILHOUETTE ELEMENTS: Large kite shield, full plate helmet, heavy armor
+    AVOID: Two-handed weapons, exposed skin, light/mobile appearance
+
+------------------------------------------------------------------------
+
+[8] ASSASSIN (unlocks from Rogue at 1500 AP)
+    Role: Glass cannon — highest ATK and SPD, lowest HP (25)
+    Signature Color: Deep Dark Purple — Color(0.2, 0.15, 0.3)
+    Stats: Extreme damage, dies in 2 hits — kill or be killed
+
+    PROMPT:
+    "[General prefix] A deadly assassin in skin-tight dark leather
+    armor, almost entirely black with deep purple accents at the seams
+    and joints. Face fully masked — a sleek face-covering mask with only
+    narrow eye slits showing cold, focused eyes. Wields a single long
+    curved dagger or short blade in a forward grip, the other hand
+    empty and open (ready to grab or strike). A bandolier of small
+    throwing knives across the chest. Ultra-light gear — no cloak, no
+    cape, nothing that could catch or slow them down. Lean, angular
+    build — every ounce of fat stripped away. Stance is predatory —
+    low center of gravity, one foot forward, blade angled up.
+    Should read as 'the Rogue's deadlier, more committed evolution.'
+    Visually darker and more lethal than the Rogue."
+
+    KEY SILHOUETTE ELEMENTS: Single curved blade, face mask, throwing knife bandolier
+    AVOID: Dual wielding (differentiates from Rogue), bright colors, bulky gear
+
+------------------------------------------------------------------------
+
+[9] NINJA (unlocks from Rogue at 1500 AP)
+    Role: Speed specialist — fastest unit in base roster, harasses at any range
+    Signature Color: Crimson Red — Color(0.85, 0.2, 0.2)
+    Stats: SPD 28 (fastest base job), throws shurikens, disrupts with smoke
+
+    PROMPT:
+    "[General prefix] A swift ninja in traditional-inspired garb —
+    fitted dark grey bodysuit with crimson red sash, arm wraps, and
+    headband. A crimson scarf or face wrap trailing behind like it's
+    caught in motion. Wields a shuriken (throwing star) in one hand,
+    held between fingers ready to throw. The other hand may hold a
+    small round smoke bomb. Split-toe tabi boots. Light, minimal armor
+    — speed over protection. A small tool pouch on the lower back. Hair
+    visible above the headband (spiky or tied back). Athletic and wiry
+    build. Stance is dynamic and off-balance — caught mid-motion, one
+    foot barely touching the ground, as if about to vanish. Should feel
+    like the fastest thing on the battlefield — motion lines almost
+    implied by the pose. Contrasts with Assassin: Ninja = speed and
+    disruption, Assassin = single lethal strike."
+
+    KEY SILHOUETTE ELEMENTS: Shuriken in hand, trailing scarf, dynamic off-balance pose
+    AVOID: Heavy weapons, static pose, bulky build
+
+------------------------------------------------------------------------
+
+[10] BISHOP (unlocks from White Mage at 1500 AP)
+     Role: Combat priest — AoE heals (Curaga) and offensive Holy magic
+     Signature Color: Golden — Color(0.95, 0.85, 0.3)
+     Stats: Highest MAG (27), huge MP pool (55), paper-thin physically
+
+     PROMPT:
+     "[General prefix] A commanding bishop in ornate golden-white
+     ceremonial robes — heavier and more structured than the White
+     Mage's flowing garments. Rich gold and cream color scheme with
+     intricate embroidered borders. Carries an elaborate bishop's staff
+     or crosier — a tall staff with a curved or looped head, adorned
+     with a radiant golden gem. Wears a tall mitre (bishop's hat) or
+     ornate golden circlet. Open-front robe reveals layered vestments
+     beneath. Prayer beads or a holy symbol hanging from the belt. Both
+     hands on the crosier, planted firmly. Stance is authoritative and
+     upright — this is not a humble healer, this is a high-ranking
+     cleric who can call down Holy fire. Should look like a direct
+     upgrade to the White Mage — more ornate, more powerful, more
+     gold. The 'White Mage who found their warrior faith.'"
+
+     KEY SILHOUETTE ELEMENTS: Ornate crosier/bishop staff, mitre or circlet, layered robes
+     AVOID: Simple/humble appearance, dark colors, weapons
+
+------------------------------------------------------------------------
+
+[11] TIME MAGE (unlocks from White Mage at 1500 AP)
+     Role: AoE magic bomber — slows enemies, drops Meteor on groups
+     Signature Color: Cool Cyan-Blue — Color(0.3, 0.75, 0.9)
+     Stats: Good SPD for a mage (16), AoE specialist
+
+     PROMPT:
+     "[General prefix] An enigmatic time mage in layered robes of cool
+     cyan-blue and deep midnight blue with silver star and clock-gear
+     motifs woven into the fabric. Carries a staff topped with a small
+     spinning astrolabe or hourglass apparatus (the sand seems to float
+     upward). Wears a wide-brimmed pointed wizard hat (classic FF
+     Time Mage design) in midnight blue with a silver band. Beneath the
+     hat brim, the face is partially shadowed — visible is a calm,
+     knowing expression. Robes have layered asymmetric hems suggesting
+     warped space. Small clock gears or constellation patterns as
+     decorative elements on the belt and cuffs. One hand holds the
+     staff, the other is raised slightly with faint cyan particles
+     orbiting the fingers (slowed-time effect). Stance is relaxed but
+     eerie — they exist slightly out of sync with reality. Should feel
+     mysterious and cerebral — the wizard who studies time itself."
+
+     KEY SILHOUETTE ELEMENTS: Wide-brimmed pointed hat, astrolabe/hourglass staff, floating particles
+     AVOID: Warm colors, heavy armor, aggressive stance
+
+------------------------------------------------------------------------
+C. CROSS-TREE JOBS — Require AP in two prerequisite jobs to unlock
+------------------------------------------------------------------------
+
+[12] PALADIN (unlocks from Knight 1500 AP + White Mage 1500 AP)
+     Role: Holy warrior — second tankiest, magic melee + powerful self-heal
+     Signature Color: Radiant Gold-White — Color(1.0, 0.95, 0.6)
+     Stats: High HP (55), solid DEF (11), meaningful MAG (17)
+
+     PROMPT:
+     "[General prefix] A radiant paladin in gleaming white-gold plate
+     armor with intricate holy engravings along the edges. Radiant gold
+     and luminous white color scheme — the brightest, most 'noble'
+     character on the roster. Wields a hand-and-a-half sword (bastard
+     sword) with a golden crossguard and a subtle glow along the blade
+     edge — divine enchantment visible. A medium heater shield on the
+     other arm bearing a radiant sun or holy cross emblem. White cape
+     or cloak flowing from both pauldrons — grander than the Knight's
+     surcoat. A golden circlet or open-face helm that reveals a
+     resolute, righteous expression. White plume or wing motif on the
+     helmet. The armor catches light more than any other class — should
+     almost seem to glow. Stance is noble and commanding — sword held
+     upright in a salute or guard position, shield forward. Should
+     read as 'the Knight and White Mage had a child who chose the
+     crusade.' Visually the most heroic, 'paladin of light' archetype."
+
+     KEY SILHOUETTE ELEMENTS: Glowing sword, white cape, golden plate armor, holy shield
+     AVOID: Dark colors, stealth elements, humble/simple appearance
+
+------------------------------------------------------------------------
+
+[13] SHADOW (unlocks from Assassin 1500 AP + Ninja 1500 AP)
+     Role: Apex assassin — fastest unit alive (SPD 29), Death Blow kills anything from behind
+     Signature Color: Near-Black — Color(0.1, 0.1, 0.15)
+     Stats: Highest SPD in the game, lowest HP (25) and DEF (3)
+
+     PROMPT:
+     "[General prefix] A terrifying shadow operative — the apex of the
+     stealth tree. Almost entirely black with the faintest dark blue or
+     dark violet edge highlights to prevent the sprite from becoming an
+     unreadable silhouette. Full-body fitted suit of matte black with
+     no reflections — absorbs light. Face completely concealed behind
+     a featureless dark mask — no eyes visible, just void. Wields a
+     single impossibly thin, long blade (a ninjato or stiletto) in one
+     hand, blade pointed downward. The other hand holds a fan of three
+     shurikens between the fingers. Faint wisps of shadow or dark
+     smoke trail from the shoulders and feet as if the character is
+     partially dissolving into darkness. Minimal gear — no belt, no
+     pouch, no cape. Just the weapon, the shurikens, and the shadow.
+     Stance is eerily still — standing upright with unsettling calm,
+     like a figure in a nightmare. Should be the visual opposite of
+     the Paladin — where the Paladin radiates light, the Shadow
+     consumes it. The most intimidating silhouette in the game."
+
+     KEY SILHOUETTE ELEMENTS: Thin blade pointed down, shuriken fan, shadow wisps, featureless mask
+     AVOID: Any bright colors, any visible face/eyes, any bulky elements
+
+------------------------------------------------------------------------
+
+[14] SAGE (unlocks from White Mage 1500 AP + Time Mage 1500 AP)
+     Role: Ultimate spellcaster — highest MAG (28), casts Flare and Full Cure
+     Signature Color: Deep Royal Purple with Gold — hybrid of WM and Time Mage palettes
+     Stats: Highest MAG and MP in the game, paper-thin physically
+
+     PROMPT:
+     "[General prefix] An ancient, powerful sage in magnificent layered
+     robes blending deep royal purple with gold and silver celestial
+     embroidery. The most ornately dressed mage on the roster. Carries
+     a grand staff — taller than the character — topped with a complex
+     orbiting arrangement of a crystal, an hourglass, and a glowing
+     star (combining White Mage's healing crystal with Time Mage's
+     temporal apparatus). Wears a tall, elaborate hat or crown that
+     blends the Time Mage's pointed hat with the Bishop's mitre — a
+     pointed wizard's hat with golden trim and a small hovering star
+     above its tip. Multiple layers of robes cascade outward — inner
+     white, middle purple, outer deep indigo, all with gold borders.
+     Both hands grip the staff with quiet authority. Faint celestial
+     particles (tiny stars, motes of light) orbit the character slowly.
+     Expression (what little is visible) is serene and ancient — this
+     is the endgame mage who has mastered both healing and destruction.
+     Should feel like the culmination of the magic tree — the most
+     powerful and visually complex mage sprite."
+
+     KEY SILHOUETTE ELEMENTS: Grand compound staff, elaborate layered robes, hovering star, celestial particles
+     AVOID: Simple/humble appearance, dark/evil aesthetic, physical weapons
+
+================================================================================
+4. SPRITE SHEET LAYOUT NOTES (for future animation phases)
+================================================================================
+
+Once idle sprites are approved, we will expand to full sprite sheets:
+
+FRAMES PER DIRECTION (4 directions: S, W, N, E):
+  - Idle:        2 frames (subtle breathing/sway loop)
+  - Walk:        4 frames (tile-to-tile movement)
+  - Attack:      3 frames (windup, strike, follow-through)
+  - Cast:        3 frames (charge, release, cooldown) — mages only
+  - Hit/Hurt:    2 frames (impact, stagger)
+  - Death/KO:    3 frames (stagger, fall, prone)
+  - Special:     2-3 frames (job-specific — backstab, steal, etc.)
+
+TOTAL PER CHARACTER: ~68 frames (17 per direction × 4 directions)
+SHEET FORMAT:        Horizontal strip per animation, all 4 directions stacked
+FRAME SIZE:          64×64 each, consistent across all jobs
+
+For now: IDLE SOUTH-FACING ONLY. One image per job. 14 total images.
+
+================================================================================
+5. NAMING CONVENTIONS
+================================================================================
+
+File naming for generated sprites:
+
+  spr_[job_name]_idle_s.png
+
+Examples:
+  spr_squire_idle_s.png
+  spr_rogue_idle_s.png
+  spr_white_mage_idle_s.png
+  spr_dark_mage_idle_s.png
+  spr_archer_idle_s.png
+  spr_soldier_idle_s.png
+  spr_knight_idle_s.png
+  spr_assassin_idle_s.png
+  spr_ninja_idle_s.png
+  spr_bishop_idle_s.png
+  spr_time_mage_idle_s.png
+  spr_paladin_idle_s.png
+  spr_shadow_idle_s.png
+  spr_sage_idle_s.png
+
+Place all generated sprites in: assets/sprites/characters/
+
+================================================================================
+6. JOB TREE VISUAL REFERENCE (for understanding progression relationships)
+================================================================================
+
+This shows how jobs connect. When generating sprites, the VISUAL EVOLUTION
+should be apparent — advanced jobs should look like believable upgrades of
+their prerequisites.
+
+  STARTER TIER          ADVANCED TIER         CROSS-TREE TIER
+  ─────────────         ──────────────        ────────────────
+  Squire ──────────┬──→ Soldier
+                   └──→ Knight ─────────┬──→ PALADIN
+                                        │
+  White Mage ──────┬──→ Bishop          │
+                   │                    ├──→ (Knight + WM)
+                   └──→ Time Mage ──┬───┘
+                                    └──→ SAGE (WM + Time Mage)
+
+  Rogue ───────────┬──→ Assassin ───┬──→ SHADOW (Assassin + Ninja)
+                   └──→ Ninja ──────┘
+
+  Dark Mage ────────── (no advanced branches yet — future expansion)
+  Archer ───────────── (no advanced branches yet — future expansion)
+
+VISUAL EVOLUTION GUIDELINES:
+  - Squire → Soldier: More armor, bigger sword, military bearing
+  - Squire → Knight: Full plate, big shield, slower/heavier feel
+  - Rogue → Assassin: Darker, more lethal, single blade focus
+  - Rogue → Ninja: More dynamic, red accents, thrown weapons
+  - White Mage → Bishop: More ornate, golden, authoritative
+  - White Mage → Time Mage: Mysterious, cosmic, temporal motifs
+  - Knight + White Mage → Paladin: Holy warrior, light radiates, peak noble
+  - Assassin + Ninja → Shadow: Pure darkness, featureless, terrifying
+  - White Mage + Time Mage → Sage: Ultimate mage, most ornate, cosmic power
+
+================================================================================
+7. BATCH GENERATION ORDER (recommended)
+================================================================================
+
+Generate in this order to establish visual anchors first, then build
+evolutionary chains:
+
+  Round 1 — ANCHORS (starters that define the visual language):
+    1. Squire (the baseline — everything is relative to this)
+    2. White Mage (establishes the mage visual language)
+    3. Rogue (establishes the stealth visual language)
+
+  Round 2 — REMAINING STARTERS:
+    4. Dark Mage (contrast with White Mage)
+    5. Archer (unique ranged identity)
+
+  Round 3 — SQUIRE BRANCHES:
+    6. Soldier (Squire evolved — offense)
+    7. Knight (Squire evolved — defense)
+
+  Round 4 — ROGUE BRANCHES:
+    8. Assassin (Rogue evolved — lethality)
+    9. Ninja (Rogue evolved — speed)
+
+  Round 5 — WHITE MAGE BRANCHES:
+    10. Bishop (White Mage evolved — holy authority)
+    11. Time Mage (White Mage evolved — temporal mystery)
+
+  Round 6 — CROSS-TREE PINNACLES:
+    12. Paladin (Knight + WM — radiant holy warrior)
+    13. Shadow (Assassin + Ninja — apex darkness)
+    14. Sage (WM + Time Mage — ultimate spellcaster)
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+Art Director Notes:
+
+When reviewing generated sprites, I will assess against three criteria:
+  1. STYLE CONSISTENCY — Does it match the FFTA HD pixel art brief?
+  2. SILHOUETTE READABILITY — Can you tell the job at 64x64 without zooming?
+  3. EVOLUTIONARY COHERENCE — Does the advanced job visually "descend" from
+     its prerequisite? Can you see the Squire in the Knight?
+
+If ChatGPT Image generates at a higher resolution, we will handle downscaling
+in-house. The priority is getting the CHARACTER DESIGN right — proportions,
+color, silhouette, gear, pose.
+
+Loop in the UI Developer for any HUD/portrait crop specs once idle sprites
+are approved. Loop in the Programming Lead to confirm the sprite import
+pipeline in Godot (AnimatedSprite2D vs Sprite3D billboard — TBD based on
+the 2.5D rendering approach).
+
+— Art Director, RBW Studios
