@@ -118,3 +118,11 @@ func get_endless_player_jobs() -> Array:
 
 func get_endless_player_names() -> Array:
 	return _endless_player_names.duplicate()
+
+## Restore a mid-run state loaded from a save file.
+## Sets round directly instead of always resetting to 1.
+func restore_endless_run(jobs: Array, names: Array, round: int) -> void:
+	_endless_mode = true
+	_endless_round = round
+	_endless_player_jobs  = jobs.duplicate()
+	_endless_player_names = names.duplicate()

@@ -99,6 +99,30 @@ func has_item(item_name: StringName) -> bool:
 	return get_item_by_name(item_name) != null
 
 
+# =============================================================================
+# SERIALIZATION
+# =============================================================================
+
+## Serialize the bag to a list of item name strings for JSON storage.
+## Order is preserved so the bag looks the same on reload.
+func to_dict() -> Dictionary:
+	var names: Array = []
+	for item in _items:
+		names.append(String(item.item_name))
+	return {"items": names}
+
+
+## Reconstruct an Inventory from a Dictionary produced by to_dict().
+## Skips any item name that ItemLibrary doesn't recognise (forward-compat safety).
+static func from_dict(data: Dictionary) -> Inventory:
+	var inv := Inventory.new()
+	for name_str in data.get("items", []):
+		var item: ItemData = ItemLibrary.get_item(StringName(name_str))
+		if item != null:
+			inv.add_item(item)
+	return inv
+
+
 func get_stacked_summary() -> Array:
 	var seen: Dictionary = {}
 	var out: Array = []

@@ -39,6 +39,31 @@ func get_ap(job_name: StringName) -> int:
 
 
 # =============================================================================
+# SERIALIZATION
+# =============================================================================
+
+## Serialize AP state to a plain Dictionary suitable for JSON.
+## Keys are stored as plain strings (StringName round-trips cleanly through JSON).
+func to_dict() -> Dictionary:
+	var out: Dictionary = {}
+	for job_name in ap_per_job:
+		out[String(job_name)] = ap_per_job[job_name]
+	return out
+
+
+## Restore AP state from a Dictionary produced by to_dict().
+## Ignores keys that don't correspond to known jobs (forward-compat safety).
+static func from_dict(data: Dictionary) -> JobProgression:
+	var prog := JobProgression.new()
+	var known: Array = JobLibrary.all_job_names()
+	for key in data:
+		var job_name := StringName(key)
+		if known.has(job_name):
+			prog.ap_per_job[job_name] = int(data[key])
+	return prog
+
+
+# =============================================================================
 # UNLOCK / SKILL QUERIES
 # =============================================================================
 

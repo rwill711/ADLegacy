@@ -83,6 +83,16 @@ func _ready() -> void:
 		_grid, _units_root, encounter["loadout"], player_jobs, enemy_jobs,
 		player_names, enemy_names
 	)
+
+	# Overlay saved equipment / inventory / AP progression on player units when
+	# resuming an endless run (round 2+ or continuing after a relaunch).
+	if SceneManager.is_endless_mode() and GameManager.has_save():
+		var save_data: Dictionary = GameManager.load_game()
+		var saved_units: Array = save_data.get("units", [])
+		var player_units: Array = _unit_spawner.get_units_on_team(UnitEnums.Team.PLAYER)
+		for i in mini(player_units.size(), saved_units.size()):
+			player_units[i].restore_from_save(saved_units[i])
+
 	_current_encounter = encounter
 
 	_camera_rig.set_focus(_grid_center_world(_grid), true)
@@ -310,6 +320,7 @@ func _on_battle_ended(outcome: int) -> void:
 
 func _on_retry_pressed() -> void:
 	SceneManager.end_endless_run()
+	GameManager.delete_save()
 	_battle_summary.hide_summary()
 	get_tree().change_scene_to_file("res://scenes/main_menu/main_menu.tscn")
 
@@ -329,6 +340,8 @@ static func _random_enemy_pool() -> Array:
 
 
 func _on_continue_pressed() -> void:
+	# Save before advancing so the file always holds the last completed round.
+	GameManager.save_game(_unit_spawner.get_units_on_team(UnitEnums.Team.PLAYER))
 	SceneManager.advance_endless_round()
 	SceneManager.set_player_jobs(SceneManager.get_endless_player_jobs())
 	SceneManager.set_player_names(SceneManager.get_endless_player_names())

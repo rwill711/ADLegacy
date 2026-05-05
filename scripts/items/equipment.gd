@@ -148,6 +148,59 @@ func get_total_stat_modifiers() -> Dictionary:
 
 
 # =============================================================================
+# SERIALIZATION
+# =============================================================================
+
+## Serialize all equipped gear to a plain Dictionary for JSON storage.
+## Slot keys are human-readable strings so the save file is inspectable.
+## Rings are stored as a 2-element array matching the ring slot indices.
+func to_dict() -> Dictionary:
+	var slots: Dictionary = {}
+	for slot in _gear:
+		var item: ItemData = _gear[slot]
+		if item != null:
+			var key: String = _slot_name(slot)
+			if not key.is_empty():
+				slots[key] = String(item.item_name)
+	var rings_out: Array = [null, null]
+	for i in 2:
+		if _rings[i] != null:
+			rings_out[i] = String(_rings[i].item_name)
+	return {"slots": slots, "rings": rings_out}
+
+
+## Reconstruct an Equipment from a Dictionary produced by to_dict().
+## Each item is looked up by name and re-equipped via the normal API so all
+## two-handed / off-hand constraints are respected. Unknown items are skipped.
+static func from_dict(data: Dictionary) -> Equipment:
+	var eq := Equipment.new()
+	for item_name_str in data.get("slots", {}).values():
+		var item: ItemData = ItemLibrary.get_item(StringName(item_name_str))
+		if item != null:
+			eq.equip(item)
+	var rings_in: Array = data.get("rings", [null, null])
+	for i in mini(2, rings_in.size()):
+		if rings_in[i] != null:
+			var item: ItemData = ItemLibrary.get_item(StringName(rings_in[i]))
+			if item != null:
+				eq.equip_ring(item, i)
+	return eq
+
+
+static func _slot_name(slot: ItemEnums.EquipSlot) -> String:
+	match slot:
+		ItemEnums.EquipSlot.MAIN_HAND: return "main_hand"
+		ItemEnums.EquipSlot.OFF_HAND:  return "off_hand"
+		ItemEnums.EquipSlot.HELM:      return "helm"
+		ItemEnums.EquipSlot.BODY:      return "body"
+		ItemEnums.EquipSlot.BOOTS:     return "boots"
+		ItemEnums.EquipSlot.CLOAK:     return "cloak"
+		ItemEnums.EquipSlot.NECKLACE:  return "necklace"
+		ItemEnums.EquipSlot.TRINKET:   return "trinket"
+	return ""
+
+
+# =============================================================================
 # INTERNALS
 # =============================================================================
 

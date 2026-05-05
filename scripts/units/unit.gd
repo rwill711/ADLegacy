@@ -501,3 +501,69 @@ func get_castable_skills() -> Array:
 	return out
 
 
+# =============================================================================
+# SERIALIZATION
+# =============================================================================
+
+## Serialize all persistent campaign state to a plain Dictionary for JSON.
+## Derived fields (stats, skills) and per-battle counters are intentionally
+## excluded — they're either rederived on load or reset each round.
+func to_dict() -> Dictionary:
+	return {
+		"unit_id":      String(unit_id),
+		"display_name": display_name,
+		"team":         int(team),
+		"job":          String(job.job_name) if job != null else "",
+		"base_attributes": {
+			"strength":     base_attributes.strength     if base_attributes != null else 5,
+			"dexterity":    base_attributes.dexterity    if base_attributes != null else 5,
+			"constitution": base_attributes.constitution if base_attributes != null else 5,
+			"charisma":     base_attributes.charisma     if base_attributes != null else 5,
+			"luck":         base_attributes.luck         if base_attributes != null else 5,
+			"wisdom":       base_attributes.wisdom       if base_attributes != null else 5,
+		},
+		"equipment":  equipment.to_dict()  if equipment  != null else {},
+		"inventory":  inventory.to_dict()  if inventory  != null else {"items": []},
+		"progression": progression.to_dict() if progression != null else {},
+	}
+
+
+## Restore persistent state onto a unit that has already been initialize()d.
+## Call this immediately after spawning to overlay saved progression, gear,
+## and inventory over the fresh defaults that initialize() created.
+## Stats and skills are rederived at the end so everything is consistent.
+func restore_from_save(data: Dictionary) -> void:
+	# Base attributes first — equipment stat derivation depends on them.
+	if data.has("base_attributes"):
+		var a: Dictionary = data["base_attributes"]
+		if base_attributes != null:
+			base_attributes.strength     = int(a.get("strength",     base_attributes.strength))
+			base_attributes.dexterity    = int(a.get("dexterity",    base_attributes.dexterity))
+			base_attributes.constitution = int(a.get("constitution", base_attributes.constitution))
+			base_attributes.charisma     = int(a.get("charisma",     base_attributes.charisma))
+			base_attributes.luck         = int(a.get("luck",         base_attributes.luck))
+			base_attributes.wisdom       = int(a.get("wisdom",       base_attributes.wisdom))
+
+	# Equipment — replace the starter loadout with the saved one.
+	if data.has("equipment") and not data["equipment"].is_empty():
+		equipment = Equipment.from_dict(data["equipment"])
+
+	# Inventory — replace starter consumables with the saved bag.
+	if data.has("inventory"):
+		inventory = Inventory.from_dict(data["inventory"])
+
+	# Progression — replace the freshly seeded record with the saved one.
+	if data.has("progression"):
+		progression = JobProgression.from_dict(data["progression"])
+
+	# Rederive stats (attributes + equipment both settled now).
+	stats = _derive_stats_with_equipment()
+
+	# Rederive skills from the restored progression.
+	if progression != null and job != null:
+		skills = progression.skills_for_job(job.job_name)
+
+	if is_inside_tree() and _body_mesh != null:
+		_apply_visual_state()
+
+
