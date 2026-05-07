@@ -40,6 +40,12 @@ class_name SkillData extends Resource
 @export var area_size: int = 0
 
 
+## --- Accuracy ---------------------------------------------------------------
+## Base hit-chance percentage (0–100) before evasion and facing modifiers.
+## 100 = always hits barring evasion. Lower values trade accuracy for power.
+@export var base_accuracy: int = 100
+
+
 ## --- Conditions -------------------------------------------------------------
 ## If true, this skill's bonus triggers ONLY when the attacker is behind the
 ## target. Used by Backstab. Hit-from-front still legal, just no bonus.

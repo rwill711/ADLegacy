@@ -20,6 +20,7 @@ class_name UnitStats extends Resource
 @export var magic: int = 10      # Magical damage stat
 @export var resistance: int = 10 # Magical damage resistance
 @export var speed: int = 10      # Drives turn order / CTR fill rate
+@export var evasion: int = 0     # Subtracted from attacker's hit chance
 
 
 ## --- Movement stats ---------------------------------------------------------

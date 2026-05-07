@@ -54,6 +54,11 @@ const RES_CON_COEFF_DEN: int = 2   ## CON contribution denominator
 const SPD_DEX_COEFF: int = 2       ## Per point of DEX
 const SPD_LCK_COEFF: int = 1       ## Per point of LCK
 
+# --- Evasion (subtracted from attacker's hit chance) ---
+const EVA_DEX_COEFF: int = 1       ## Per point of DEX
+const EVA_LCK_COEFF_NUM: int = 1   ## LCK contribution numerator
+const EVA_LCK_COEFF_DEN: int = 2   ## LCK contribution denominator
+
 
 # =============================================================================
 # DERIVATION — from BaseAttributes to UnitStats
@@ -76,6 +81,7 @@ static func derive(attrs: BaseAttributes, move_range: int, jump: int) -> UnitSta
 	s.magic      = calc_magic(attrs.wisdom, attrs.charisma)
 	s.resistance = calc_resistance(attrs.wisdom, attrs.constitution)
 	s.speed      = calc_speed(attrs.dexterity, attrs.luck)
+	s.evasion    = calc_evasion(attrs.dexterity, attrs.luck)
 
 	s.move_range = move_range
 	s.jump       = jump
@@ -130,6 +136,12 @@ static func calc_speed(dex: int, lck: int) -> int:
 	return (dex * SPD_DEX_COEFF) + (lck * SPD_LCK_COEFF)
 
 
+## Evasion — subtracted from the attacker's base_accuracy before the hit roll.
+## DEX 9 LCK 5 → 11, DEX 5 LCK 4 → 7, DEX 3 LCK 3 → 4
+static func calc_evasion(dex: int, lck: int) -> int:
+	return (dex * EVA_DEX_COEFF) + ((lck * EVA_LCK_COEFF_NUM) / EVA_LCK_COEFF_DEN)
+
+
 # =============================================================================
 # DEBUG / UI HELPERS
 # =============================================================================
@@ -148,6 +160,7 @@ static func preview(attrs: BaseAttributes, move_range: int = 3, jump: int = 2) -
 		"magic":      calc_magic(attrs.wisdom, attrs.charisma),
 		"resistance": calc_resistance(attrs.wisdom, attrs.constitution),
 		"speed":      calc_speed(attrs.dexterity, attrs.luck),
+		"evasion":    calc_evasion(attrs.dexterity, attrs.luck),
 		"move_range": move_range,
 		"jump":       jump,
 	}
