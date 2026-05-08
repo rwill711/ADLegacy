@@ -14,7 +14,14 @@ class_name AbilityResolver
 
 const FRONT_MOD: float = 0.75
 const FLANK_MOD: float = 1.0
-const REAR_MOD: float = 1.5
+const REAR_MOD: float  = 1.5
+
+## Accuracy bonuses/penalties (percentage points) added to base_accuracy.
+const FRONT_ACC_MOD: int = -5
+const FLANK_ACC_MOD: int = 10
+const REAR_ACC_MOD: int  = 15
+const MIN_HIT_CHANCE: int = 5
+const MAX_HIT_CHANCE: int = 100
 
 
 # =============================================================================
@@ -102,6 +109,7 @@ static func _apply_one(caster: Unit, skill: SkillData, target: Unit) -> Dictiona
 		"heal": 0,
 		"was_kill": false,
 		"was_hit": true,
+		"hit_chance": 100,
 		"side": 1,
 		"buff_label": "",
 	}
@@ -140,6 +148,13 @@ static func _apply_damage(
 	var side: int = UnitEnums.attack_side(caster.coord, target.coord, target.facing)
 	effect["side"] = side
 
+	# Hit roll — miss early-exits before any stat mutation.
+	var hit_chance: int = calc_hit_chance(skill, target, side)
+	effect["hit_chance"] = hit_chance
+	if randi() % 100 >= hit_chance:
+		effect["was_hit"] = false
+		return
+
 	var facing_mod: float = _side_modifier(side)
 	var base: float = float(attack_stat) * skill.power
 
@@ -159,6 +174,19 @@ static func _apply_damage(
 # =============================================================================
 # PREDICATES / HELPERS
 # =============================================================================
+
+## Public helper used by the pre-confirm UI (Bite 3) to show hit% before
+## committing. side: 0=front, 1=flank, 2=rear.
+static func calc_hit_chance(skill: SkillData, target: Unit, side: int) -> int:
+	var facing_bonus: int
+	match side:
+		0: facing_bonus = FRONT_ACC_MOD
+		1: facing_bonus = FLANK_ACC_MOD
+		2: facing_bonus = REAR_ACC_MOD
+		_: facing_bonus = FLANK_ACC_MOD
+	var chance: int = skill.base_accuracy + facing_bonus - target.stats.evasion
+	return clampi(chance, MIN_HIT_CHANCE, MAX_HIT_CHANCE)
+
 
 static func _is_valid_hit(caster: Unit, target: Unit, skill: SkillData) -> bool:
 	var is_self: bool = (target.unit_id == caster.unit_id)

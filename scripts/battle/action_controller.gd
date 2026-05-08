@@ -19,6 +19,7 @@ class_name ActionController extends Node
 @export var heal_text_color: Color = Color(0.55, 1, 0.55)
 @export var kill_text_color: Color = Color(1, 0.9, 0.4)
 @export var buff_text_color: Color = Color(0.7, 0.85, 1)
+@export var miss_text_color: Color  = Color(0.65, 0.65, 0.65)
 
 ## AP earned per skill use and per kill. Tuning pass in Phase 10.
 const AP_PER_SKILL_USE: int = 50
@@ -552,6 +553,10 @@ func _spawn_effect_visuals(_caster: Unit, skill: SkillData, result: Dictionary) 
 		var text: String = ""
 		var color: Color = damage_text_color
 
+		if not effect.get("was_hit", true):
+			FloatingText.spawn(_world_root, "Miss", miss_text_color, anchor_pos)
+			continue
+
 		if effect["damage"] > 0:
 			text = str(effect["damage"])
 			color = damage_text_color
@@ -584,7 +589,9 @@ func _push_to_debug_log(caster: Unit, skill: SkillData, result: Dictionary) -> v
 	summary_parts.append("%s cast %s" % [caster.unit_id, skill.skill_name])
 	for effect in result["effects"]:
 		var fragment: String = ""
-		if effect["damage"] > 0:
+		if not effect.get("was_hit", true):
+			fragment = "%s MISS (%d%%)" % [effect["target_id"], effect.get("hit_chance", 100)]
+		elif effect["damage"] > 0:
 			fragment = "%s -%d%s" % [effect["target_id"], effect["damage"],
 				" KILL" if effect["was_kill"] else ""]
 		elif effect["heal"] > 0:
@@ -719,7 +726,9 @@ func _push_combat_log_skill(caster: Unit, skill: SkillData, result: Dictionary) 
 		var target := _unit_spawner.get_unit(effect["target_id"])
 		var tname: String = target.display_name if target != null else String(effect["target_id"])
 		var text: String = ""
-		if effect["damage"] > 0:
+		if not effect.get("was_hit", true):
+			text = "%s %s attacked %s but missed!" % [caster.display_name, job_str, tname]
+		elif effect["damage"] > 0:
 			if effect["was_kill"]:
 				text = "%s %s defeated %s for %d damage!" % [caster.display_name, job_str, tname, effect["damage"]]
 			else:
@@ -767,7 +776,9 @@ func _log_result(caster: Unit, skill: SkillData, result: Dictionary) -> void:
 	for effect in result["effects"]:
 		var side_label: String = ["front", "flank", "REAR"][effect["side"]]
 		var outcome := ""
-		if effect["damage"] > 0:
+		if not effect.get("was_hit", true):
+			outcome = "MISS (hit_chance=%d%%)" % effect.get("hit_chance", 100)
+		elif effect["damage"] > 0:
 			outcome = "dmg=%d%s" % [
 				effect["damage"],
 				"  KILL" if effect["was_kill"] else ""
