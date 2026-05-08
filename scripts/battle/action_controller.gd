@@ -27,7 +27,7 @@ const AP_KILL_BONUS: int = 25
 
 
 ## --- State ------------------------------------------------------------------
-enum ActionState { IDLE, SELECTING_SKILL, SELECTING_TARGET, EXECUTING }
+enum ActionState { IDLE, SELECTING_SKILL, SELECTING_TARGET, CONFIRMING, EXECUTING }
 
 var _state: ActionState = ActionState.IDLE
 var _active_unit: Unit = null
@@ -37,6 +37,8 @@ var _item_mode: bool = false          # true while targeting with an item
 var _valid_targets: Array = []   # Array[Vector2i] — tiles with alive units
 var _range_tiles: Array = []     # Array[Vector2i] — all tiles in skill range
 var _move_mode: bool = false     # true while move-preview is showing
+var _confirm_panel: AttackConfirmPanel = null
+var _pending_anchor: Vector2i = Vector2i.ZERO
 
 ## Refs set via bind()
 var _grid: BattleGrid = null
@@ -73,6 +75,11 @@ func bind(
 	_ability_bar = ability_bar
 	_world_root = world_root
 	_battle_rewards = battle_rewards
+
+	_confirm_panel = AttackConfirmPanel.new()
+	_world_root.add_child(_confirm_panel)
+	_confirm_panel.confirmed.connect(_on_attack_confirmed)
+	_confirm_panel.cancelled.connect(_on_attack_cancelled)
 
 
 func set_structure_manager(mgr) -> void:
@@ -328,7 +335,9 @@ func _spawn_item_visuals(result: Dictionary) -> void:
 
 func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 	if button_index == MOUSE_BUTTON_RIGHT:
-		if _state == ActionState.SELECTING_TARGET:
+		if _state == ActionState.CONFIRMING:
+			_on_attack_cancelled()
+		elif _state == ActionState.SELECTING_TARGET:
 			cancel_targeting()
 		elif _move_mode:
 			# Cancel move selection → restore ability bar.
@@ -347,8 +356,37 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 		return
 	if _item_mode:
 		_execute_item(coord)
+	elif _selected_skill != null and _selected_skill.is_offensive():
+		_show_confirm(coord)
 	else:
 		_execute_skill(coord)
+
+
+# =============================================================================
+# ATTACK CONFIRM
+# =============================================================================
+
+func _show_confirm(anchor: Vector2i) -> void:
+	var target: Unit = _find_unit_at(_unit_spawner.get_all_units(), anchor)
+	if target == null or _active_unit == null or _selected_skill == null:
+		_execute_skill(anchor)
+		return
+	_pending_anchor = anchor
+	_state = ActionState.CONFIRMING
+	_confirm_panel.show_confirm(_selected_skill, target, _active_unit)
+
+
+func _on_attack_confirmed() -> void:
+	_confirm_panel.hide_confirm()
+	_execute_skill(_pending_anchor)
+
+
+func _on_attack_cancelled() -> void:
+	_confirm_panel.hide_confirm()
+	_state = ActionState.SELECTING_TARGET
+	# Range tiles are still highlighted from skill selection — no re-highlight needed.
+	if _active_unit != null and _selected_skill != null:
+		_ability_bar.show_targeting(_selected_skill)
 
 
 # =============================================================================
