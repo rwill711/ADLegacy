@@ -133,8 +133,8 @@ static func _backstab() -> SkillData:
 		BACKSTAB, "Backstab",
 		SkillEnums.SkillType.PHYSICAL_DAMAGE,
 		SkillEnums.TargetType.ENEMY,
-		1, 1, 1.2, 0,
-		"Strike. Deals massive extra damage when attacking from behind."
+		1, 1, 1.0, 0,
+		"Strike from behind for massive bonus damage."
 	)
 	s.requires_rear_for_bonus = true
 	s.rear_bonus_multiplier = 2.0

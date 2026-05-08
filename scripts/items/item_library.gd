@@ -77,11 +77,37 @@ static func get_items(item_names: Array) -> Array:
 
 static func get_starter_equipment(job_name: StringName) -> Array:
 	match job_name:
+		# --- Starter jobs ---
 		JobLibrary.ROGUE:
 			return [_dagger(), _leather_vest(), _leather_boots()]
 		JobLibrary.SQUIRE:
 			return [_short_sword(), _iron_shield(), _chain_mail(), _iron_boots()]
 		JobLibrary.WHITE_MAGE:
+			return [_wooden_staff(), _cloth_robe(), _sandals()]
+		JobLibrary.DARK_MAGE:
+			return [_wooden_staff(), _cloth_robe(), _sandals()]
+		JobLibrary.ARCHER:
+			return [_dagger(), _leather_vest(), _leather_boots()]
+		# --- Advanced physical (heavy) ---
+		JobLibrary.SOLDIER:
+			return [_short_sword(), _chain_mail(), _iron_boots()]
+		JobLibrary.KNIGHT:
+			return [_short_sword(), _iron_shield(), _chain_mail(), _iron_boots()]
+		JobLibrary.PALADIN:
+			return [_short_sword(), _iron_shield(), _chain_mail(), _iron_boots()]
+		# --- Advanced physical (light) ---
+		JobLibrary.ASSASSIN:
+			return [_dagger(), _leather_vest(), _leather_boots()]
+		JobLibrary.NINJA:
+			return [_dagger(), _leather_vest(), _leather_boots()]
+		JobLibrary.SHADOW:
+			return [_dagger(), _leather_vest(), _leather_boots()]
+		# --- Advanced magic ---
+		JobLibrary.BISHOP:
+			return [_wooden_staff(), _cloth_robe(), _sandals()]
+		JobLibrary.TIME_MAGE:
+			return [_wooden_staff(), _cloth_robe(), _sandals()]
+		JobLibrary.SAGE:
 			return [_wooden_staff(), _cloth_robe(), _sandals()]
 	push_warning("ItemLibrary: no starter loadout for job '%s'" % [job_name])
 	return []
@@ -157,19 +183,19 @@ static func _cloth_hood() -> ItemData:
 
 static func _dagger() -> ItemData:
 	return ItemData.create_equipment(DAGGER, "Dagger",
-		ItemEnums.EquipSlot.MAIN_HAND, {"dexterity": 1}, {"attack": 3},
+		ItemEnums.EquipSlot.MAIN_HAND, {"dexterity": 1}, {"attack": 8},
 		[], "A short blade favored by rogues. Quick and precise.",
 		ItemEnums.Rarity.COMMON, ItemEnums.WeaponHand.ONE_HANDED)
 
 static func _short_sword() -> ItemData:
 	return ItemData.create_equipment(SHORT_SWORD, "Short Sword",
-		ItemEnums.EquipSlot.MAIN_HAND, {"strength": 1}, {"attack": 4},
+		ItemEnums.EquipSlot.MAIN_HAND, {"strength": 1}, {"attack": 8},
 		[], "A reliable sidearm. Every squire's first blade.",
 		ItemEnums.Rarity.COMMON, ItemEnums.WeaponHand.ONE_HANDED)
 
 static func _wooden_staff() -> ItemData:
 	return ItemData.create_equipment(WOODEN_STAFF, "Wooden Staff",
-		ItemEnums.EquipSlot.MAIN_HAND, {"wisdom": 1}, {"magic": 4},
+		ItemEnums.EquipSlot.MAIN_HAND, {"wisdom": 1}, {"magic": 5},
 		[], "Gnarled oak staff. Channels magic — and bonks in a pinch.",
 		ItemEnums.Rarity.COMMON, ItemEnums.WeaponHand.TWO_HANDED)
 

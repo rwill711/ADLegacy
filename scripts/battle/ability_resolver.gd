@@ -158,10 +158,11 @@ static func _apply_damage(
 	var facing_mod: float = _side_modifier(side)
 	var base: float = float(attack_stat) * skill.power
 
-	# Backstab-style "bonus only from rear" modifier stacks on top of the
-	# standard facing mod — a rear backstab with x2 rear_bonus yields
-	# 1.5 × 2.0 = 3.0x of the base stat.
+	# rear_bonus_multiplier IS the positional reward — it replaces facing_mod
+	# rather than stacking on top of it. Without this, rear_bonus × REAR_MOD
+	# = 2.0 × 1.5 = ×3.0, which made Backstab do 65 damage at base gear level.
 	if side == 2 and skill.requires_rear_for_bonus:
+		facing_mod = 1.0
 		base *= skill.rear_bonus_multiplier
 
 	var damage: int = maxi(1, int(base * facing_mod) - defense_stat)
