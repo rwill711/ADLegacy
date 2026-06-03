@@ -13,6 +13,9 @@ class_name UnitSpawner extends Node
 ## --- Config -----------------------------------------------------------------
 @export var log_spawns: bool = true
 
+const ROSTER_MAX: int = 24  ## Maximum characters in the persistent party roster.
+const SQUAD_MAX:  int = 7   ## Maximum units deployable per battle.
+
 
 ## --- State ------------------------------------------------------------------
 var _units: Array = []
@@ -107,16 +110,26 @@ func spawn_alpha_roster(
 	player_jobs: Array = [],
 	enemy_jobs: Array = [],
 	player_names: Array = [],
-	enemy_names: Array = []
+	enemy_names: Array = [],
+	extra_enemies: int = 0,
+	level_player_spawns: Array = [],
+	level_enemy_spawns: Array = []
 ) -> Array:
 	_units.clear()
 
-	var player_spawns: Array = AlphaTestMap.player_spawn_points()
-	var enemy_spawns: Array = _pick_enemy_spawn_coords(grid, 3)
+	var base_enemy_count: int = 3
+	var total_enemies: int = base_enemy_count + extra_enemies
+	var player_spawns: Array = level_player_spawns if not level_player_spawns.is_empty() \
+		else AlphaTestMap.player_spawn_points()
+	var enemy_spawns: Array = level_enemy_spawns if not level_enemy_spawns.is_empty() \
+		else _pick_enemy_spawn_coords(grid, total_enemies)
 
 	# --- Player side ---------------------------------------------------------
 	var jobs: Array = player_jobs if not player_jobs.is_empty() else PLAYER_JOB_ORDER
 	for i in jobs.size():
+		if i >= player_spawns.size():
+			push_warning("UnitSpawner: more player jobs than spawn points; capping at %d" % player_spawns.size())
+			break
 		var job_name: StringName = jobs[i]
 		var coord: Vector2i = player_spawns[i]
 		var unit := _spawn_one(
@@ -145,9 +158,20 @@ func spawn_alpha_roster(
 				if i < enemy_names.size() and enemy_names[i] != "":
 					unit.display_name = enemy_names[i]
 				_units.append(unit)
+		_auto_face_units(_units)
+		_assign_party_inventory(_units)
 		return _units
 
 	var enemy_entries: Array = _resolve_enemy_entries(enemy_loadout)
+	# Pad with default jobs when extra_enemies requires more entries than the
+	# FOIL loadout provides (e.g. DEFEAT_BOSS mode spawning +2 enemies).
+	while enemy_entries.size() < total_enemies:
+		var idx: int = enemy_entries.size() % DEFAULT_ENEMY_JOB_ORDER.size()
+		enemy_entries.append({
+			"job_name": DEFAULT_ENEMY_JOB_ORDER[idx],
+			"consumable": "",
+			"gear_hint": "",
+		})
 	var ai_hints: Dictionary = enemy_loadout.get("ai_hints", {})
 
 	for i in enemy_entries.size():
@@ -173,6 +197,7 @@ func spawn_alpha_roster(
 		_units.append(unit)
 
 	_auto_face_units(_units)
+	_assign_party_inventory(_units)
 
 	return _units
 
@@ -195,6 +220,22 @@ func get_units_on_team(team: UnitEnums.Team) -> Array:
 
 func get_all_units() -> Array:
 	return _units.duplicate()
+
+
+## Spawn a single unit and register it. Used by scene preview mode so actors
+## can be placed on the 3D map before SceneDirector runs.
+func spawn_unit(
+	job_name: StringName,
+	team:     UnitEnums.Team,
+	unit_id:  StringName,
+	coord:    Vector2i,
+	grid:     BattleGrid,
+	parent:   Node3D
+) -> Unit:
+	var unit := _spawn_one(job_name, team, unit_id, coord, grid, parent)
+	if unit != null:
+		_units.append(unit)
+	return unit
 
 
 ## Preview what the Phase 6 loadout would produce given the current FOIL
@@ -381,10 +422,25 @@ static func _pick_enemy_spawn_coords(grid: BattleGrid, count: int) -> Array:
 				candidates.append(Vector2i(x, y))
 
 	if candidates.size() < count:
-		return fallback
+		# Supplement zone candidates with fixed fallback points so extra enemies
+		# still get a spawn slot when the zone is sparse.
+		for fb in fallback:
+			if not candidates.has(fb):
+				candidates.append(fb)
+		if candidates.size() < count:
+			return candidates  # return what we have; spawner will cap at list length
 
 	candidates.shuffle()
 	return candidates.slice(0, count)
+
+
+## Give every player unit a reference to the shared party inventory so they
+## all read and consume from the same bag during battle.
+func _assign_party_inventory(units: Array) -> void:
+	var party_inv: Inventory = SceneManager.get_party_inventory()
+	for unit in units:
+		if unit != null and unit.team == UnitEnums.Team.PLAYER:
+			unit.inventory = party_inv
 
 
 static func _team_label(team: UnitEnums.Team) -> String:

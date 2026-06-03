@@ -6,6 +6,13 @@ static func all_structures() -> Array:
 	return [cabin(), watchtower(), vault()]
 
 
+static func get_structure(name: String) -> StructureData:
+	for s in all_structures():
+		if s.label.to_lower() == name.to_lower():
+			return s
+	return null
+
+
 static func random_structure(rng: RandomNumberGenerator) -> StructureData:
 	var pool := all_structures()
 	return pool[rng.randi_range(0, pool.size() - 1)]

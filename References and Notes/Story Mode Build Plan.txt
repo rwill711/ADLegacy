@@ -1,0 +1,126 @@
+Story Mode Infrastructure Build Plan
+=====================================
+Goal: Two in-game tools that lay the groundwork for story mode —
+a hand-crafted Level Editor and a Scripted Scene Planner.
+
+Design decisions locked in:
+  - Random procedural maps (MapTemplate) stay as-is for endless/practice.
+  - New deterministic LevelData format for story maps — saved as JSON per level.
+  - Both tools live in-game (accessible from the main menu); they write files to disk (user://).
+  - Scene actors are abstract slots (Actor 1, Actor 2 …) assigned roles (Hero, Villain, etc.)
+    that get cast to actual units at runtime — the same scene works with any cast.
+  - Portraits: colored silhouette placeholder until art arrives.
+
+=======================================================================
+FEATURE 1: LEVEL EDITOR
+=======================================================================
+
+LE-1  Data layer                                              [ ]
+      - scripts/world/level_data.gd
+        class LevelData: stores width, height, name,
+        per-tile array (terrain, elevation, chest_tag, structure_id),
+        player_spawn list, enemy_spawn list.
+      - scripts/world/level_library.gd
+        Static helpers: save_level(data, filename), load_level(filename),
+        list_levels() — reads/writes user://levels/*.json
+      - scripts/world/level_loader.gd
+        Converts a LevelData JSON into a BattleGrid deterministically
+        (no RNG). Replaces MapBuilder for story battles.
+
+LE-2  Level Editor UI                                         [ ]
+      - scripts/ui/level_editor/level_editor.gd  (CanvasLayer root)
+        - Grid canvas: 12×12 (or map-size) clickable/paintable cells.
+        - Left palette: terrain buttons (Grass, Forest, Mountain,
+          Stone, Water), Elevation +/−, Structure picker,
+          Chest picker (standard / elite), Spawn Zone toggles
+          (Player / Enemy / Clear).
+        - Top bar: map name field, New / Load / Save buttons.
+        - Right panel: selected-tile info readout.
+        Terrain types come from GridEnums.TerrainType so adding new
+        types only requires updating that enum — the editor reads it
+        dynamically.
+
+LE-3  Battle integration                                      [ ]
+      - main.gd: detect LevelData vs MapTemplate at load time and
+        call LevelLoader.build() instead of MapBuilder.build().
+      - SceneManager: add set_level_data() / consume_level_data()
+        (analogous to set_map_template).
+      - Main menu: "Level Editor" button → opens editor overlay.
+      - Character select / practice screen: "Load Custom Map" option.
+
+
+=======================================================================
+FEATURE 2: SCRIPTED SCENE PLANNER
+=======================================================================
+
+SP-1  Data layer                                              [ ]
+      - scripts/scenes/scene_data.gd
+        class SceneData: scene_name, map_name (which level it plays on),
+        actors[] — [{slot, role_name}],
+        steps[]  — [{type, actor_slot, params…}]
+        Step types: MOVE, FACE, DIALOGUE, WAIT, CAMERA
+      - scripts/scenes/scene_library.gd
+        save_scene(), load_scene(), list_scenes()
+        reads/writes user://scenes/*.json
+
+SP-2  Runtime Director                                        [ ]
+      - scripts/scenes/scene_director.gd
+        Executes a SceneData step by step. Caller provides a cast
+        dictionary {slot → Unit} to bind abstract actors to live units.
+        Steps handled: MOVE (uses MoveController or teleport),
+        FACE (unit.set_facing), DIALOGUE (opens DialogueBox),
+        WAIT (timer), CAMERA (CameraRig.set_focus).
+        Emits scene_finished signal when all steps complete.
+      - scripts/ui/dialogue_box.gd
+        CanvasLayer overlay: portrait placeholder (colored rect with
+        role initial), speaker name label, text body, "Next" button.
+        Typewriter effect on text reveal.
+
+SP-3  Scene Planner UI                                        [ ]
+      - scripts/ui/scene_planner/scene_planner.gd  (CanvasLayer root)
+        - Left panel: actor roster (add/remove slots, name the role).
+        - Center panel: step list (ordered), each step shows
+          type + summary (e.g. "Actor 1 → MOVE (3,5)").
+          Add / Remove / Move Up / Move Down controls.
+        - Right panel: step editor — changes based on step type:
+            MOVE: actor dropdown, to-coord grid picker
+            FACE: actor dropdown, direction buttons (N/S/E/W)
+            DIALOGUE: actor dropdown, text area
+            WAIT: duration spinner
+        - Top bar: scene name, map selector (from saved LevelData
+          and MapTemplate names), New / Load / Save buttons.
+        - Mini map preview: shows the chosen map's spawn zones
+          so you can click coords instead of typing them.
+
+SP-4  Integration                                             [ ]
+      - Battle scene: hook points for pre-battle scene, post-battle
+        scene, and mid-battle triggered scenes (on turn N, on unit
+        death, on chest looted, etc.).
+      - SceneManager: set_pre_battle_scene() / consume_pre_battle_scene()
+        so the main menu or level loader can attach a scene to a battle.
+      - Main menu: "Scene Planner" button → opens planner overlay.
+
+
+=======================================================================
+SUGGESTED BUILD ORDER
+=======================================================================
+
+Start with the data layers (LE-1 and SP-1) in parallel — they are
+pure code with no UI and unblock everything else.
+
+Then build the runtime pieces (LE-3 basic loader, SP-2 director +
+dialogue box) so the output is testable before the full editor UIs exist.
+
+Finally build the editor UIs (LE-2 and SP-3) — these are the most
+work but by then the data formats are proven.
+
+Recommended sequence (one item per session, pause for confirmation):
+  1. LE-1  LevelData + LevelLibrary + LevelLoader
+  2. LE-3  Battle scene integration (load a hand-written JSON level)
+  3. LE-2  Level Editor UI
+  4. SP-1  SceneData + SceneLibrary
+  5. SP-2  SceneDirector + DialogueBox
+  6. SP-3  Scene Planner UI
+  7. SP-4  Battle integration hooks
+
+=======================================================================

@@ -1,0 +1,49 @@
+Story Mode Build Checklist
+===========================
+
+FEATURE 1: LEVEL EDITOR
+------------------------
+[x] LE-1  Data layer
+          LevelData class, LevelLibrary (save/load user://levels/*.json),
+          LevelLoader (JSON → BattleGrid, deterministic, no RNG)
+
+[x] LE-2  Level Editor UI
+          In-game CanvasLayer editor: paintable grid, terrain/elevation/
+          structure/chest/spawn-zone tools, save/load/new bar.
+          Terrain palette reads GridEnums.TerrainType dynamically.
+
+[x] LE-3  Battle integration
+          LevelData path through SceneManager, MapBuilder bypass,
+          main menu "Level Editor" button, practice "Load Custom Map" option.
+
+
+FEATURE 2: SCRIPTED SCENE PLANNER
+-----------------------------------
+[x] SP-1  Data layer
+          SceneData class (actor slots w/ role names, typed step list),
+          SceneLibrary (save/load user://scenes/*.json)
+
+[x] SP-2  Runtime Director + Dialogue Box
+          SceneDirector executes steps (MOVE, FACE, DIALOGUE, WAIT, CAMERA).
+          DialogueBox overlay: colored silhouette portrait placeholder,
+          speaker name, typewriter text, Next button.
+
+[x] SP-3  Scene Planner UI
+          In-game CanvasLayer planner: actor roster, ordered step list,
+          step-type editor panel, mini map coord picker, save/load/new bar.
+
+[x] SP-4  Battle integration hooks
+          Pre/post/triggered scene hook points in battle scene.
+          SceneManager attach: set_pre_battle_scene / consume_pre_battle_scene.
+          Main menu "Scene Planner" button.
+
+
+BUILD ORDER
+-----------
+1. LE-1
+2. LE-3
+3. LE-2
+4. SP-1
+5. SP-2
+6. SP-3
+7. SP-4

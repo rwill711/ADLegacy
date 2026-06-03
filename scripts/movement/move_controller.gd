@@ -13,6 +13,7 @@ class_name MoveController extends Node
 
 signal move_completed
 signal move_undone
+signal chest_collected(coord: Vector2i)
 
 
 ## --- Config -----------------------------------------------------------------
@@ -271,6 +272,7 @@ func _try_collect_chest(unit: Unit, coord: Vector2i) -> void:
 		for tag in drops:
 			_battle_rewards.add_drop(tag, "chest")
 	print("[chest] %s opened at %s — got: %s" % [unit.unit_id, coord, drops])
+	chest_collected.emit(coord)
 
 
 func _animate_along_path(unit: Unit, path: Array) -> void:

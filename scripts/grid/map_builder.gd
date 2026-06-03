@@ -49,7 +49,10 @@ static func build(template: MapTemplate, intensity: float = 1.0, structure_mgr =
 # =============================================================================
 
 static func player_spawn_points() -> Array:
-	return [Vector2i(1, 10), Vector2i(2, 11), Vector2i(3, 10)]
+	return [
+		Vector2i(0,  9), Vector2i(2,  9), Vector2i(4,  9),
+		Vector2i(1, 11), Vector2i(3, 11), Vector2i(5, 11),
+	]
 
 
 static func enemy_spawn_points() -> Array:

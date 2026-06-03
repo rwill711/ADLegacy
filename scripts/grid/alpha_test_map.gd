@@ -53,9 +53,8 @@ static func build() -> BattleGrid:
 ## hardcode coordinates that drift out of sync with the map layout.
 static func player_spawn_points() -> Array:
 	return [
-		Vector2i(1, 10),
-		Vector2i(2, 11),
-		Vector2i(3, 10),
+		Vector2i(0,  9), Vector2i(2,  9), Vector2i(4,  9), Vector2i(6,  9),
+		Vector2i(1, 11), Vector2i(3, 11), Vector2i(5, 11),
 	]
 
 

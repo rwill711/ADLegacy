@@ -1,3 +1,4 @@
+class_name Constants
 ## Global constants for ADLegacy.
 
 # Grid
@@ -10,6 +11,10 @@ const MAX_ELEVATION: int = 8
 const MAX_UNITS_PER_SIDE: int = 8
 const BASE_MOVE_RANGE: int    = 3
 const BASE_ACTION_POINTS: int = 2
+
+# Unit progression — HP/MP gained per character level-up (recruit catch-up).
+const BASE_HP_GROWTH: int = 5
+const BASE_MP_GROWTH: int = 3
 
 # UI
 const UI_SCALE: float = 1.0

@@ -22,6 +22,7 @@ FOILTracker="*res://scripts/foil/foil_tracker.gd"
 DebugManager="*res://scripts/debug/debug_manager.gd"
 SceneManager="*res://scripts/core/scene_manager.gd"
 GameManager="*res://autoloads/game_manager.gd"
+StoryManager="*res://autoloads/story_manager.gd"
 
 [display]
 

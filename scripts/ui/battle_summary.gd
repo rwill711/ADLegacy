@@ -41,7 +41,8 @@ func show_summary(
 	turn_count: int,
 	units: Array,
 	rewards: BattleRewards = null,
-	endless_round: int = 0
+	endless_round: int = 0,
+	story_active: bool = false
 ) -> void:
 	_outcome_label.text = _outcome_text(outcome)
 	_outcome_label.modulate = _outcome_color(outcome)
@@ -60,7 +61,7 @@ func show_summary(
 			_enemy_stats_box.add_child(row)
 
 	_build_rewards_section(outcome, rewards)
-	_update_endless_ui(outcome, endless_round)
+	_update_endless_ui(outcome, endless_round, story_active)
 
 	_root.visible = true
 
@@ -189,7 +190,7 @@ func _build_rewards_section(outcome: TurnEnums.BattleOutcome, rewards: BattleRew
 	_root.move_child(section, _root.get_child_count() - 2)
 
 
-func _update_endless_ui(outcome: TurnEnums.BattleOutcome, endless_round: int) -> void:
+func _update_endless_ui(outcome: TurnEnums.BattleOutcome, endless_round: int, story_active: bool = false) -> void:
 	var victory: bool = outcome == TurnEnums.BattleOutcome.PLAYER_VICTORY
 
 	# Round label — sits just below the turn count.
@@ -207,17 +208,17 @@ func _update_endless_ui(outcome: TurnEnums.BattleOutcome, endless_round: int) ->
 	elif _round_label != null:
 		_round_label.visible = false
 
-	# Next Battle button — prepended to the buttons row, visible on endless victory only.
+	# Continue button — shown on endless victory (Next Battle) or story victory (Continue Story).
 	if _continue_button == null:
 		_continue_button = Button.new()
-		_continue_button.custom_minimum_size = Vector2(160, 44)
+		_continue_button.custom_minimum_size = Vector2(180, 44)
 		_continue_button.add_theme_font_size_override("font_size", 18)
-		_continue_button.text = "Next Battle →"
 		_continue_button.pressed.connect(func(): continue_pressed.emit())
 		var buttons_row: HBoxContainer = _retry_button.get_parent()
 		buttons_row.add_child(_continue_button)
 		buttons_row.move_child(_continue_button, 0)
-	_continue_button.visible = endless_round > 0 and victory
+	_continue_button.text = "Continue Story →" if story_active else "Next Battle →"
+	_continue_button.visible = (endless_round > 0 or story_active) and victory
 
 
 func _clear_box(box: VBoxContainer) -> void:

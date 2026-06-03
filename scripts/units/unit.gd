@@ -565,5 +565,3 @@ func restore_from_save(data: Dictionary) -> void:
 
 	if is_inside_tree() and _body_mesh != null:
 		_apply_visual_state()
-
-

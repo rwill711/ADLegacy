@@ -31,6 +31,9 @@ var _active_unit: Unit = null
 var _phase: TurnEnums.TurnPhase = TurnEnums.TurnPhase.TICKING
 var _outcome: TurnEnums.BattleOutcome = TurnEnums.BattleOutcome.ONGOING
 
+var _win_condition: TurnEnums.WinCondition = TurnEnums.WinCondition.DEFEAT_ALL
+var _boss_unit_id: StringName = &""
+
 ## Turn-scoped flags that reset on TURN_START.
 var _moved_this_turn: bool = false
 var _acted_this_turn: bool = false
@@ -70,6 +73,14 @@ func begin_battle(units: Array) -> void:
 
 	battle_started.emit(_units)
 	_advance_to_next_turn()
+
+
+## Set the win condition before begin_battle(). For DEFEAT_BOSS, supply the
+## unit_id of the key enemy. LOOT_ALL_CHESTS victory is triggered externally
+## via end_battle(PLAYER_VICTORY) once the condition is met in main.gd.
+func set_win_condition(condition: TurnEnums.WinCondition, boss_id: StringName = &"") -> void:
+	_win_condition = condition
+	_boss_unit_id = boss_id
 
 
 ## Ends the battle immediately with the given outcome. Debug commands call this
@@ -374,10 +385,13 @@ func _alive_units() -> Array:
 	return out
 
 
-## Check each team for at least one alive unit. Victory/defeat based on that.
+## Check each team for at least one alive unit, then apply the active win
+## condition. LOOT_ALL_CHESTS victory is handled externally — only defeat
+## is evaluated here for that mode.
 func _evaluate_outcome() -> TurnEnums.BattleOutcome:
 	var player_alive := false
 	var enemy_alive := false
+	var boss_alive := false
 	for unit in _units:
 		if unit == null or not unit.is_alive():
 			continue
@@ -385,12 +399,24 @@ func _evaluate_outcome() -> TurnEnums.BattleOutcome:
 			player_alive = true
 		elif unit.team == UnitEnums.Team.ENEMY:
 			enemy_alive = true
-	if player_alive and not enemy_alive:
-		return TurnEnums.BattleOutcome.PLAYER_VICTORY
-	if enemy_alive and not player_alive:
-		return TurnEnums.BattleOutcome.PLAYER_DEFEAT
+			if unit.unit_id == _boss_unit_id:
+				boss_alive = true
+
 	if not player_alive and not enemy_alive:
 		return TurnEnums.BattleOutcome.DRAW
+	if not player_alive:
+		return TurnEnums.BattleOutcome.PLAYER_DEFEAT
+
+	match _win_condition:
+		TurnEnums.WinCondition.DEFEAT_ALL:
+			if not enemy_alive:
+				return TurnEnums.BattleOutcome.PLAYER_VICTORY
+		TurnEnums.WinCondition.DEFEAT_BOSS:
+			if not _boss_unit_id.is_empty() and not boss_alive:
+				return TurnEnums.BattleOutcome.PLAYER_VICTORY
+		TurnEnums.WinCondition.LOOT_ALL_CHESTS:
+			pass  # victory signalled externally by main.gd
+
 	return TurnEnums.BattleOutcome.ONGOING
 
 

@@ -1,0 +1,180 @@
+SCRIPTED SCENES IN GODOT 4 — ADLegacy Reference
+=================================================
+A scripted scene is a controlled sequence: dialogue, camera moves, character
+animations, and game-state changes that play out without player input (or with
+limited input like "press A to continue").
+
+--------------------------------------------------------
+1. CORE CONCEPT — THE DIRECTOR PATTERN
+--------------------------------------------------------
+Keep all sequence logic in one "Director" node so scenes stay data-driven and
+easy to author without touching gameplay code.
+
+   ScriptedScene (Node)
+   ├── Director (Node)          ← runs the sequence
+   ├── DialogueBox (CanvasLayer)← shows text
+   ├── CameraRig (Camera2D)     ← pans / zooms
+   └── Actors (Node2D)          ← sprite / animation players
+
+The Director holds an Array of "steps" and advances through them one by one.
+
+--------------------------------------------------------
+2. STEP STRUCTURE (GDScript)
+--------------------------------------------------------
+Each step is a Dictionary with a "type" key:
+
+    var steps = [
+        { "type": "dialogue", "speaker": "Marche", "text": "We have to stop them." },
+        { "type": "move_actor", "actor": "marche", "to": Vector2(320, 200), "duration": 0.8 },
+        { "type": "play_anim", "actor": "marche", "anim": "draw_sword" },
+        { "type": "wait", "seconds": 0.5 },
+        { "type": "dialogue", "speaker": "Ritz", "text": "Then let's go." },
+        { "type": "end" },
+    ]
+
+--------------------------------------------------------
+3. THE DIRECTOR SCRIPT
+--------------------------------------------------------
+# director.gd
+extends Node
+
+signal sequence_finished
+
+@export var dialogue_box : Control
+@export var camera_rig   : Camera2D
+
+var steps      : Array = []
+var step_index : int   = 0
+var waiting_input : bool = false
+
+func start(sequence: Array) -> void:
+    steps      = sequence
+    step_index = 0
+    _run_step()
+
+func _run_step() -> void:
+    if step_index >= steps.size():
+        emit_signal("sequence_finished")
+        return
+
+    var step = steps[step_index]
+
+    match step["type"]:
+        "dialogue":
+            dialogue_box.show_line(step["speaker"], step["text"])
+            waiting_input = true          # advance on player confirm
+
+        "move_actor":
+            var actor = _get_actor(step["actor"])
+            var tween = create_tween()
+            tween.tween_property(actor, "position", step["to"], step["duration"])
+            await tween.finished
+            _advance()
+
+        "play_anim":
+            var actor = _get_actor(step["actor"])
+            actor.get_node("AnimationPlayer").play(step["anim"])
+            _advance()
+
+        "wait":
+            await get_tree().create_timer(step["seconds"]).timeout
+            _advance()
+
+        "end":
+            emit_signal("sequence_finished")
+
+func advance_dialogue() -> void:   # call this from input handler
+    if waiting_input:
+        waiting_input = false
+        _advance()
+
+func _advance() -> void:
+    step_index += 1
+    _run_step()
+
+func _get_actor(name: String) -> Node:
+    return $"../Actors".get_node(name)
+
+--------------------------------------------------------
+4. WIRING UP INPUT
+--------------------------------------------------------
+In the ScriptedScene root (or a parent that owns input during the scene):
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event.is_action_pressed("ui_accept"):
+        director.advance_dialogue()
+
+This keeps input logic separate from sequence logic.
+
+--------------------------------------------------------
+5. CAMERA STEPS
+--------------------------------------------------------
+Add a "camera_move" step type to Director:
+
+        "camera_move":
+            var tween = create_tween()
+            tween.tween_property(camera_rig, "position", step["to"], step["duration"])
+            if step.has("zoom"):
+                tween.parallel().tween_property(
+                    camera_rig, "zoom", step["zoom"], step["duration"])
+            await tween.finished
+            _advance()
+
+Example step:
+    { "type": "camera_move", "to": Vector2(400, 100), "zoom": Vector2(1.5, 1.5), "duration": 1.0 }
+
+--------------------------------------------------------
+6. HOOKING A SCRIPTED SCENE INTO THE BATTLE FLOW
+--------------------------------------------------------
+ADLegacy flow recommendation:
+
+  a) Before battle: load a ScriptedScene as a sub-scene via add_child(),
+     await its sequence_finished signal, then remove it and start the battle.
+
+  b) After battle: same pattern — add ScriptedScene child, await, remove.
+
+Example in your battle manager:
+
+    func _on_battle_start() -> void:
+        var scene = preload("res://scenes/story/chapter1_intro.tscn").instantiate()
+        add_child(scene)
+        await scene.sequence_finished
+        scene.queue_free()
+        _begin_battle_proper()
+
+This avoids a full scene change and keeps battle state intact.
+
+--------------------------------------------------------
+7. KEEPING SCENES DATA-DRIVEN (OPTIONAL UPGRADE)
+--------------------------------------------------------
+Once you have several scripted scenes, move "steps" arrays to JSON files so
+designers can edit them without touching GDScript:
+
+    # load_sequence.gd helper
+    static func from_file(path: String) -> Array:
+        var file = FileAccess.open(path, FileAccess.READ)
+        return JSON.parse_string(file.get_as_text())
+
+    # usage
+    director.start(load_sequence.from_file("res://data/story/ch1_intro.json"))
+
+JSON file format mirrors the Dictionary structure from section 2.
+
+--------------------------------------------------------
+8. QUICK CHECKLIST FOR A NEW SCRIPTED SCENE
+--------------------------------------------------------
+[ ] Create ScriptedScene .tscn with Director, DialogueBox, CameraRig, Actors
+[ ] Write your steps Array (or JSON file)
+[ ] Connect sequence_finished signal to whatever runs next
+[ ] Hook advance_dialogue() to ui_accept input
+[ ] Test: run scene in isolation with F6 before wiring into battle flow
+[ ] Sync to ADLegacy repo via robocopy as usual
+
+--------------------------------------------------------
+9. COMMON PITFALLS
+--------------------------------------------------------
+- Forgetting "await" on tweens → next step fires immediately, steps overlap
+- Calling queue_free() on an actor mid-tween → crash; always await tween first
+- Input leaking into battle after scene ends → disconnect or remove the
+  ScriptedScene node so its _unhandled_input is gone
+- Long dialogue on small DialogueBox → add auto-wrap or scroll support early

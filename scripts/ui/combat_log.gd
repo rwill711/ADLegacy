@@ -8,12 +8,14 @@ const MAX_ENTRIES: int = 80
 @onready var _log_list: VBoxContainer  = %LogList
 
 
-func push(text: String) -> void:
+func push(text: String, color: Color = Color.WHITE) -> void:
 	if _log_list == null or text.is_empty():
 		return
 	var lbl := Label.new()
 	lbl.text = text
 	lbl.add_theme_font_size_override("font_size", 13)
+	if color != Color.WHITE:
+		lbl.add_theme_color_override("font_color", color)
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE

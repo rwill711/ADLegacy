@@ -58,3 +58,11 @@ enum BattleOutcome {
 	PLAYER_DEFEAT,
 	DRAW,           # Possible if a party KOs everyone simultaneously (AOE trade).
 }
+
+
+## --- Win condition ----------------------------------------------------------
+enum WinCondition {
+	DEFEAT_ALL,       ## Kill every enemy (default).
+	DEFEAT_BOSS,      ## Kill the designated key enemy; battle starts with +2 enemies.
+	LOOT_ALL_CHESTS,  ## Loot every chest on the map, then escape to the map edge.
+}
