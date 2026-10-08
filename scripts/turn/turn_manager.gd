@@ -75,6 +75,16 @@ func begin_battle(units: Array) -> void:
 	_advance_to_next_turn()
 
 
+## Add a unit mid-battle (reinforcements). Starts at CT 0 so it doesn't
+## jump the queue on the tick it arrives.
+func register_unit(unit: Unit) -> void:
+	if unit == null or _units.has(unit):
+		return
+	_units.append(unit)
+	_ct_table[unit.unit_id] = 0
+	_emit_queue_update()
+
+
 ## Set the win condition before begin_battle(). For DEFEAT_BOSS, supply the
 ## unit_id of the key enemy. LOOT_ALL_CHESTS victory is triggered externally
 ## via end_battle(PLAYER_VICTORY) once the condition is met in main.gd.

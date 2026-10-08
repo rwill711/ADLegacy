@@ -168,6 +168,10 @@ func is_executing() -> bool:
 # UNDO MOVE
 # =============================================================================
 
+func can_undo_move() -> bool:
+	return _pre_move_coord != Vector2i(-1, -1)
+
+
 ## Teleport the unit back to where they were before their last move. Only
 ## valid while _pre_move_coord is set (i.e., the unit moved this turn).
 ## Caller must also call turn_manager.undeclare_moved().
@@ -268,6 +272,9 @@ func _try_collect_chest(unit: Unit, coord: Vector2i) -> void:
 	rng.randomize()
 	var drops: Array = LootResolver.roll(table, rng)
 	_grid.clear_chest(coord)  # clears flag and emits tile_changed → prop removed
+	# Opening a chest commits the move — otherwise Undo Move would let the
+	# player grab loot for free and still move somewhere else.
+	_pre_move_coord = Vector2i(-1, -1)
 	if _battle_rewards != null:
 		for tag in drops:
 			_battle_rewards.add_drop(tag, "chest")

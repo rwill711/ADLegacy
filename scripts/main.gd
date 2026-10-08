@@ -61,6 +61,7 @@ var _deploying: bool = false
 var _deploy_zone: Array = []         # Array[Vector2i]
 var _deploy_selected: Unit = null
 var _deploy_panel: CanvasLayer = null
+var _level_player_spawns: Array = [] # set when a hand-built level supplies spawns
 
 ## Story scene state.
 var _scene_director: SceneDirector = null
@@ -80,6 +81,7 @@ func _ready() -> void:
 		_grid = LevelLoader.build(level_data)
 		level_player_spawns = LevelLoader.player_spawn_points(level_data)
 		level_enemy_spawns  = LevelLoader.enemy_spawn_points(level_data)
+		_level_player_spawns = level_player_spawns
 	else:
 		var map_template_name: String = SceneManager.consume_map_template()
 		var map_template = _MapLibrary.get_template(map_template_name) \
@@ -881,8 +883,18 @@ func _start_deployment(units: Array) -> void:
 
 
 ## Zone: bottom 4 rows × left 7 columns, covering all 6 player spawn points.
+## Hand-built levels instead use their authored player spawns plus each
+## spawn's orthogonal neighbours, so the zone follows wherever the designer
+## put the party.
 func _compute_deploy_zone() -> Array:
 	var zone: Array = []
+	if not _level_player_spawns.is_empty():
+		for spawn in _level_player_spawns:
+			for delta in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var c: Vector2i = spawn + delta
+				if _grid.get_tile(c) != null and not zone.has(c):
+					zone.append(c)
+		return zone
 	var x_max: int = 7
 	var y_start: int = maxi(0, _grid.height - 4)
 	for y in range(y_start, _grid.height):
@@ -1143,11 +1155,9 @@ func _setup_loot_mode_chests() -> void:
 	for unit in _unit_spawner.get_all_units():
 		if unit != null:
 			reserved[unit.coord] = true
-	# Buffer the bottom-left player spawn quadrant (matches deploy zone).
-	var y_start: int = maxi(0, _grid.height - 4)
-	for y in range(y_start, _grid.height):
-		for x in range(0, 7):
-			reserved[Vector2i(x, y)] = true
+	# Buffer the player deploy zone so no chest spawns on a starting tile.
+	for coord in _compute_deploy_zone():
+		reserved[coord] = true
 	# Exclude the map border itself (that's the escape zone).
 	for x in _grid.width:
 		reserved[Vector2i(x, 0)] = true

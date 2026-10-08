@@ -81,14 +81,6 @@ func bind(
 	_confirm_panel.confirmed.connect(_on_attack_confirmed)
 	_confirm_panel.cancelled.connect(_on_attack_cancelled)
 
-
-func set_structure_manager(mgr) -> void:
-	_structure_manager = mgr
-
-
-func set_combat_log(log) -> void:
-	_combat_log = log
-
 	_turn_manager.turn_started.connect(_on_turn_started)
 	_turn_manager.turn_ended.connect(_on_turn_ended)
 	_turn_manager.battle_ended.connect(_on_battle_ended)
@@ -98,6 +90,14 @@ func set_combat_log(log) -> void:
 	_ability_bar.move_requested.connect(_on_move_requested)
 	_ability_bar.undo_move_requested.connect(_on_undo_move_requested)
 	_move_controller.move_completed.connect(_on_move_completed)
+
+
+func set_structure_manager(mgr) -> void:
+	_structure_manager = mgr
+
+
+func set_combat_log(log) -> void:
+	_combat_log = log
 
 
 # =============================================================================
@@ -141,10 +141,18 @@ func cancel_targeting() -> void:
 	_item_mode = false
 	_selected_item = null
 	_state = ActionState.SELECTING_SKILL
-	if _active_unit != null and _active_unit.team == UnitEnums.Team.PLAYER:
-		var can_move: bool = not _turn_manager.has_moved()
-		var can_undo: bool = _turn_manager.has_moved() and not _turn_manager.has_acted()
-		_ability_bar.show_for_unit(_active_unit, can_move, can_undo, true, _at_approach(_active_unit))
+	_restore_menu()
+
+
+## Re-show the ability bar with buttons derived from the turn's real
+## move/act state, so a cancel can never re-enable a spent action.
+func _restore_menu() -> void:
+	if _active_unit == null or _active_unit.team != UnitEnums.Team.PLAYER:
+		return
+	var moved: bool = _turn_manager.has_moved()
+	var acted: bool = _turn_manager.has_acted()
+	var can_undo: bool = moved and not acted and _move_controller.can_undo_move()
+	_ability_bar.show_for_unit(_active_unit, not moved, can_undo, not acted, _at_approach(_active_unit))
 
 
 # =============================================================================
@@ -205,16 +213,15 @@ func _on_move_completed() -> void:
 	if not _active_unit.is_alive():
 		return
 	# Unit just moved. Show skill buttons + Undo Move (if they haven't acted).
-	var can_undo: bool = not _turn_manager.has_acted()
-	_ability_bar.show_for_unit(_active_unit, false, can_undo, not _turn_manager.has_acted(), _at_approach(_active_unit))
+	_restore_menu()
 	_state = ActionState.SELECTING_SKILL
 
 
 func _on_undo_move_requested() -> void:
-	if _active_unit == null:
+	if _active_unit == null or _turn_manager.has_acted():
 		return
 	_move_controller.undo_move()
-	_ability_bar.show_for_unit(_active_unit, true, false, not _turn_manager.has_acted(), _at_approach(_active_unit))
+	_restore_menu()
 	_state = ActionState.SELECTING_SKILL
 
 
@@ -344,9 +351,7 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 			_move_mode = false
 			_move_controller.hide_preview()
 			_state = ActionState.SELECTING_SKILL
-			if _active_unit != null and _active_unit.team == UnitEnums.Team.PLAYER:
-				var can_undo: bool = _turn_manager.has_moved() and not _turn_manager.has_acted()
-				_ability_bar.show_for_unit(_active_unit, not _turn_manager.has_moved(), can_undo)
+			_restore_menu()
 		return
 	if button_index != MOUSE_BUTTON_LEFT:
 		return
@@ -496,7 +501,10 @@ static func _score_enemy_target(
 	elif skill.skill_type == SkillEnums.SkillType.HEALING:
 		if UnitEnums.teams_are_hostile(unit.team, target.team):
 			return -1
-		base_score = 60 + (target.stats.max_hp - target.stats.hp)
+		var hp_missing: int = target.stats.max_hp - target.stats.hp
+		if hp_missing <= 0:
+			return -1  # don't burn MP and the action healing a full-HP ally
+		base_score = 60 + hp_missing
 	elif skill.skill_type == SkillEnums.SkillType.BUFF:
 		base_score = 20
 	else:

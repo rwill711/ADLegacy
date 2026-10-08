@@ -238,6 +238,36 @@ func spawn_unit(
 	return unit
 
 
+## Spawn a reinforcement wave into the enemy zone. Jobs are drawn at random
+## from `job_pool`. Returns only the units that actually spawned — the zone
+## may be too crowded to fit the whole wave.
+func spawn_enemy_wave(
+	grid: BattleGrid,
+	parent: Node3D,
+	job_pool: Array,
+	wave_size: int,
+	wave_index: int
+) -> Array:
+	var spawned: Array = []
+	if job_pool.is_empty() or wave_size <= 0:
+		return spawned
+	var coords: Array = _pick_enemy_spawn_coords(grid, wave_size)
+	var player_centroid := _centroid_of_team(_units, UnitEnums.Team.PLAYER)
+	for i in coords.size():
+		var job_name: StringName = StringName(job_pool.pick_random())
+		var unit := _spawn_one(
+			job_name, UnitEnums.Team.ENEMY,
+			"reinf_%d_%d_%s" % [wave_index, i, job_name], coords[i],
+			grid, parent
+		)
+		if unit == null:
+			continue
+		unit.face_toward(player_centroid)
+		_units.append(unit)
+		spawned.append(unit)
+	return spawned
+
+
 ## Preview what the Phase 6 loadout would produce given the current FOIL
 ## state. Used by the debug overlay's FOIL tab.
 static func default_base_enemy_pool() -> Array:
