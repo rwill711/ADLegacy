@@ -13,7 +13,7 @@ config_version=5
 config/name="Adventure Legacy"
 config/description="A 2.5D tactics game inspired by Final Fantasy Tactics Advance. Features the FOIL adaptive-CPU system."
 run/main_scene="res://scenes/main_menu/main_menu.tscn"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]

@@ -121,6 +121,7 @@ static func _apply_revive(item: ItemData, target: Unit, effect: Dictionary) -> b
 		t.set_ease(Tween.EASE_OUT)
 		t.set_trans(Tween.TRANS_CUBIC)
 		t.tween_property(target._body_mesh, "rotation_degrees:z", 0.0, 0.3)
+	target.play_revive()
 	effect["heal"] = revive_hp
 	effect["revived"] = true
 	effect["message"] = "Revived with %d HP" % revive_hp

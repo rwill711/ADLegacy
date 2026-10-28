@@ -109,6 +109,8 @@ static func get_starter_equipment(job_name: StringName) -> Array:
 			return [_wooden_staff(), _cloth_robe(), _sandals()]
 		JobLibrary.SAGE:
 			return [_wooden_staff(), _cloth_robe(), _sandals()]
+	if JobLibrary.is_monster(job_name):
+		return []  # monsters fight with claws and teeth
 	push_warning("ItemLibrary: no starter loadout for job '%s'" % [job_name])
 	return []
 

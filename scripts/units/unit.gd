@@ -72,6 +72,18 @@ var _hp_bar_mat: StandardMaterial3D = null
 const _HP_BAR_WIDTH: float = 0.55
 const _HP_BAR_HEIGHT: float = 0.07
 
+## Sprite visuals (used when the job has art; capsule is the fallback).
+## Global size knob for all unit sprites (1.0 = per-character pixel_size).
+const SPRITE_SCALE: float = 1.2
+var _capsule: CapsuleMesh = null
+var _sprite: AnimatedSprite3D = null
+var _sprite_key: String = ""
+var _current_anim: String = ""
+var _team_ring_mat: StandardMaterial3D = null
+var _last_world_pos: Vector3 = Vector3.INF
+var _still_time: float = 0.0
+var _flash_tween: Tween = null
+
 
 # =============================================================================
 # LIFECYCLE
@@ -172,6 +184,7 @@ func change_job(new_job_name: StringName) -> bool:
 
 	if is_inside_tree() and _body_mesh != null:
 		_apply_tint()
+		_refresh_sprite()
 
 	return true
 
@@ -257,6 +270,7 @@ func _build_visuals() -> void:
 	var capsule := CapsuleMesh.new()
 	capsule.radius = 0.3
 	capsule.height = 1.1
+	_capsule = capsule
 	_body_mesh.mesh = capsule
 	# Lift so the capsule's base sits on the tile's top surface.
 	_body_mesh.position = Vector3(0, capsule.height * 0.5, 0)
@@ -298,6 +312,10 @@ func _build_visuals() -> void:
 	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	bg_mat.no_depth_test = true
+	# Transparent pass + priorities: draw over tile highlights and sprites,
+	# and always draw the fill on top of the background.
+	bg_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bg_mat.render_priority = 3
 	bg.material_override = bg_mat
 	bg.position = Vector3(0, bar_y, 0)
 	_body_mesh.add_child(bg)
@@ -312,6 +330,8 @@ func _build_visuals() -> void:
 	_hp_bar_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_hp_bar_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	_hp_bar_mat.no_depth_test = true
+	_hp_bar_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_hp_bar_mat.render_priority = 4
 	_hp_bar_fg.material_override = _hp_bar_mat
 	_hp_bar_fg.position = Vector3(0, bar_y, 0.002)
 	_body_mesh.add_child(_hp_bar_fg)
@@ -327,8 +347,185 @@ func _build_visuals() -> void:
 	label.modulate = Color(1, 1, 1, 0.95)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
+	label.render_priority = 5
+	label.outline_render_priority = 4
 	label.position = Vector3(0, capsule.height + 0.25, 0)
 	_body_mesh.add_child(label)
+
+	# Team ring on the ground — heroes and enemies share sprite art, so this
+	# is how you tell friend from foe at a glance.
+	var ring := MeshInstance3D.new()
+	ring.name = "TeamRing"
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.30
+	torus.outer_radius = 0.40
+	torus.rings = 32
+	ring.mesh = torus
+	ring.scale = Vector3(1.0, 0.15, 1.0)
+	ring.position = Vector3(0, 0.03, 0)
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_team_ring_mat = StandardMaterial3D.new()
+	_team_ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_team_ring_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_team_ring_mat.render_priority = 1
+	ring.material_override = _team_ring_mat
+	add_child(ring)
+
+	# Animated billboard sprite. Child of the unit (not the body) so the old
+	# body-rotation tweens (defeat / revive) don't tip it over.
+	_sprite = AnimatedSprite3D.new()
+	_sprite.name = "Sprite"
+	_sprite.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	# Opaque prepass keeps depth-correct overlap with trees/other units; the
+	# raised priority draws it after the tile highlight overlay (which has no
+	# depth test) so highlights don't tint units standing on them.
+	_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS
+	_sprite.render_priority = 2
+	_sprite.shaded = false
+	_sprite.double_sided = true
+	_sprite.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_sprite.visible = false
+	_sprite.animation_finished.connect(_on_sprite_anim_finished)
+	add_child(_sprite)
+
+
+## Swap between sprite art and the capsule placeholder based on the job.
+## Safe to call repeatedly; only rebuilds when the sprite key changes.
+func _refresh_sprite() -> void:
+	if _sprite == null:
+		return
+	var key: String = UnitSpriteLibrary.key_for(job.job_name, unit_id) if job != null else ""
+	if key == _sprite_key:
+		return
+	_sprite_key = key
+	var frames: SpriteFrames = UnitSpriteLibrary.get_frames(key) if key != "" else null
+	var use_sprite: bool = frames != null
+	_sprite.visible = use_sprite
+	_body_mesh.mesh = null if use_sprite else _capsule
+	if _facing_arrow != null:
+		# Flat ground marker in front of the unit instead of a chest arrow.
+		# Rotating -90 on X lays the prism down with its tip pointing forward.
+		if use_sprite:
+			_facing_arrow.position = Vector3(0, 0.05, -0.5)
+			_facing_arrow.rotation_degrees = Vector3(-90, 0, 0)
+			_facing_arrow.scale = Vector3(0.9, 0.9, 0.12)
+		else:
+			_facing_arrow.position = Vector3(0, _capsule.height * 0.6, -(_capsule.radius + 0.15))
+			_facing_arrow.rotation_degrees = Vector3.ZERO
+			_facing_arrow.scale = Vector3.ONE
+
+	var top: float = _capsule.height
+	if use_sprite:
+		var d: Dictionary = UnitSpriteLibrary.info(key)
+		_sprite.sprite_frames = frames
+		_sprite.pixel_size = float(d["pixel_size"]) * SPRITE_SCALE
+		top = float(d["h"]) * _sprite.pixel_size
+		_current_anim = ""
+		if is_alive() or stats == null:
+			play_anim("idle")
+		else:
+			play_anim("death")
+			_sprite.frame = _sprite.sprite_frames.get_frame_count(_sprite.animation) - 1
+		_update_sprite_flip()
+
+	# Keep HP bar + job letter just above the art.
+	var bar_y: float = top + 0.12
+	for n in ["HPBarBG", "HPBarFG"]:
+		var bar := _body_mesh.get_node_or_null(n) as Node3D
+		if bar != null:
+			bar.position.y = bar_y
+	var job_label := _body_mesh.get_node_or_null("JobLabel") as Node3D
+	if job_label != null:
+		job_label.position.y = bar_y + (0.22 if use_sprite else -0.2)
+
+
+# =============================================================================
+# SPRITE ANIMATION
+# =============================================================================
+
+## Play a named animation ("idle", "walk", "attack", "attack2", "cast",
+## "hit", "death"). Missing ones fall back sensibly (cast -> attack, ...).
+func play_anim(anim: String) -> void:
+	if _sprite == null or not _sprite.visible or _sprite_key == "":
+		return
+	var real: String = UnitSpriteLibrary.resolve_anim(_sprite_key, anim)
+	_current_anim = anim
+	_sprite.play(StringName(real))
+
+
+## Pick the right swing / spell animation for a skill.
+func play_action_anim(skill: SkillData) -> void:
+	var anim: String = "attack"
+	if skill != null:
+		match skill.skill_type:
+			SkillEnums.SkillType.MAGIC_DAMAGE, SkillEnums.SkillType.HEALING, \
+			SkillEnums.SkillType.BUFF, SkillEnums.SkillType.DEBUFF:
+				anim = "cast"
+			SkillEnums.SkillType.PHYSICAL_DAMAGE:
+				anim = "attack" if skill.skill_name == &"basic_attack" else "attack2"
+	play_anim(anim)
+
+
+## Bring a defeated unit's sprite back up (used by revive items).
+func play_revive() -> void:
+	if _body_mesh != null:
+		_body_mesh.rotation_degrees.z = 0.0
+	play_anim("idle")
+
+
+func _on_sprite_anim_finished() -> void:
+	if not is_alive():
+		return  # hold the last death frame
+	play_anim("idle")
+
+
+func _process(delta: float) -> void:
+	if _sprite == null or not _sprite.visible:
+		return
+	_update_sprite_flip()
+
+	# Walk while the move tween is carrying us between tiles.
+	var pos: Vector3 = global_position
+	var moved: bool = _last_world_pos != Vector3.INF \
+		and pos.distance_squared_to(_last_world_pos) > 0.000001
+	_last_world_pos = pos
+	if moved:
+		_still_time = 0.0
+		if _current_anim == "idle" and is_alive():
+			play_anim("walk")
+	else:
+		_still_time += delta
+		if _current_anim == "walk" and _still_time > 0.08:
+			play_anim("idle")
+
+
+## Art faces right; mirror it when the unit faces screen-left.
+func _update_sprite_flip() -> void:
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if cam == null:
+		return
+	var forward: Vector3 = -global_transform.basis.z
+	var cam_right: Vector3 = cam.global_transform.basis.x
+	var dot: float = forward.dot(cam_right)
+	if absf(dot) > 0.05:
+		_sprite.flip_h = dot < 0.0
+	var d: Dictionary = UnitSpriteLibrary.info(_sprite_key)
+	if d.is_empty():
+		return
+	# Keep the feet anchor on the tile center whichever way we face.
+	var dx: float = float(d["w"]) * 0.5 - float(d["anchor_x"])
+	_sprite.offset = Vector2(-dx if _sprite.flip_h else dx, float(d["h"]) * 0.5)
+
+
+func _flash_hit() -> void:
+	if _sprite == null or not _sprite.visible:
+		return
+	if _flash_tween != null and _flash_tween.is_valid():
+		_flash_tween.kill()
+	_sprite.modulate = Color(1.0, 0.45, 0.45)
+	_flash_tween = create_tween()
+	_flash_tween.tween_property(_sprite, "modulate", Color.WHITE, 0.3)
 
 
 func _apply_visual_state() -> void:
@@ -337,6 +534,7 @@ func _apply_visual_state() -> void:
 	# place_on_tile() for the correct world y. This method just handles facing
 	# and tint; position is set externally.
 	_apply_tint()
+	_refresh_sprite()
 	_update_hp_bar()
 	rotation.y = UnitEnums.facing_to_y_rotation(facing)
 	var job_label := _body_mesh.get_node_or_null("JobLabel") as Label3D
@@ -364,6 +562,9 @@ func _update_hp_bar() -> void:
 func _on_defeated_visual() -> void:
 	if _body_mesh == null:
 		return
+	if _sprite != null and _sprite.visible:
+		play_anim("death")
+		return
 	var t := create_tween()
 	t.set_ease(Tween.EASE_OUT)
 	t.set_trans(Tween.TRANS_CUBIC)
@@ -378,6 +579,10 @@ func _apply_tint() -> void:
 	var base := UnitEnums.team_color(team)
 	var job_color := Color.WHITE if job == null else job.job_color
 	_body_material.albedo_color = base.lerp(job_color, 0.35)
+	if _team_ring_mat != null:
+		var ring_color := base
+		ring_color.a = 0.85
+		_team_ring_mat.albedo_color = ring_color
 
 
 # =============================================================================
@@ -438,9 +643,13 @@ func take_damage(amount: int) -> int:
 	var lost := stats.take_damage(amount)
 	total_damage_taken += lost
 	hp_changed.emit(stats.hp, stats.max_hp)
+	if lost > 0:
+		_flash_hit()
 	if not stats.is_alive():
 		set_state(UnitEnums.UnitState.DEFEATED)
 		defeated.emit()
+	elif lost > 0:
+		play_anim("hit")
 	return lost
 
 

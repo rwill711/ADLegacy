@@ -50,6 +50,8 @@ func _ready() -> void:
 	_job_names.append(&"")
 	for job in JobLibrary.all_alpha_jobs():
 		_job_names.append(job.job_name)
+	# Monsters go last so player dropdowns (which skip them) keep the same indices.
+	_job_names.append_array(JobLibrary.monster_job_names())
 
 	# First 3 slots default to the starter trio; remaining slots start empty.
 	var player_defaults: Array = [&"rogue", &"squire", &"white_mage", &"", &"", &"", &""]
@@ -100,6 +102,8 @@ func _add_slot(col: VBoxContainer, label_text: String, default_job: StringName, 
 	opt.add_theme_font_size_override("font_size", 14)
 	for idx in _job_names.size():
 		var job_name: StringName = _job_names[idx]
+		if show_name and JobLibrary.is_monster(job_name):
+			continue  # monsters are enemy-only
 		if job_name == &"":
 			opt.add_item(EMPTY_LABEL)
 		else:

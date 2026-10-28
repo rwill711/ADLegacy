@@ -45,6 +45,15 @@ const PALADIN     := &"paladin"
 const SHADOW      := &"shadow"
 const SAGE        := &"sage"
 
+## Monsters — enemy-only jobs. Not in all_job_names() / all_alpha_jobs(), so
+## they never show up as player picks or in job progression.
+const SLIME       := &"slime"
+const PANTHER     := &"panther"
+const DRAGON      := &"dragon"
+const WEREWOLF    := &"werewolf"
+const WOLF        := &"wolf"
+const ZOMBIE      := &"zombie"
+
 
 ## --- Lookup -----------------------------------------------------------------
 static func get_job(job_name: StringName) -> JobData:
@@ -63,6 +72,12 @@ static func get_job(job_name: StringName) -> JobData:
 		PALADIN:    return _paladin()
 		SHADOW:     return _shadow()
 		SAGE:       return _sage()
+		SLIME:      return _slime()
+		PANTHER:    return _panther()
+		DRAGON:     return _dragon()
+		WEREWOLF:   return _werewolf()
+		WOLF:       return _wolf()
+		ZOMBIE:     return _zombie()
 	push_warning("JobLibrary: unknown job '%s'" % [job_name])
 	return null
 
@@ -73,6 +88,19 @@ static func all_alpha_jobs() -> Array:
 		_soldier(), _knight(), _assassin(), _ninja(), _bishop(), _time_mage(),
 		_paladin(), _shadow(), _sage(),
 	]
+
+
+## Enemy-only monster jobs.
+static func all_monster_jobs() -> Array:
+	return [_slime(), _panther(), _dragon(), _werewolf(), _wolf(), _zombie()]
+
+
+static func monster_job_names() -> Array:
+	return [SLIME, PANTHER, DRAGON, WEREWOLF, WOLF, ZOMBIE]
+
+
+static func is_monster(job_name: StringName) -> bool:
+	return monster_job_names().has(job_name)
 
 
 ## All job StringNames in the registry. Add new jobs here as they land.
@@ -91,7 +119,7 @@ static func all_job_names() -> Array:
 ## Add advanced job entries here as each Bite lands (Bites 3+).
 static func get_job_prerequisites(job_name: StringName) -> Array:
 	match job_name:
-		ROGUE, SQUIRE, WHITE_MAGE, DARK_MAGE, ARCHER:
+		ROGUE, SQUIRE, WHITE_MAGE, DARK_MAGE, ARCHER, SLIME, PANTHER, DRAGON, WEREWOLF, WOLF, ZOMBIE:
 			return []
 		SOLDIER:
 			return [{job = SQUIRE, ap_needed = 1500}]
@@ -441,4 +469,71 @@ static func _sage() -> JobData:
 		[SkillLibrary.STAFF_BONK, SkillLibrary.FLARE, SkillLibrary.FULL_CURE],
 		Color(0.6, 0.3, 0.9),   # deep violet — ancient arcane mastery
 		"Master mage. Highest MAG in the game; nukes groups with Flare or heals with Full Cure."
+	)
+
+
+# =============================================================================
+# MONSTERS (enemy-only)
+# =============================================================================
+## Attribute arrays still follow the 30-point standard so StatFormulas keeps
+## them in the same power band as the human jobs. Skills reuse existing ones.
+
+static func _slime() -> JobData:
+	#              STR  DEX  CON  CHA  LCK  WIS  = 30
+	var attrs := BaseAttributes.create(3, 3, 9, 3, 6, 6)
+	return JobData.create(
+		SLIME, "Slime", attrs, 3, 1,
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.STONE_THROW],
+		Color(0.4, 0.85, 0.4),
+		"Squishy blob. Soaks hits and spits goo from range."
+	)
+
+
+static func _panther() -> JobData:
+	var attrs := BaseAttributes.create(6, 9, 3, 2, 7, 3)
+	return JobData.create(
+		PANTHER, "Panther", attrs, 5, 3,
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.BACKSTAB, SkillLibrary.SHADOW_STRIKE],
+		Color(0.25, 0.22, 0.35),
+		"Fast flanker. Pounces on exposed backs."
+	)
+
+
+static func _dragon() -> JobData:
+	var attrs := BaseAttributes.create(9, 3, 9, 2, 2, 5)
+	return JobData.create(
+		DRAGON, "Dragon", attrs, 3, 2,
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.CLEAVE, SkillLibrary.METEOR],
+		Color(0.35, 0.6, 0.3),
+		"Huge and tough. Tail sweeps and fire breath."
+	)
+
+
+static func _werewolf() -> JobData:
+	var attrs := BaseAttributes.create(9, 6, 7, 2, 4, 2)
+	return JobData.create(
+		WEREWOLF, "Werewolf", attrs, 4, 3,
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.POWER_STRIKE, SkillLibrary.CLEAVE],
+		Color(0.55, 0.35, 0.2),
+		"Brutal melee bruiser."
+	)
+
+
+static func _wolf() -> JobData:
+	var attrs := BaseAttributes.create(5, 8, 4, 3, 7, 3)
+	return JobData.create(
+		WOLF, "Wolf", attrs, 5, 2,
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.BACKSTAB],
+		Color(0.6, 0.6, 0.6),
+		"Quick pack hunter."
+	)
+
+
+static func _zombie() -> JobData:
+	var attrs := BaseAttributes.create(6, 2, 9, 2, 3, 8)
+	return JobData.create(
+		ZOMBIE, "Zombie", attrs, 3, 1,
+		[SkillLibrary.BASIC_ATTACK, SkillLibrary.DARK_ORB, SkillLibrary.CURSE],
+		Color(0.5, 0.65, 0.4),
+		"Slow and durable. Lobs necrotic magic."
 	)

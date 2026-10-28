@@ -410,7 +410,7 @@ static func _win_condition_for_endless_round(round_number: int) -> TurnEnums.Win
 
 
 static func _random_enemy_pool() -> Array:
-	var all_jobs: Array = JobLibrary.all_alpha_jobs()
+	var all_jobs: Array = JobLibrary.all_alpha_jobs() + JobLibrary.all_monster_jobs()
 	all_jobs.shuffle()
 	var pool: Array = []
 	for i in mini(3, all_jobs.size()):
@@ -533,7 +533,7 @@ func _setup_reinforcements() -> void:
 	var round: int = SceneManager.get_endless_round()
 	if round < 3:
 		return
-	var jobs: Array = JobLibrary.all_alpha_jobs().map(func(j): return j.job_name)
+	var jobs: Array = JobLibrary.all_alpha_jobs().map(func(j): return j.job_name) + JobLibrary.monster_job_names()
 	if jobs.is_empty():
 		return
 	_reinf_schedule = {

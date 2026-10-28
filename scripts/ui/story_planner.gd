@@ -36,6 +36,8 @@ func _ready() -> void:
 	_job_names.append(&"")
 	for job in JobLibrary.all_alpha_jobs():
 		_job_names.append(job.job_name)
+	# Monsters go last so player dropdowns (which skip them) keep the same indices.
+	_job_names.append_array(JobLibrary.monster_job_names())
 	_refresh_asset_lists()
 	_build_ui()
 
@@ -527,6 +529,8 @@ func _build_mission_editor(act: Dictionary) -> void:
 		popt.add_theme_font_size_override("font_size", 13)
 		for j in _job_names.size():
 			var jname: StringName = _job_names[j]
+			if JobLibrary.is_monster(jname):
+				continue  # monsters are enemy-only
 			if jname == &"":
 				popt.add_item(EMPTY_LABEL)
 			else:

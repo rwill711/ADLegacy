@@ -91,12 +91,25 @@ func _build_tile_node(tile: GridTile) -> void:
 
 	add_child(mesh_instance)
 
+	# --- Textured top face (the box itself only shows side color) ---
+	var top_mat: Material = EnvironmentArt.ground_material(tile.terrain, tile.coord)
+	if top_mat != null:
+		var top := MeshInstance3D.new()
+		top.name = "Top"
+		var top_quad := QuadMesh.new()
+		top_quad.size = Vector2(size_xy, size_xy)
+		top.mesh = top_quad
+		top.rotation_degrees = Vector3(-90, 0, 0)
+		top.position = Vector3(0, size_y * 0.5 + 0.002, 0)
+		top.material_override = top_mat
+		mesh_instance.add_child(top)
+
 	# --- Terrain prop (tree or rock sits on top of tile) ---
-	_add_terrain_prop(mesh_instance, tile.terrain, size_y)
+	_add_terrain_prop(mesh_instance, tile, size_y)
 
 	# --- Chest prop ---
 	if not tile.chest_loot_tag.is_empty():
-		_add_chest_prop(mesh_instance, size_y)
+		_add_chest_prop(mesh_instance, size_y, tile.chest_loot_tag)
 
 	# --- Structure wall prop ---
 	if tile.structure_id != &"":
@@ -175,55 +188,25 @@ func _on_occupancy_changed(_coord: Vector2i) -> void:
 
 
 # =============================================================================
-# TERRAIN PROPS (tree / rock meshes on top of tiles)
+# TERRAIN PROPS (tree / rock sprites on top of tiles)
 # =============================================================================
 
 func _add_terrain_prop(
 	parent: MeshInstance3D,
-	terrain: GridEnums.TerrainType,
+	tile: GridTile,
 	size_y: float
 ) -> void:
-	match terrain:
+	var prop: Node3D = null
+	match tile.terrain:
 		GridEnums.TerrainType.FOREST:
-			# Trunk
-			var trunk := MeshInstance3D.new()
-			var cyl := CylinderMesh.new()
-			cyl.top_radius = 0.05
-			cyl.bottom_radius = 0.09
-			cyl.height = 0.35
-			trunk.mesh = cyl
-			trunk.position = Vector3(0, size_y * 0.5 + 0.175, 0)
-			var trunk_mat := StandardMaterial3D.new()
-			trunk_mat.albedo_color = Color(0.42, 0.28, 0.14)
-			trunk_mat.roughness = 1.0
-			trunk.material_override = trunk_mat
-			parent.add_child(trunk)
-			# Canopy
-			var canopy := MeshInstance3D.new()
-			var sph := SphereMesh.new()
-			sph.radius = 0.3
-			sph.height = 0.55
-			canopy.mesh = sph
-			canopy.position = Vector3(0, size_y * 0.5 + 0.62, 0)
-			var canopy_mat := StandardMaterial3D.new()
-			canopy_mat.albedo_color = Color(0.12, 0.52, 0.14)
-			canopy_mat.roughness = 0.95
-			canopy.material_override = canopy_mat
-			parent.add_child(canopy)
-
+			prop = EnvironmentArt.make_tree(tile.coord)
 		GridEnums.TerrainType.MOUNTAIN:
-			var rock := MeshInstance3D.new()
-			var sph := SphereMesh.new()
-			sph.radius = 0.28
-			sph.height = 0.38
-			rock.mesh = sph
-			rock.scale = Vector3(1.1, 0.8, 0.95)
-			rock.position = Vector3(0.05, size_y * 0.5 + 0.16, -0.05)
-			var rock_mat := StandardMaterial3D.new()
-			rock_mat.albedo_color = Color(0.55, 0.52, 0.48)
-			rock_mat.roughness = 1.0
-			rock.material_override = rock_mat
-			parent.add_child(rock)
+			prop = EnvironmentArt.make_rock(tile.coord)
+	if prop == null:
+		return
+	prop.name = "Prop"
+	prop.position = Vector3(0, size_y * 0.5, 0)
+	parent.add_child(prop)
 
 
 ## Stone wall block rising from the tile, with an arch cut-out on the entrance.
@@ -284,32 +267,29 @@ func _add_structure_prop(parent: MeshInstance3D, size_y: float, is_entrance: boo
 		marker.material_override = mmat
 		parent.add_child(marker)
 
+		# Wall torches flanking the doorway, on both faces, plus a warm light.
+		var torch_y: float = size_y * 0.5 + arch_h * 0.55
+		for side in [-1, 1]:
+			for face in [-1, 1]:
+				var torch := EnvironmentArt.make_torch()
+				torch.position = Vector3(side * (gap * 0.5 + pillar_w * 0.5),
+					torch_y, face * (tile_size * 0.5 + 0.04))
+				parent.add_child(torch)
+		var glow := OmniLight3D.new()
+		glow.light_color = Color(1.0, 0.65, 0.3)
+		glow.light_energy = 1.2
+		glow.omni_range = 2.5
+		glow.shadow_enabled = false
+		glow.position = Vector3(0.0, torch_y, 0.0)
+		parent.add_child(glow)
 
 
-func _add_chest_prop(parent: MeshInstance3D, size_y: float) -> void:
-	var chest := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(0.38, 0.28, 0.30)
-	chest.mesh = box
-	chest.position = Vector3(0.0, size_y * 0.5 + 0.14, 0.0)
 
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.45, 0.25, 0.08)  # brown
-	mat.roughness = 0.85
-	chest.material_override = mat
+func _add_chest_prop(parent: MeshInstance3D, size_y: float, loot_tag: String = "") -> void:
+	var chest := EnvironmentArt.make_chest(loot_tag)
+	chest.name = "Chest"
+	chest.position = Vector3(0.0, size_y * 0.5, 0.0)
 	parent.add_child(chest)
-
-	# Thin gold band across the lid
-	var band := MeshInstance3D.new()
-	var band_box := BoxMesh.new()
-	band_box.size = Vector3(0.40, 0.035, 0.32)
-	band.mesh = band_box
-	band.position = Vector3(0.0, size_y * 0.5 + 0.255, 0.0)
-	var band_mat := StandardMaterial3D.new()
-	band_mat.albedo_color = Color(0.85, 0.68, 0.15)
-	band_mat.roughness = 0.4
-	band.material_override = band_mat
-	parent.add_child(band)
 
 
 # =============================================================================
@@ -336,7 +316,7 @@ func _get_terrain_material(terrain: GridEnums.TerrainType) -> StandardMaterial3D
 	if _material_cache.has(terrain):
 		return _material_cache[terrain]
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = GridEnums.terrain_color(terrain)
+	mat.albedo_color = EnvironmentArt.side_color(terrain)
 	mat.roughness = 0.9
 	_material_cache[terrain] = mat
 	return mat

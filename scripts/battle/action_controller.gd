@@ -306,6 +306,7 @@ func _execute_item(anchor: Vector2i) -> void:
 		return
 
 	caster.face_toward(anchor)
+	caster.play_anim("cast")
 	var result := ItemResolver.resolve(caster.inventory, item, target)
 	_spawn_item_visuals(result)
 	_push_combat_log_item(caster, item, target, result)
@@ -413,6 +414,7 @@ func _execute_skill(anchor: Vector2i) -> void:
 	var turn_number: int = _turn_manager.get_turn_number()
 
 	caster.face_toward(anchor)
+	caster.play_action_anim(skill)
 	caster.set_state(UnitEnums.UnitState.ACTING)
 
 	var result := AbilityResolver.resolve(caster, skill, anchor, _grid, all_units, turn_number)
