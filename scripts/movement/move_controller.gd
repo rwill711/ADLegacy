@@ -217,7 +217,10 @@ func _on_tile_clicked(coord: Vector2i, button_index: int) -> void:
 func execute_move(unit: Unit, goal: Vector2i) -> void:
 	if _executing or unit == null:
 		return
-	var path: Array = Pathfinder.find_path(_grid, unit, goal)
+	# Same ally pass-through rules the AI used to pick `goal` from
+	# reachable_tiles — without them the path detours past the move budget
+	# or fails outright when an ally is in the way.
+	var path: Array = Pathfinder.find_path(_grid, unit, goal, _build_ally_ids(unit))
 	if path.size() < 2:
 		return
 	await _execute_path(unit, path)

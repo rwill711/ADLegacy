@@ -254,7 +254,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	# cancels the end-turn.
 	if _turn_manager.get_phase() == TurnEnums.TurnPhase.CHOOSING_FACING:
 		return
+	# A modal menu owns the keyboard (it handles its own Esc).
+	if OverlayScreen.is_any_open(get_tree()):
+		return
 	if event.is_action_pressed("cancel_action"):
+		# Esc also dismisses the unit Status panel.
+		if _inspect_panel != null and _inspect_panel.visible:
+			_hide_unit_inspect()
+			return
 		_action_controller.cancel_targeting()
 		return
 	if event.is_action_pressed("end_turn"):
@@ -289,8 +296,8 @@ func _on_turn_started(unit: Unit) -> void:
 	await _check_turn_triggers()
 
 	if unit.team != UnitEnums.Team.PLAYER:
-		# Run the enemy brain. Async so we can sequence think-delay → act →
-		# move → act again → end.
+		# Run the enemy brain. Async so we can sequence think-delay → plan →
+		# move → act → reposition → end.
 		_run_enemy_turn(unit)
 
 
@@ -300,25 +307,23 @@ func _run_enemy_turn(unit: Unit) -> void:
 	if not _still_this_unit_turn(unit):
 		return
 
-	# First pass: can we already hit someone?
-	var acted: bool = _action_controller.enemy_act_if_possible(unit)
-	if acted:
+	# Pick the best tile to act from (possibly where we stand). If it's
+	# elsewhere, move first; otherwise act first and reposition after.
+	var plan: Dictionary = _action_controller.plan_enemy_turn(unit)
+	if plan["move_to"] != unit.coord:
+		await _move_controller.execute_move(unit, plan["move_to"])
+		if not _still_this_unit_turn(unit):
+			return
+
+	if not _turn_manager.has_acted() \
+	and _action_controller.enemy_act_if_possible(unit):
 		await get_tree().create_timer(enemy_think_delay).timeout
 
-	# Move toward the nearest enemy if we still have the move.
+	# Acted in place with the move still unused: step to a safer / better spot.
 	if _still_this_unit_turn(unit) and not _turn_manager.has_moved():
-		var goal: Vector2i = _closest_reachable_toward_enemy(unit)
+		var goal: Vector2i = _action_controller.reposition_tile(unit)
 		if goal != unit.coord:
 			await _move_controller.execute_move(unit, goal)
-
-			if not _still_this_unit_turn(unit):
-				return
-
-			# Second pass: now that we moved, maybe we can hit.
-			if not _turn_manager.has_acted():
-				acted = _action_controller.enemy_act_if_possible(unit)
-				if acted:
-					await get_tree().create_timer(enemy_think_delay).timeout
 
 	if _still_this_unit_turn(unit):
 		# Auto-face toward the nearest remaining hostile so the enemy's back
@@ -327,31 +332,6 @@ func _run_enemy_turn(unit: Unit) -> void:
 		if threat != null:
 			unit.face_toward(threat.coord)
 		_turn_manager.end_turn_immediate()
-
-
-## Pick the reachable tile closest (manhattan) to the nearest hostile unit.
-## If already in attack range, stays put. If no hostile alive, no movement.
-func _closest_reachable_toward_enemy(unit: Unit) -> Vector2i:
-	var nearest_enemy: Unit = _nearest_hostile(unit)
-	if nearest_enemy == null:
-		return unit.coord
-
-	var ally_ids: Dictionary = {}
-	for ally in _unit_spawner.get_units_on_team(unit.team):
-		if ally.unit_id != unit.unit_id and ally.is_alive():
-			ally_ids[ally.unit_id] = true
-	var reachable: Dictionary = Pathfinder.reachable_tiles(_grid, unit, ally_ids)
-	if reachable.is_empty():
-		return unit.coord
-
-	var best_coord: Vector2i = unit.coord
-	var best_dist: int = BattleGrid.manhattan(unit.coord, nearest_enemy.coord)
-	for coord in reachable:
-		var dist: int = BattleGrid.manhattan(coord, nearest_enemy.coord)
-		if dist < best_dist:
-			best_dist = dist
-			best_coord = coord
-	return best_coord
 
 
 func _nearest_hostile(unit: Unit) -> Unit:
@@ -955,6 +935,8 @@ func _build_deploy_panel(units: Array) -> void:
 	equip_btn.text = "Set Equipment"
 	equip_btn.add_theme_font_size_override("font_size", 13)
 	equip_btn.pressed.connect(func():
+		if OverlayScreen.is_any_open(get_tree()):
+			return  # already open — don't stack a second copy
 		var screen := EquipmentScreen.new()
 		screen.init(player_units)
 		add_child(screen)
@@ -1023,6 +1005,8 @@ func _deploy_move_unit(unit: Unit, to: Vector2i) -> void:
 
 
 func _confirm_deployment() -> void:
+	# Battle is starting — sweep away any menu left open during deployment.
+	OverlayScreen.close_all(get_tree())
 	_deploying = false
 	_deploy_selected = null
 	for coord in _deploy_zone:

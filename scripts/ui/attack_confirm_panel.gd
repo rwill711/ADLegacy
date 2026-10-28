@@ -94,24 +94,7 @@ func hide_confirm() -> void:
 
 
 static func _estimate_label(skill: SkillData, caster: Unit, target: Unit, side: int) -> String:
-	var is_physical: bool = skill.skill_type == SkillEnums.SkillType.PHYSICAL_DAMAGE
-	var is_magic: bool    = skill.skill_type == SkillEnums.SkillType.MAGIC_DAMAGE
-	if not (is_physical or is_magic):
+	var est_dmg: int = AbilityResolver.estimate_damage(skill, caster, target, side)
+	if est_dmg <= 0:
 		return ""
-
-	var attack_stat: int  = caster.stats.attack  if is_physical else caster.stats.magic
-	var defense_stat: int = target.stats.defense if is_physical else target.stats.resistance
-
-	var facing_mod: float
-	match side:
-		0: facing_mod = AbilityResolver.FRONT_MOD
-		1: facing_mod = AbilityResolver.FLANK_MOD
-		2: facing_mod = AbilityResolver.REAR_MOD
-		_: facing_mod = AbilityResolver.FLANK_MOD
-
-	var base: float = float(attack_stat) * skill.power
-	if side == 2 and skill.requires_rear_for_bonus:
-		base *= skill.rear_bonus_multiplier
-
-	var est_dmg: int = maxi(1, int(base * facing_mod) - defense_stat)
 	return "Est. damage: ~%d" % est_dmg

@@ -1,8 +1,6 @@
-class_name EquipmentScreen extends CanvasLayer
+class_name EquipmentScreen extends OverlayScreen
 ## Per-unit equipment management overlay shown during deployment.
 ## Stub — full implementation deferred. Lists units and their gear slots.
-
-signal closed
 
 var _units: Array = []
 
@@ -14,26 +12,8 @@ func init(units: Array) -> void:
 
 
 func _build_ui() -> void:
-	var panel := PanelContainer.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(520, 400)
-	add_child(panel)
-
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 20)
-	panel.add_child(margin)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	margin.add_child(vbox)
-
-	var title := Label.new()
-	title.text = "Equipment"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 22)
-	title.add_theme_color_override("font_color", Color(0.95, 0.85, 0.45))
-	vbox.add_child(title)
+	var frame: Dictionary = _build_frame(Vector2(520, 520), "Equipment")
+	var body: VBoxContainer = frame["body"]
 
 	for unit in _units:
 		if unit == null:
@@ -42,7 +22,7 @@ func _build_ui() -> void:
 		unit_lbl.text = unit.display_name
 		unit_lbl.add_theme_font_size_override("font_size", 15)
 		unit_lbl.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
-		vbox.add_child(unit_lbl)
+		body.add_child(unit_lbl)
 
 		if unit.equipment != null:
 			var slots := [
@@ -58,27 +38,8 @@ func _build_ui() -> void:
 				var row_lbl := Label.new()
 				row_lbl.text = "    %-12s %s" % [slot_name + ":", item_name]
 				row_lbl.add_theme_font_size_override("font_size", 13)
-				vbox.add_child(row_lbl)
+				body.add_child(row_lbl)
 
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(spacer)
-
-	var note := Label.new()
-	note.text = "Full equipment management coming soon."
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.add_theme_font_size_override("font_size", 12)
-	note.modulate = Color(0.6, 0.6, 0.6)
-	vbox.add_child(note)
-
-	var close_btn := Button.new()
-	close_btn.text = "Close"
-	close_btn.custom_minimum_size = Vector2(140, 42)
-	close_btn.add_theme_font_size_override("font_size", 15)
-	close_btn.pressed.connect(_on_close)
-	vbox.add_child(close_btn)
-
-
-func _on_close() -> void:
-	closed.emit()
-	queue_free()
+	var footer: VBoxContainer = frame["footer"]
+	_add_footer_note(footer, "Full equipment management coming soon.  (Esc to close)")
+	_add_footer_button(footer, "Close", close)

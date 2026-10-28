@@ -176,6 +176,24 @@ static func _apply_damage(
 # PREDICATES / HELPERS
 # =============================================================================
 
+## Deterministic damage preview (no hit roll, no mutation). Mirrors
+## _apply_damage so the confirm panel and the enemy AI see real numbers.
+## Returns 0 for non-damage skills.
+static func estimate_damage(skill: SkillData, caster: Unit, target: Unit, side: int) -> int:
+	var is_physical: bool = skill.skill_type == SkillEnums.SkillType.PHYSICAL_DAMAGE
+	var is_magic: bool    = skill.skill_type == SkillEnums.SkillType.MAGIC_DAMAGE
+	if not (is_physical or is_magic):
+		return 0
+	var attack_stat: int  = caster.stats.attack  if is_physical else caster.stats.magic
+	var defense_stat: int = target.stats.defense if is_physical else target.stats.resistance
+	var facing_mod: float = _side_modifier(side)
+	var base: float = float(attack_stat) * skill.power
+	if side == 2 and skill.requires_rear_for_bonus:
+		facing_mod = 1.0
+		base *= skill.rear_bonus_multiplier
+	return maxi(1, int(base * facing_mod) - defense_stat)
+
+
 ## Public helper used by the pre-confirm UI (Bite 3) to show hit% before
 ## committing. side: 0=front, 1=flank, 2=rear.
 static func calc_hit_chance(skill: SkillData, target: Unit, side: int) -> int:

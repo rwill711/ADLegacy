@@ -25,6 +25,10 @@ class_name ActionController extends Node
 const AP_PER_SKILL_USE: int = 50
 const AP_KILL_BONUS: int = 25
 
+## Enemy AI tuning.
+const AI_LETHAL_BONUS: int = 80        ## Score bonus for a likely killing blow
+const AI_ADJACENT_THREAT_PENALTY: int = 15  ## Ranged units: per hostile adjacent to the tile
+
 
 ## --- State ------------------------------------------------------------------
 enum ActionState { IDLE, SELECTING_SKILL, SELECTING_TARGET, CONFIRMING, EXECUTING }
@@ -478,8 +482,110 @@ func _pick_enemy_action(unit: Unit, all_units: Array) -> Dictionary:
 			var score: int = _score_enemy_target(unit, skill, anchor, all_units)
 			if score > best_score:
 				best_score = score
-				best = {"skill": skill, "anchor": anchor}
+				best = {"skill": skill, "anchor": anchor, "score": score}
 	return best
+
+
+## Decide where an enemy should stand this turn. Scores the best action
+## available from its current tile and from every reachable tile, and
+## returns {"move_to": Vector2i, "will_act": bool}. When nothing is in reach
+## anywhere, falls back to repositioning toward the fight.
+func plan_enemy_turn(unit: Unit) -> Dictionary:
+	var all_units: Array = _unit_spawner.get_all_units()
+	var origin: Vector2i = unit.coord
+	var ranged: bool = _preferred_range(unit) > 1
+
+	var best_tile: Vector2i = origin
+	var here: Dictionary = _pick_enemy_action(unit, all_units)
+	var best_score: int = here.get("score", -1)
+	if best_score >= 0 and ranged:
+		best_score -= _adjacent_hostiles(unit, origin, all_units) * AI_ADJACENT_THREAT_PENALTY
+
+	# Score each reachable tile by pretending the unit stands there. Targeting
+	# and the side calc read unit.coord, so a temporary swap is enough.
+	for coord in _enemy_reachable(unit):
+		unit.coord = coord
+		var plan: Dictionary = _pick_enemy_action(unit, all_units)
+		unit.coord = origin
+		if plan.is_empty():
+			continue
+		var score: int = plan["score"]
+		if ranged:
+			score -= _adjacent_hostiles(unit, coord, all_units) * AI_ADJACENT_THREAT_PENALTY
+		if score > best_score:
+			best_score = score
+			best_tile = coord
+
+	if best_score < 0:
+		return {"move_to": reposition_tile(unit), "will_act": false}
+	return {"move_to": best_tile, "will_act": true}
+
+
+## Where to stand when not attacking (or after attacking): close to the
+## nearest hostile, but no closer than the unit's preferred range so mages
+## and archers don't wander into melee.
+func reposition_tile(unit: Unit) -> Vector2i:
+	var all_units: Array = _unit_spawner.get_all_units()
+	var desired: int = _preferred_range(unit)
+	var best: Vector2i = unit.coord
+	var best_key: Vector2i = _reposition_key(unit, unit.coord, desired, all_units)
+	for coord in _enemy_reachable(unit):
+		var key: Vector2i = _reposition_key(unit, coord, desired, all_units)
+		if key.x < best_key.x or (key.x == best_key.x and key.y < best_key.y):
+			best_key = key
+			best = coord
+	return best
+
+
+## Sort key for reposition: (distance from preferred range, adjacent threats).
+func _reposition_key(unit: Unit, coord: Vector2i, desired: int, all_units: Array) -> Vector2i:
+	var nearest: int = 999999
+	for other in all_units:
+		if other == null or other == unit or not other.is_alive():
+			continue
+		if UnitEnums.teams_are_hostile(unit.team, other.team):
+			nearest = mini(nearest, BattleGrid.manhattan(coord, other.coord))
+	if nearest == 999999:
+		return Vector2i(0, 0)
+	var threats: int = _adjacent_hostiles(unit, coord, all_units) if desired > 1 else 0
+	return Vector2i(absi(nearest - desired), threats)
+
+
+func _enemy_reachable(unit: Unit) -> Array:
+	var ally_ids: Dictionary = {}
+	for ally in _unit_spawner.get_units_on_team(unit.team):
+		if ally.unit_id != unit.unit_id and ally.is_alive():
+			ally_ids[ally.unit_id] = true
+	return Pathfinder.reachable_tiles(_grid, unit, ally_ids).keys()
+
+
+## Range the unit wants to fight from: the reach of its strongest attack, so a
+## Squire's stone_throw doesn't make it hang back. Units whose best attack is
+## weak (power < 1.0, e.g. White Mage's staff_bonk) are support and stay at
+## healing range instead.
+static func _preferred_range(unit: Unit) -> int:
+	var best_power: float = 0.0
+	var range_out: int = 1
+	for skill in unit.skills:
+		if skill.is_offensive() and skill.power > best_power:
+			best_power = skill.power
+			range_out = maxi(1, skill.max_range)
+	if best_power < 1.0:
+		for skill in unit.skills:
+			if skill.skill_type == SkillEnums.SkillType.HEALING:
+				range_out = maxi(range_out, skill.max_range)
+	return range_out
+
+
+static func _adjacent_hostiles(unit: Unit, coord: Vector2i, all_units: Array) -> int:
+	var count: int = 0
+	for other in all_units:
+		if other == null or other == unit or not other.is_alive():
+			continue
+		if UnitEnums.teams_are_hostile(unit.team, other.team) \
+		and BattleGrid.manhattan(coord, other.coord) == 1:
+			count += 1
+	return count
 
 
 static func _score_enemy_target(
@@ -496,8 +602,14 @@ static func _score_enemy_target(
 	if skill.is_offensive():
 		if not UnitEnums.teams_are_hostile(unit.team, target.team):
 			return -1
-		var missing: int = target.stats.max_hp - target.stats.hp
-		base_score = 100 + missing
+		# Expected damage (estimate × hit chance) plus a lethality bonus, so
+		# the AI finishes off weak targets and values rear attacks.
+		var side: int = UnitEnums.attack_side(unit.coord, target.coord, target.facing)
+		var hit: int = AbilityResolver.calc_hit_chance(skill, target, side)
+		var est: int = AbilityResolver.estimate_damage(skill, unit, target, side)
+		base_score = 100 + (mini(est, target.stats.hp) * hit) / 100 * 3
+		if est >= target.stats.hp:
+			base_score += AI_LETHAL_BONUS * hit / 100
 	elif skill.skill_type == SkillEnums.SkillType.HEALING:
 		if UnitEnums.teams_are_hostile(unit.team, target.team):
 			return -1
